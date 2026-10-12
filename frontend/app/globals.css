@@ -24,3 +24,95 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.booking-shell {
+  min-height: 100vh;
+  color: #1e2934;
+  background: #f5f7f8;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.booking-header {
+  height: 76px;
+  padding: 0 max(6vw, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e8edef;
+}
+
+.brand { display: inline-flex; align-items: center; gap: 10px; color: #173a35; text-decoration: none; font-size: 20px; font-weight: 750; letter-spacing: -.5px; }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: white; background: #16866e; font-size: 17px; }
+.header-note { color: #84918e; font-size: 13px; }
+.booking-content { max-width: 1080px; margin: 0 auto; padding: 42px 24px 64px; }
+.back-link { display: inline-block; margin-bottom: 38px; color: #58716b; text-decoration: none; font-size: 13px; font-weight: 600; }
+.back-link:hover { color: #13816b; }
+.eyebrow, .route-label { color: #1b806a; font-size: 10px; font-weight: 750; letter-spacing: 1.2px; }
+.booking-content h1 { margin: 8px 0 9px; color: #193b34; font-size: clamp(30px, 4vw, 39px); letter-spacing: -1.2px; }
+.intro { max-width: 570px; margin: 0; color: #71807d; font-size: 14px; line-height: 1.7; }
+.booking-grid { display: grid; grid-template-columns: 1fr 1.04fr; gap: 22px; margin-top: 32px; align-items: start; }
+.trip-card, .details-card { border: 1px solid #e6ecea; border-radius: 14px; background: #fff; box-shadow: 0 8px 28px #173a3508; }
+.trip-card { padding: 25px 26px 21px; }
+.trip-card-top, .card-heading { display: flex; align-items: center; justify-content: space-between; }
+.trip-badge, .step-pill { border-radius: 20px; padding: 6px 9px; color: #60736e; background: #f3f6f5; font-size: 9px; font-weight: 700; letter-spacing: .6px; }
+.trip-card h2 { margin: 17px 0 23px; color: #193b34; font-size: 22px; letter-spacing: -.55px; }
+.journey-line { position: relative; display: grid; gap: 19px; }
+.journey-stop { position: relative; z-index: 1; display: flex; align-items: center; gap: 13px; background: #fff; }
+.stop-dot { width: 11px; height: 11px; flex: 0 0 11px; border: 2px solid #199078; border-radius: 50%; background: white; }
+.stop-dot.end { border-color: #ee9c64; background: #fff8f2; }
+.journey-connector { position: absolute; top: 9px; left: 5px; height: 37px; border-left: 1px dashed #b9cac5; }
+.journey-stop strong, .journey-stop small { display: block; }
+.journey-stop strong { color: #30443f; font-size: 13px; }
+.journey-stop small { margin-top: 4px; color: #8a9794; font-size: 11px; }
+.trip-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; padding: 16px 0; border-top: 1px solid #edf1f0; border-bottom: 1px solid #edf1f0; }
+.trip-meta > div { display: flex; align-items: center; gap: 9px; }
+.meta-icon { color: #17836d; font-size: 19px; }
+.trip-meta small, .trip-meta strong { display: block; }
+.trip-meta small { margin-bottom: 5px; color: #879490; font-size: 10px; }
+.trip-meta strong { color: #3b4c48; font-size: 11px; }
+.availability { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #26745f; font-size: 12px; font-weight: 700; }
+.availability-dot { width: 7px; height: 7px; border-radius: 50%; background: #27a47f; box-shadow: 0 0 0 3px #e7f5ef; }
+.availability.sold-out { color: #a34940; }
+.availability.sold-out .availability-dot { background: #c95d50; box-shadow: 0 0 0 3px #f9ecea; }
+.capacity-note { margin-left: auto; color: #99a39f; font-size: 10px; font-weight: 500; }
+.details-card { padding: 25px 26px; }
+.card-heading h2 { margin: 7px 0 22px; color: #193b34; font-size: 18px; letter-spacing: -.4px; }
+.step-pill { color: #788984; font-size: 8px; }
+.field-label { display: block; margin-bottom: 10px; color: #40534e; font-size: 12px; font-weight: 700; }
+.passenger-control { display: flex; align-items: center; justify-content: space-between; max-width: 180px; padding: 5px; border: 1px solid #e3eae8; border-radius: 9px; }
+.passenger-control button { width: 33px; height: 32px; border: 0; border-radius: 6px; color: #1c7765; background: #eef7f4; cursor: pointer; font-size: 18px; }
+.passenger-control button:disabled { color: #aeb9b5; background: #f4f6f5; cursor: not-allowed; }
+.passenger-control output { color: #304640; font-size: 13px; font-weight: 700; }
+.passenger-control output span { color: #84918d; font-weight: 400; }
+.field-hint { margin: 8px 0 20px; color: #9aa5a2; font-size: 10px; }
+.fare-breakdown { padding: 14px 0 4px; border-top: 1px solid #edf1f0; }
+.fare-breakdown > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: #7d8986; font-size: 11px; }
+.fare-breakdown strong { color: #4a5d57; font-size: 11px; }
+.fare-breakdown .fare-total { margin-top: 15px; padding-top: 14px; border-top: 1px dashed #dce5e2; color: #304840; font-size: 12px; font-weight: 700; }
+.fare-breakdown .fare-total strong { color: #16816a; font-size: 17px; }
+.fare-note { margin: -1px 0 17px; color: #96a19e; font-size: 10px; line-height: 1.5; }
+.confirm-button { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; gap: 12px; border: 0; border-radius: 8px; color: #fff; background: #16836d; cursor: pointer; font-size: 12px; font-weight: 700; transition: background .15s ease; }
+.confirm-button:hover:not(:disabled) { background: #106e5b; }
+.confirm-button:disabled { background: #a8b8b3; cursor: not-allowed; }
+.message { display: flex; flex-direction: column; gap: 6px; margin: 13px 0 0; padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.5; }
+.error-message { color: #943f37; background: #fff1ef; }
+.success-message { color: #24664f; background: #edf8f2; }
+.success-message strong { font-size: 13px; }
+.success-message b { letter-spacing: .7px; }
+.booking-footnote { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; color: #95a09d; font-size: 10px; }
+.booking-footnote span { color: #508e7d; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .booking-header { height: 64px; }
+  .booking-content { padding: 26px 18px 48px; }
+  .back-link { margin-bottom: 29px; }
+  .booking-grid { grid-template-columns: 1fr; gap: 15px; margin-top: 25px; }
+  .trip-card, .details-card { padding: 21px; }
+}
+
+@media (max-width: 380px) {
+  .header-note { font-size: 11px; }
+  .trip-meta { grid-template-columns: 1fr; }
+  .booking-content { padding-right: 14px; padding-left: 14px; }
+}
