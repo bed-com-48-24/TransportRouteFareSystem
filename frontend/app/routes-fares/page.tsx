@@ -111,22 +111,22 @@ export default function RoutesFaresPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center px-5 pb-12 pt-14 text-center sm:px-8 sm:pb-16 sm:pt-20">
           <section className="max-w-3xl">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-white">
-              YOUR JOURNEY STARTS WITH A WELCOME
+              ROUTES, FARES &amp; LOCAL TRAVEL
             </p>
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              A warmer welcome to every journey.
+              Know the way before you go.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white sm:text-lg">
-              Find your route, explore your options, and feel at home from the
-              moment you set off. Wherever you are going, we are glad you are
-              here.
+              Search a destination and get ready to explore bus and taxi
+              options. We’ll make it clear when verified route and fare
+              information is available.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2.5 text-sm font-medium text-white">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
                 <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
                   <path d="m4 10 4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Simple route search
+                Destination search
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
                 <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
@@ -256,6 +256,95 @@ export default function RoutesFaresPage() {
       </section>
 
       <div className="mx-auto max-w-6xl px-5 pb-16 pt-8 sm:px-8 sm:pt-10">
+        <section
+          aria-labelledby="routes-fares-heading"
+          className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+              PLAN WITH CONFIDENCE
+            </p>
+            <h2
+              id="routes-fares-heading"
+              className="mt-2 text-2xl font-bold tracking-tight text-[#14233b]"
+            >
+              Routes &amp; fares, at a glance
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Find a destination first, then check the travel details that
+              matter before setting off.
+            </p>
+          </div>
+          <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+            <article className="bg-white p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eef2f7] text-[#29466d]">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="size-5"
+                  >
+                    <path
+                      d="M4 15.5 5.5 9a2 2 0 0 1 1.94-1.5h9.12A2 2 0 0 1 18.5 9l1.5 6.5V19h-2v-2H6v2H4v-3.5ZM6 13h12M8 10h.01M16 10h.01"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="font-semibold text-[#14233b]">
+                    Route options
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Search by town or city to start exploring bus and taxi
+                    travel. Verified routes, stops, and departure times are not
+                    connected yet.
+                  </p>
+                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                    Route data coming soon
+                  </span>
+                </div>
+              </div>
+            </article>
+            <article className="bg-white p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eef2f7] text-[#29466d]">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="size-5"
+                  >
+                    <path
+                      d="M12 3v18m4-14.5c-.7-1-2-1.5-4-1.5-2.2 0-3.5 1-3.5 2.5S10 10 12 10s3.5 1 3.5 2.5S14.2 15 12 15c-2 0-3.3-.5-4-1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <div>
+                  <h3 className="font-semibold text-[#14233b]">
+                    Fare estimates
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Fares can vary by operator and service. We don’t show
+                    unverified prices; please confirm the current fare with
+                    your transport provider.
+                  </p>
+                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                    Verified fares coming soon
+                  </span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
         <div aria-live="polite" aria-atomic="true">
           {searchedDestination === null ? (
             <section
@@ -288,11 +377,11 @@ export default function RoutesFaresPage() {
                 id="start-search-heading"
                 className="mt-4 text-lg font-semibold text-[#14233b]"
               >
-                Start with a destination
+                Find a route to your destination
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                Enter a town or city above to check whether verified travel
-                information is available.
+                Choose a popular destination or search for a town or city
+                above. We’ll show the travel information status for it here.
               </p>
             </section>
           ) : (
@@ -326,17 +415,16 @@ export default function RoutesFaresPage() {
                 id="travel-information-heading"
                 className="mt-4 text-lg font-semibold text-[#14233b]"
               >
-                {searchedDestination} is ready to explore
+                Travel information for {searchedDestination}
               </h2>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                Your destination has been added to your search. Confirmed bus
-                and taxi routes, fares, and departure times are not available
-                here yet because verified travel information has not been
-                connected.
+                We don’t have verified bus or taxi routes, fare estimates, or
+                departure times for this destination yet. Please confirm
+                available services and current prices with a local transport
+                provider.
               </p>
-              <p className="mt-3 text-xs text-slate-500">
-                Please confirm travel options and current prices with your
-                transport provider.
+              <p className="mt-4 inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                Verified route and fare details are not available yet
               </p>
             </section>
           )}
