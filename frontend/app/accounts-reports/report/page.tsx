@@ -1,8 +1,9 @@
 "use client";
-
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export default function ReportPage() {
+  const router = useRouter();
   const [reportType, setReportType] = useState("Route");
   const [itemName, setItemName] = useState("");
   const [description, setDescription] = useState("");
@@ -11,18 +12,22 @@ export default function ReportPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
+  
+    if(!reportType || !itemName || !description) {
+      setMessage("Please fill in all required fields.");
+      return;
+    }
     setMessage(
-      "Report form validated. Submitting reports will be connected to the backend later."
-    );
+      "Report form validated. Submitting reports will be connected.");
+      router.push("/accounts-reports/home");
+
   }
 
   return (
     <main className="report-container">
       <h1>Report Inaccurate Information</h1>
-      <p>
-        Help us improve public transport information by reporting
-        incorrect or outdated details.
+      <p>Report
+        incorrect or fare details.
       </p>
 
       <form onSubmit={handleSubmit}>
