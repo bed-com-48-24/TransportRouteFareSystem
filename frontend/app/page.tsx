@@ -7,9 +7,11 @@ export default function Home() {
         <Link className="brand" href="/">
           <span className="brand-mark">R</span> RouteWise
         </Link>
-        <Link className="home-nav-link" href="/transport-booking">
-          Bookings
-        </Link>
+        <div className="home-nav-links">
+          <Link className="home-nav-link" href="/routes-fares">Routes & fares</Link>
+          <Link className="home-nav-link" href="/transport-booking">Bookings</Link>
+          <Link className="home-nav-link" href="/accounts-reports/login">Account</Link>
+        </div>
       </nav>
 
       <section className="home-hero">
@@ -32,18 +34,18 @@ export default function Home() {
       <section className="home-feature-row">
         <article>
           <span>01</span>
-          <strong>Choose a trip</strong>
-          <p>See departure details and live demo seat availability.</p>
+          <strong>Find routes and fares</strong>
+          <p>Search popular destinations and compare estimated fares.</p>
         </article>
         <article>
           <span>02</span>
-          <strong>Enter your details</strong>
-          <p>Select your travel date, pickup and drop-off points.</p>
+          <strong>Choose a trip</strong>
+          <p>See departure details and demo seat availability.</p>
         </article>
         <article>
           <span>03</span>
-          <strong>Get confirmed</strong>
-          <p>Receive a unique booking reference instantly.</p>
+          <strong>Manage your account</strong>
+          <p>Register, update your profile, and view support reports.</p>
         </article>
       </section>
     </main>
