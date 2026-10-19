@@ -25,7 +25,7 @@ const services = [
     title: "Report Information",
     description: "Report incorrect route or fare details.",
     icon: "📝",
-    href: "/reports",
+    href: "/accounts-reports/report",
   },
 ];
 
@@ -33,17 +33,18 @@ export default function HomePage() {
   const router = useRouter();
 
   return (
-    <main className="min-h-screen w-full max-w-3xl mx-auto overflow-y-auto bg-gray-50">
+    <main className="min-h-screen bg-slate-200 px-4 py-6">
+      <div className="mx-auto max-w-2xl rounded-xl bg-white shadow-md">
       {/* Navigation */}
       <header className="bg-white shadow-sm">
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+        <nav className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3">
           <button
             onClick={() => router.push("/")}
-            className="flex items-center gap-3 text-left"
+            className="flex items-center gap-2 text-left"
           >
-            <span className="text-3xl">🚌</span>
+            <span className="text-2xl">🚌</span>
             <span>
-              <span className="block text-lg font-bold text-slate-900">
+              <span className="block text-base font-bold text-slate-900">
                 Transport Hub
               </span>
               <span className="block text-xs text-slate-500">
@@ -86,25 +87,20 @@ export default function HomePage() {
       </header>
 
       {/* Hero section */}
-      <section className="bg-[#12304A] text-white px-5 py-8 min-h-0">
-        <div className="mx-auto max-w-7xl px-6 py-16 md:py-20">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-sky-300">
+      <section className="bg-[#12304A] text-white">
+        <div className=" px-5 py-5">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-sky-300">
             Your journey starts here
           </p>
 
-          <h1 className="text-3xl font-bold">
+          <h1 className="max-w-2xl text-2xl font-bold leading-tight md:text-3xl">
             Travel smarter. Know your route.
           </h1>
 
-          <p className="mt-5 max-w-xl leading-7 text-slate-300">
-            Find bus routes, check fare information and access
-            transport services in one convenient place.
-          </p>
-
-          <div className="mt-8 flex flex-wrap gap-4">
+          <div className="mt-4 flex flex-wrap gap-4">
             <button
               onClick={() => router.push("/routes")}
-              className="rounded-lg bg-white px-6 py-3 font-semibold text-[#12304A] hover:bg-sky-100"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-sky-100"
             >
               🗺️ Find Routes
             </button>
@@ -120,34 +116,32 @@ export default function HomePage() {
       </section>
 
       {/* Services */}
-      <section className="mx-auto max-w-7xl px-6 py-12">
+      <section className="px-5 py-4">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-base font-bold text-slate-900">
             Explore Our Services
           </h2>
-          <p className="mt-2 text-slate-600">
-            Information and services for passengers and company staff.
-          </p>
+          
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3">
           {services.map((service) => (
             <button
               key={service.title}
               onClick={() => router.push(service.href)}
-              className="rounded-xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="rounded-lg border border-slate-200 bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
-              <span className="text-3xl">{service.icon}</span>
+              <span className="text-xl">{service.icon}</span>
 
-              <h3 className="mt-4 text-lg font-semibold text-slate-900">
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">
                 {service.title}
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-1 text-sm leading-4 text-slate-600">
                 {service.description}
               </p>
 
-              <span className="mt-5 inline-block text-sm font-semibold text-blue-700">
+              <span className="mt-2 inline-block text-xs font-semibold text-blue-700">
                 Explore →
               </span>
             </button>
@@ -156,14 +150,15 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-8 border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6 text-sm text-slate-500">
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="px-5 py-3 text-xs text-slate-500">
           Transport Route and Fare Information System
           <span className="mt-1 block">
             Helping passengers access transport information.
           </span>
         </div>
       </footer>
+      </div>
     </main>
   );
 }
