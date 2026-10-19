@@ -6,6 +6,94 @@ import Link from "next/link";
 const brandName = "Mthunzi Express";
 const popularDestinations = ["Blantyre", "Lilongwe", "Mzuzu", "Zomba", "Salima"];
 
+<<<<<<< HEAD
+=======
+type RouteOption = {
+  id: string;
+  origin: string;
+  destination: string;
+  service: string;
+  pickupPoint: string;
+  dropOffPoint: string;
+  estimatedFare: number;
+};
+
+const sampleRoutes: RouteOption[] = [
+  {
+    id: "blantyre-lilongwe-coach",
+    origin: "Blantyre",
+    destination: "Lilongwe",
+    service: "Intercity coach",
+    pickupPoint: "Blantyre central bus depot (sample stop)",
+    dropOffPoint: "Lilongwe bus terminal (sample stop)",
+    estimatedFare: 30000,
+  },
+  {
+    id: "blantyre-zomba-minibus",
+    origin: "Blantyre",
+    destination: "Zomba",
+    service: "Minibus",
+    pickupPoint: "Blantyre central bus depot (sample stop)",
+    dropOffPoint: "Zomba bus terminal (sample stop)",
+    estimatedFare: 8000,
+  },
+  {
+    id: "lilongwe-blantyre-coach",
+    origin: "Lilongwe",
+    destination: "Blantyre",
+    service: "Intercity coach",
+    pickupPoint: "Lilongwe bus terminal (sample stop)",
+    dropOffPoint: "Blantyre central bus depot (sample stop)",
+    estimatedFare: 30000,
+  },
+  {
+    id: "lilongwe-mzuzu-coach",
+    origin: "Lilongwe",
+    destination: "Mzuzu",
+    service: "Intercity coach",
+    pickupPoint: "Lilongwe bus terminal (sample stop)",
+    dropOffPoint: "Mzuzu bus terminal (sample stop)",
+    estimatedFare: 22000,
+  },
+  {
+    id: "lilongwe-salima-minibus",
+    origin: "Lilongwe",
+    destination: "Salima",
+    service: "Minibus",
+    pickupPoint: "Lilongwe bus terminal (sample stop)",
+    dropOffPoint: "Salima bus terminal (sample stop)",
+    estimatedFare: 7000,
+  },
+  {
+    id: "mzuzu-lilongwe-coach",
+    origin: "Mzuzu",
+    destination: "Lilongwe",
+    service: "Intercity coach",
+    pickupPoint: "Mzuzu bus terminal (sample stop)",
+    dropOffPoint: "Lilongwe bus terminal (sample stop)",
+    estimatedFare: 22000,
+  },
+  {
+    id: "zomba-blantyre-minibus",
+    origin: "Zomba",
+    destination: "Blantyre",
+    service: "Minibus",
+    pickupPoint: "Zomba bus terminal (sample stop)",
+    dropOffPoint: "Blantyre central bus depot (sample stop)",
+    estimatedFare: 8000,
+  },
+  {
+    id: "salima-lilongwe-minibus",
+    origin: "Salima",
+    destination: "Lilongwe",
+    service: "Minibus",
+    pickupPoint: "Salima bus terminal (sample stop)",
+    dropOffPoint: "Lilongwe bus terminal (sample stop)",
+    estimatedFare: 7000,
+  },
+];
+
+>>>>>>> feature/routes-fares
 export default function RoutesFaresPage() {
   const [destination, setDestination] = useState("");
   const [searchedDestination, setSearchedDestination] = useState<string | null>(
@@ -45,6 +133,18 @@ export default function RoutesFaresPage() {
     setSearchedDestination(normalizedDestination);
   }
 
+<<<<<<< HEAD
+=======
+  const matchingRoutes =
+    searchedDestination === null
+      ? []
+      : sampleRoutes.filter((route) =>
+          route.destination
+            .toLocaleLowerCase()
+            .includes(searchedDestination.toLocaleLowerCase()),
+        );
+
+>>>>>>> feature/routes-fares
   return (
     <main className="min-h-screen bg-white text-[#26364d]">
       <a
@@ -117,9 +217,14 @@ export default function RoutesFaresPage() {
               Know the way before you go.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white sm:text-lg">
+<<<<<<< HEAD
               Search a destination and get ready to explore bus and taxi
               options. We’ll make it clear when verified route and fare
               information is available.
+=======
+              Search a destination to compare sample bus and minibus routes,
+              estimated fares, and where to board and get off.
+>>>>>>> feature/routes-fares
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2.5 text-sm font-medium text-white">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
@@ -223,6 +328,7 @@ export default function RoutesFaresPage() {
               </p>
             ) : (
               <div id="destination-help" className="mt-2 text-sm text-slate-600">
+<<<<<<< HEAD
                 <p>Enter a destination to check for travel information.</p>
                 <p className="sr-only">
                   Screen reader instructions: Type a town or city in the
@@ -230,6 +336,15 @@ export default function RoutesFaresPage() {
                   choose a popular destination button. Search results will be
                   announced after you search. Verified route, fare, and
                   departure information is not currently connected.
+=======
+                <p>Enter a destination to see matching sample routes.</p>
+                <p className="sr-only">
+                  Screen reader instructions: Type a town or city in the
+                  Destination field, then activate Search routes. You can also
+                  choose a popular destination button. Matching sample routes,
+                  estimated fares, and pickup and drop-off points will be
+                  announced after you search.
+>>>>>>> feature/routes-fares
                 </p>
               </div>
             )}
@@ -271,8 +386,13 @@ export default function RoutesFaresPage() {
               Routes &amp; fares, at a glance
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+<<<<<<< HEAD
               Find a destination first, then check the travel details that
               matter before setting off.
+=======
+              Browse routes matching your destination, with sample fare
+              estimates and boarding points.
+>>>>>>> feature/routes-fares
             </p>
           </div>
           <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
@@ -299,12 +419,20 @@ export default function RoutesFaresPage() {
                     Route options
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
+<<<<<<< HEAD
                     Search by town or city to start exploring bus and taxi
                     travel. Verified routes, stops, and departure times are not
                     connected yet.
                   </p>
                   <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                     Route data coming soon
+=======
+                    Search by destination to see sample coach and minibus
+                    journeys, including where each journey starts and ends.
+                  </p>
+                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                    Sample route information
+>>>>>>> feature/routes-fares
                   </span>
                 </div>
               </div>
@@ -332,12 +460,20 @@ export default function RoutesFaresPage() {
                     Fare estimates
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
+<<<<<<< HEAD
                     Fares can vary by operator and service. We don’t show
                     unverified prices; please confirm the current fare with
                     your transport provider.
                   </p>
                   <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                     Verified fares coming soon
+=======
+                    Example estimates are shown in Malawi kwacha (MWK). Actual
+                    fares may differ by operator and service.
+                  </p>
+                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                    Indicative estimates only
+>>>>>>> feature/routes-fares
                   </span>
                 </div>
               </div>
@@ -381,12 +517,17 @@ export default function RoutesFaresPage() {
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Choose a popular destination or search for a town or city
+<<<<<<< HEAD
                 above. We’ll show the travel information status for it here.
+=======
+                above to see matching routes, fares, and stops.
+>>>>>>> feature/routes-fares
               </p>
             </section>
           ) : (
             <section
               aria-labelledby="travel-information-heading"
+<<<<<<< HEAD
               className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm"
             >
               <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#eef2f7] text-[#29466d]">
@@ -425,15 +566,105 @@ export default function RoutesFaresPage() {
               </p>
               <p className="mt-4 inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
                 Verified route and fare details are not available yet
+=======
+              className="mx-auto max-w-4xl"
+            >
+              <div className="mb-5">
+                <h2
+                  id="travel-information-heading"
+                  className="text-xl font-bold text-[#14233b]"
+                >
+                  Routes to {searchedDestination}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {matchingRoutes.length
+                    ? `${matchingRoutes.length} sample ${matchingRoutes.length === 1 ? "route" : "routes"} found.`
+                    : "No sample routes match this destination yet."}
+                </p>
+              </div>
+              {matchingRoutes.length ? (
+                <ul className="grid gap-4">
+                  {matchingRoutes.map((route) => (
+                    <li
+                      key={route.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                    >
+                      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-bold text-[#14233b]">
+                              {route.origin} <span aria-hidden="true">→</span>{" "}
+                              {route.destination}
+                            </h3>
+                            <span className="rounded-full bg-[#eef2f7] px-3 py-1 text-xs font-semibold text-[#29466d]">
+                              {route.service}
+                            </span>
+                          </div>
+                          <span className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                            Sample route
+                          </span>
+                        </div>
+                        <div className="sm:text-right">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Estimated fare
+                          </p>
+                          <p className="mt-0.5 text-xl font-bold text-[#14233b]">
+                            MWK {route.estimatedFare.toLocaleString("en-MW")}
+                          </p>
+                        </div>
+                      </div>
+                      <dl className="mt-5 grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Pickup point
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                            {route.pickupPoint}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Drop-off point
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                            {route.dropOffPoint}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center">
+                  <p className="text-sm text-slate-600">
+                    Try another destination or choose one of the popular towns
+                    above.
+                  </p>
+                </div>
+              )}
+              <p className="mt-4 text-xs leading-5 text-slate-500">
+                These sample stops and fare estimates are for demonstration
+                only, not confirmed operator information. Check the actual
+                pickup point and current fare with your transport provider
+                before travelling.
+>>>>>>> feature/routes-fares
               </p>
             </section>
           )}
         </div>
 
         <footer className="mx-auto mt-12 max-w-3xl border-t border-slate-200 pt-5 text-center text-xs leading-5 text-slate-500">
+<<<<<<< HEAD
           Search for destinations and get ready to explore your travel options.
+=======
+          Sample route information is for planning demonstrations only.
+>>>>>>> feature/routes-fares
         </footer>
       </div>
     </main>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> feature/routes-fares
