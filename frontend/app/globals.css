@@ -1,37 +1,37 @@
 @import "tailwindcss";
-
+ 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
-
+ 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
+ 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
 }
-
+ 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-
+ 
 .booking-shell {
   min-height: 100vh;
   color: #1e2934;
   background: #f5f7f8;
   font-family: Arial, Helvetica, sans-serif;
 }
-
+ 
 .booking-header {
   height: 76px;
   padding: 0 max(6vw, 24px);
@@ -41,7 +41,7 @@ body {
   background: #fff;
   border-bottom: 1px solid #e8edef;
 }
-
+ 
 .brand { display: inline-flex; align-items: center; gap: 10px; color: #17314a; text-decoration: none; font-size: 20px; font-weight: 750; letter-spacing: -.5px; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: white; background: #2563eb; font-size: 17px; }
 .header-note { color: #8491a4; font-size: 13px; }
@@ -144,7 +144,7 @@ body {
 .home-feature-row article > span { display: block; margin-bottom: 18px; color: #2563eb; font-size: 11px; font-weight: 800; }
 .home-feature-row strong { color: #34445c; font-size: 14px; }
 .home-feature-row p { margin: 7px 0 0; color: #8491a4; font-size: 11px; line-height: 1.6; }
-
+ 
 .trip-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 31px; }
 .trip-option { display: flex; min-height: 276px; flex-direction: column; padding: 21px; }
 .trip-option h2 { margin: 19px 0 17px; }
@@ -171,7 +171,7 @@ body {
 .lookup-row .confirm-button { min-height: 42px; }
 .booking-record-main a { color: #2563eb; font-size: 11px; font-weight: 700; text-decoration: none; }
 .booking-record-main a:hover { text-decoration: underline; }
-
+ 
 @media (max-width: 720px) {
   .booking-header { height: 64px; }
   .booking-content { padding: 26px 18px 48px; }
@@ -188,7 +188,7 @@ body {
   .trip-option { min-height: 250px; }
   .confirmation-card { padding: 26px 20px; }
 }
-
+ 
 @media (max-width: 380px) {
   .header-note { font-size: 11px; }
   .trip-meta { grid-template-columns: 1fr; }
@@ -197,7 +197,7 @@ body {
   .lookup-row { grid-template-columns: 1fr; }
   .confirmation-details { grid-template-columns: 1fr; }
 }
-
+ 
 /* Accounts and routes/fare module styles */
 .register-container{
   width:90%;
@@ -216,17 +216,17 @@ body {
   margin-bottom: 12px;
   color: #16324f;
 }
-
+ 
 .register-container form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
+ 
 .register-container label {
   font-weight: 600;
 }
-
+ 
 .register-container input {
   width: 100%;
   box-sizing: border-box;
@@ -235,7 +235,7 @@ body {
   border-radius: 6px;
   font-size: 16px;
 }
-
+ 
 .register-container button {
   margin-top: 12px;
   padding: 12px;
@@ -246,7 +246,7 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
-
+ 
 .register-container button:hover {
   background: #125488;
 }
@@ -256,23 +256,23 @@ body {
   margin: 40px auto;
   color: #222222;
 }
-
+ 
 .guest-container h1 {
   color: #16324f;
   font-size: 32px;
 }
-
+ 
 .guest-container > p {
   font-size: 17px;
 }
-
+ 
 .guest-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin: 25px 0;
 }
-
+ 
 .guest-tabs button {
   padding: 12px 24px;
   border: none;
@@ -282,11 +282,11 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
-
+ 
 .guest-tabs button:hover {
   background: #125488;
 }
-
+ 
 .guest-container section {
   padding: 20px;
   border: 1px solid #dddddd;
@@ -305,23 +305,23 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
-
+ 
 .profile-container h1 {
   color: #16324f;
   font-size: 32px;
 }
-
+ 
 .profile-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
+ 
 .profile-container label {
   font-size: 17px;
   font-weight: 600;
 }
-
+ 
 .profile-container input {
   width: 100%;
   box-sizing: border-box;
@@ -330,7 +330,7 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
-
+ 
 .profile-container button {
   margin-top: 12px;
   padding: 14px;
@@ -341,7 +341,7 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
-
+ 
 .profile-container button:hover {
   background: #125488;
 }
@@ -357,23 +357,23 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
-
+ 
 .report-container h1 {
   color: #16324f;
   font-size: 32px;
 }
-
+ 
 .report-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
+ 
 .report-container label {
   font-size: 17px;
   font-weight: 600;
 }
-
+ 
 .report-container input,
 .report-container select,
 .report-container textarea {
@@ -384,11 +384,11 @@ body {
   border-radius: 7px;
   font: inherit;
 }
-
+ 
 .report-container textarea {
   resize: vertical;
 }
-
+ 
 .report-container button {
   margin-top: 12px;
   padding: 14px;
@@ -399,7 +399,7 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
-
+ 
 .report-container button:hover {
   background: #125488;
 }
@@ -415,29 +415,29 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
-
+ 
 .login-container h1 {
   color: #16324f;
   font-size: 34px;
   text-align: center;
 }
-
+ 
 .login-container > p {
   text-align: center;
   font-size: 17px;
 }
-
+ 
 .login-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
+ 
 .login-container label {
   font-size: 17px;
   font-weight: 600;
 }
-
+ 
 .login-container input {
   width: 100%;
   box-sizing: border-box;
@@ -446,7 +446,7 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
-
+ 
 .login-container button {
   margin-top: 12px;
   padding: 14px;
@@ -458,11 +458,11 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
-
+ 
 .login-container button:hover {
   background: #125488;
 }
-
+ 
 .login-container a {
   color: #1769aa;
   font-weight: 600;
@@ -471,6 +471,7 @@ html, body {
     min-height: 100%;
     overflow-y: auto;
 }
-
+ 
 .home-nav-links { display: flex; align-items: center; gap: 18px; }
 @media (max-width: 520px) { .home-nav-links { gap: 10px; } .home-nav-link { font-size: 11px; } }
+ 
