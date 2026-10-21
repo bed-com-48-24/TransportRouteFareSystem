@@ -24,6 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+<<<<<<< HEAD
+
+=======
  
 .booking-shell {
   min-height: 100vh;
@@ -199,6 +202,7 @@ body {
 }
  
 /* Accounts and routes/fare module styles */
+>>>>>>> origin/main
 .register-container{
   width:90%;
   max-width: 550px;
@@ -216,17 +220,29 @@ body {
   margin-bottom: 12px;
   color: #16324f;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .register-container form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+<<<<<<< HEAD
+
+.register-container label {
+  font-weight: 600;
+}
+
+=======
  
 .register-container label {
   font-weight: 600;
 }
  
+>>>>>>> origin/main
 .register-container input {
   width: 100%;
   box-sizing: border-box;
@@ -235,7 +251,11 @@ body {
   border-radius: 6px;
   font-size: 16px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .register-container button {
   margin-top: 12px;
   padding: 12px;
@@ -246,7 +266,11 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .register-container button:hover {
   background: #125488;
 }
@@ -256,23 +280,39 @@ body {
   margin: 40px auto;
   color: #222222;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .guest-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
+
+.guest-container > p {
+  font-size: 17px;
+}
+
+=======
  
 .guest-container > p {
   font-size: 17px;
 }
  
+>>>>>>> origin/main
 .guest-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin: 25px 0;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .guest-tabs button {
   padding: 12px 24px;
   border: none;
@@ -282,11 +322,19 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
+<<<<<<< HEAD
+
+.guest-tabs button:hover {
+  background: #125488;
+}
+
+=======
  
 .guest-tabs button:hover {
   background: #125488;
 }
  
+>>>>>>> origin/main
 .guest-container section {
   padding: 20px;
   border: 1px solid #dddddd;
@@ -305,23 +353,39 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container input {
   width: 100%;
   box-sizing: border-box;
@@ -330,7 +394,11 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container button {
   margin-top: 12px;
   padding: 14px;
@@ -341,7 +409,11 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .profile-container button:hover {
   background: #125488;
 }
@@ -357,23 +429,39 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .report-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .report-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .report-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .report-container input,
 .report-container select,
 .report-container textarea {
@@ -384,11 +472,19 @@ body {
   border-radius: 7px;
   font: inherit;
 }
+<<<<<<< HEAD
+
+.report-container textarea {
+  resize: vertical;
+}
+
+=======
  
 .report-container textarea {
   resize: vertical;
 }
  
+>>>>>>> origin/main
 .report-container button {
   margin-top: 12px;
   padding: 14px;
@@ -399,7 +495,11 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .report-container button:hover {
   background: #125488;
 }
@@ -415,29 +515,49 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container h1 {
   color: #16324f;
   font-size: 34px;
   text-align: center;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container > p {
   text-align: center;
   font-size: 17px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container input {
   width: 100%;
   box-sizing: border-box;
@@ -446,7 +566,11 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> origin/main
 .login-container button {
   margin-top: 12px;
   padding: 14px;
@@ -458,11 +582,19 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+<<<<<<< HEAD
+
+.login-container button:hover {
+  background: #125488;
+}
+
+=======
  
 .login-container button:hover {
   background: #125488;
 }
  
+>>>>>>> origin/main
 .login-container a {
   color: #1769aa;
   font-weight: 600;
@@ -470,8 +602,12 @@ body {
 html, body {
     min-height: 100%;
     overflow-y: auto;
+<<<<<<< HEAD
+}
+=======
 }
  
 .home-nav-links { display: flex; align-items: center; gap: 18px; }
 @media (max-width: 520px) { .home-nav-links { gap: 10px; } .home-nav-link { font-size: 11px; } }
  
+>>>>>>> origin/main

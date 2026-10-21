@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+export { default } from "./routes-fares/page";
+=======
 import Link from "next/link";
 
 export default function Home() {
@@ -51,3 +54,4 @@ export default function Home() {
     </main>
   );
 }
+>>>>>>> origin/main
