@@ -16,11 +16,14 @@ type RouteOption = {
   estimatedFare: number;
 };
 
+<<<<<<< HEAD
 type JourneyOption = {
   legs: RouteOption[];
   totalFare: number;
 };
 
+=======
+>>>>>>> origin/main
 const sampleRoutes: RouteOption[] = [
   {
     id: "blantyre-lilongwe-coach",
@@ -96,6 +99,7 @@ const sampleRoutes: RouteOption[] = [
   },
 ];
 
+<<<<<<< HEAD
 const cities = [
   ...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination])),
 ];
@@ -146,6 +150,10 @@ export default function RoutesFaresPage() {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [searchedOrigin, setSearchedOrigin] = useState<string | null>(null);
+=======
+export default function RoutesFaresPage() {
+  const [destination, setDestination] = useState("");
+>>>>>>> origin/main
   const [searchedDestination, setSearchedDestination] = useState<string | null>(
     null,
   );
@@ -154,6 +162,7 @@ export default function RoutesFaresPage() {
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+<<<<<<< HEAD
     searchJourney(origin, destination);
   }
 
@@ -164,27 +173,48 @@ export default function RoutesFaresPage() {
     if (!normalizedOrigin || !normalizedDestination) {
       setError("Enter both an origin and a destination.");
       setSearchedOrigin(null);
+=======
+    searchDestination(destination);
+  }
+
+  function searchDestination(value: string) {
+    const normalizedDestination = value.trim().replace(/\s+/g, " ");
+
+    if (!normalizedDestination) {
+      setError("Enter a destination to search.");
+>>>>>>> origin/main
       setSearchedDestination(null);
       return;
     }
 
+<<<<<<< HEAD
     if (normalizedOrigin.length < 2 || normalizedDestination.length < 2) {
       setError("Enter at least 2 characters for both locations.");
       setSearchedOrigin(null);
+=======
+    if (normalizedDestination.length < 2) {
+      setError("Enter at least 2 characters.");
+>>>>>>> origin/main
       setSearchedDestination(null);
       return;
     }
 
+<<<<<<< HEAD
     if (
       !/^[\p{L}\p{M}\s'-]+$/u.test(normalizedOrigin) ||
       !/^[\p{L}\p{M}\s'-]+$/u.test(normalizedDestination)
     ) {
       setError("Use letters, spaces, apostrophes, or hyphens only.");
       setSearchedOrigin(null);
+=======
+    if (!/^[\p{L}\p{M}\s'-]+$/u.test(normalizedDestination)) {
+      setError("Use letters, spaces, apostrophes, or hyphens only.");
+>>>>>>> origin/main
       setSearchedDestination(null);
       return;
     }
 
+<<<<<<< HEAD
     if (
       normalizedOrigin.toLocaleLowerCase() ===
       normalizedDestination.toLocaleLowerCase()
@@ -224,6 +254,21 @@ export default function RoutesFaresPage() {
     searchedOrigin === null || searchedDestination === null
       ? []
       : findJourneyOptions(searchedOrigin, searchedDestination);
+=======
+    setError("");
+    setDestination(normalizedDestination);
+    setSearchedDestination(normalizedDestination);
+  }
+
+  const matchingRoutes =
+    searchedDestination === null
+      ? []
+      : sampleRoutes.filter((route) =>
+          route.destination
+            .toLocaleLowerCase()
+            .includes(searchedDestination.toLocaleLowerCase()),
+        );
+>>>>>>> origin/main
 
   return (
     <main className="min-h-screen bg-white text-[#26364d]">
@@ -297,6 +342,7 @@ export default function RoutesFaresPage() {
               Know the way before you go.
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white sm:text-lg">
+<<<<<<< HEAD
               Find direct and connecting bus and minibus routes, with sample
               fares, stops, and transfer guidance for the full journey.
             </p>
@@ -306,10 +352,18 @@ export default function RoutesFaresPage() {
                 onClick={() => document.getElementById("destination")?.focus()}
                 className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm transition hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transition-none"
               >
+=======
+              Search a destination to compare sample bus and minibus routes,
+              estimated fares, and where to board and get off.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2.5 text-sm font-medium text-white">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
+>>>>>>> origin/main
                 <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
                   <path d="m4 10 4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Destination search
+<<<<<<< HEAD
               </button>
               <button
                 type="button"
@@ -320,21 +374,34 @@ export default function RoutesFaresPage() {
                 }
                 className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm transition hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transition-none"
               >
+=======
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
+>>>>>>> origin/main
                 <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-4">
                   <path d="M2.5 6.5h15v9h-15zM5 6.5l1.5-3h7l1.5 3m-10 9v1.5m9-1.5v1.5M5.5 10h.01M14.5 10h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Buses &amp; taxis
+<<<<<<< HEAD
               </button>
+=======
+              </span>
+>>>>>>> origin/main
             </div>
           </section>
 
           <section
             id="destination-search"
+<<<<<<< HEAD
             aria-label="Search for a journey"
+=======
+            aria-label="Search for a destination"
+>>>>>>> origin/main
             tabIndex={-1}
             className="mt-8 w-full max-w-3xl rounded-2xl border border-white/80 bg-white p-4 text-left shadow-2xl shadow-[#101b30]/20 focus:outline-2 focus:outline-offset-4 focus:outline-white sm:p-6"
           >
             <form onSubmit={handleSearch} noValidate>
+<<<<<<< HEAD
               <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                 <div>
                   <label
@@ -392,11 +459,65 @@ export default function RoutesFaresPage() {
                     className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-[#26364d] outline-none transition placeholder:text-slate-500 focus:border-[#29466d] focus:ring-4 focus:ring-[#29466d]/10 aria-[invalid=true]:border-red-500 motion-reduce:transition-none"
                   />
                 </div>
+=======
+            <label
+              htmlFor="destination"
+              className="mb-2 block text-sm font-semibold text-[#26364d]"
+            >
+              Destination
+            </label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative min-w-0 flex-1">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-slate-400"
+                >
+                  <circle
+                    cx="10.8"
+                    cy="10.8"
+                    r="6.8"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <path
+                    d="m16 16 4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <input
+                  id="destination"
+                  name="destination"
+                  type="search"
+                  autoComplete="off"
+                  maxLength={60}
+                  required
+                  aria-describedby={`destination-help${error ? " destination-error" : ""}`}
+                  value={destination}
+                  onChange={(event) => {
+                    setDestination(event.target.value);
+                    setError("");
+                    setSearchedDestination(null);
+                  }}
+                  placeholder="e.g. Blantyre, Mzuzu or Zomba"
+                  aria-invalid={Boolean(error)}
+                  aria-required="true"
+                  className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-base text-[#26364d] outline-none transition placeholder:text-slate-500 focus:border-[#29466d] focus:ring-4 focus:ring-[#29466d]/10 aria-[invalid=true]:border-red-500 motion-reduce:transition-none"
+                />
+              </div>
+>>>>>>> origin/main
               <button
                 type="submit"
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#14233b] px-6 text-sm font-semibold text-white transition hover:bg-[#29466d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d] motion-reduce:transition-none"
               >
+<<<<<<< HEAD
                 Find journey
+=======
+                Search routes
+>>>>>>> origin/main
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -415,13 +536,18 @@ export default function RoutesFaresPage() {
             </div>
             {error ? (
               <p
+<<<<<<< HEAD
                 id="journey-error"
+=======
+                id="destination-error"
+>>>>>>> origin/main
                 role="alert"
                 className="mt-2 text-sm font-medium text-red-700"
               >
                 {error}
               </p>
             ) : (
+<<<<<<< HEAD
               <div id="journey-help" className="mt-2 text-sm text-slate-600">
                 <p>Enter both towns to see direct or connecting sample routes.</p>
                 <p className="sr-only">
@@ -429,6 +555,16 @@ export default function RoutesFaresPage() {
                   Find journey. Connecting legs and transfer stops are shown
                   in travel order. Popular destination buttons fill the final
                   destination.
+=======
+              <div id="destination-help" className="mt-2 text-sm text-slate-600">
+                <p>Enter a destination to see matching sample routes.</p>
+                <p className="sr-only">
+                  Screen reader instructions: Type a town or city in the
+                  Destination field, then activate Search routes. You can also
+                  choose a popular destination button. Matching sample routes,
+                  estimated fares, and pickup and drop-off points will be
+                  announced after you search.
+>>>>>>> origin/main
                 </p>
               </div>
             )}
@@ -441,7 +577,11 @@ export default function RoutesFaresPage() {
                     <button
                       key={place}
                       type="button"
+<<<<<<< HEAD
                       onClick={() => selectPopularDestination(place)}
+=======
+                      onClick={() => searchDestination(place)}
+>>>>>>> origin/main
                       className="rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-medium text-[#29466d] transition hover:border-[#29466d] hover:bg-[#eef2f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d] motion-reduce:transition-none"
                     >
                       {place}
@@ -471,8 +611,12 @@ export default function RoutesFaresPage() {
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
               Browse routes matching your destination, with sample fare
+<<<<<<< HEAD
               estimates and boarding points. Information is for demonstration
               only and is not confirmed operator data.
+=======
+              estimates and boarding points.
+>>>>>>> origin/main
             </p>
           </div>
           <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
@@ -499,8 +643,13 @@ export default function RoutesFaresPage() {
                     Route options
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
+<<<<<<< HEAD
                     Search between towns to see direct coach and minibus routes
                     or follow a longer journey through its transfer stops.
+=======
+                    Search by destination to see sample coach and minibus
+                    journeys, including where each journey starts and ends.
+>>>>>>> origin/main
                   </p>
                   <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                     Sample route information
@@ -532,8 +681,12 @@ export default function RoutesFaresPage() {
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
                     Example estimates are shown in Malawi kwacha (MWK). Actual
+<<<<<<< HEAD
                     fares may differ by operator and service; confirm the
                     current fare with your provider.
+=======
+                    fares may differ by operator and service.
+>>>>>>> origin/main
                   </p>
                   <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                     Indicative estimates only
@@ -545,7 +698,11 @@ export default function RoutesFaresPage() {
         </section>
 
         <div aria-live="polite" aria-atomic="true">
+<<<<<<< HEAD
           {searchedOrigin === null || searchedDestination === null ? (
+=======
+          {searchedDestination === null ? (
+>>>>>>> origin/main
             <section
               aria-labelledby="start-search-heading"
               className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center"
@@ -576,11 +733,19 @@ export default function RoutesFaresPage() {
                 id="start-search-heading"
                 className="mt-4 text-lg font-semibold text-[#14233b]"
               >
+<<<<<<< HEAD
                 Plan your full journey
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Enter where you are starting and where you are going. We’ll
                 show each route leg in order, including where to change.
+=======
+                Find a route to your destination
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Choose a popular destination or search for a town or city
+                above to see matching routes, fares, and stops.
+>>>>>>> origin/main
               </p>
             </section>
           ) : (
@@ -593,6 +758,7 @@ export default function RoutesFaresPage() {
                   id="travel-information-heading"
                   className="text-xl font-bold text-[#14233b]"
                 >
+<<<<<<< HEAD
                   Journey from {searchedOrigin} to {searchedDestination}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
@@ -676,15 +842,79 @@ export default function RoutesFaresPage() {
                           </li>
                         ))}
                       </ol>
+=======
+                  Routes to {searchedDestination}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {matchingRoutes.length
+                    ? `${matchingRoutes.length} sample ${matchingRoutes.length === 1 ? "route" : "routes"} found.`
+                    : "No sample routes match this destination yet."}
+                </p>
+              </div>
+              {matchingRoutes.length ? (
+                <ul className="grid gap-4">
+                  {matchingRoutes.map((route) => (
+                    <li
+                      key={route.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                    >
+                      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-bold text-[#14233b]">
+                              {route.origin} <span aria-hidden="true">→</span>{" "}
+                              {route.destination}
+                            </h3>
+                            <span className="rounded-full bg-[#eef2f7] px-3 py-1 text-xs font-semibold text-[#29466d]">
+                              {route.service}
+                            </span>
+                          </div>
+                          <span className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                            Sample route
+                          </span>
+                        </div>
+                        <div className="sm:text-right">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Estimated fare
+                          </p>
+                          <p className="mt-0.5 text-xl font-bold text-[#14233b]">
+                            MWK {route.estimatedFare.toLocaleString("en-MW")}
+                          </p>
+                        </div>
+                      </div>
+                      <dl className="mt-5 grid gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Pickup point
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                            {route.pickupPoint}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Drop-off point
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                            {route.dropOffPoint}
+                          </dd>
+                        </div>
+                      </dl>
+>>>>>>> origin/main
                     </li>
                   ))}
                 </ul>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center">
                   <p className="text-sm text-slate-600">
+<<<<<<< HEAD
                     Check the town names or try another starting point or
                     destination. This demonstration only includes the towns
                     listed in the route search.
+=======
+                    Try another destination or choose one of the popular towns
+                    above.
+>>>>>>> origin/main
                   </p>
                 </div>
               )}

@@ -1,30 +1,208 @@
 @import "tailwindcss";
-
+ 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
-
+ 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
-
+ 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
 }
-
+ 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+<<<<<<< HEAD
 
+=======
+ 
+.booking-shell {
+  min-height: 100vh;
+  color: #1e2934;
+  background: #f5f7f8;
+  font-family: Arial, Helvetica, sans-serif;
+}
+ 
+.booking-header {
+  height: 76px;
+  padding: 0 max(6vw, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e8edef;
+}
+ 
+.brand { display: inline-flex; align-items: center; gap: 10px; color: #17314a; text-decoration: none; font-size: 20px; font-weight: 750; letter-spacing: -.5px; }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: white; background: #2563eb; font-size: 17px; }
+.header-note { color: #8491a4; font-size: 13px; }
+.booking-content { max-width: 1080px; margin: 0 auto; padding: 42px 24px 64px; }
+.back-link { display: inline-block; margin-bottom: 38px; color: #566b85; text-decoration: none; font-size: 13px; font-weight: 600; }
+.back-link:hover { color: #1d4ed8; }
+.eyebrow, .route-label { color: #2563eb; font-size: 10px; font-weight: 750; letter-spacing: 1.2px; }
+.booking-content h1 { margin: 8px 0 9px; color: #1e3553; font-size: clamp(30px, 4vw, 39px); letter-spacing: -1.2px; }
+.intro { max-width: 570px; margin: 0; color: #718096; font-size: 14px; line-height: 1.7; }
+.booking-grid { display: grid; grid-template-columns: 1fr 1.04fr; gap: 22px; margin-top: 32px; align-items: start; }
+.trip-card, .details-card { border: 1px solid #e6ebf2; border-radius: 14px; background: #fff; box-shadow: 0 8px 28px #17314a08; }
+.trip-card { padding: 25px 26px 21px; }
+.trip-card-top, .card-heading { display: flex; align-items: center; justify-content: space-between; }
+.trip-badge, .step-pill { border-radius: 20px; padding: 6px 9px; color: #60718a; background: #f3f6fa; font-size: 9px; font-weight: 700; letter-spacing: .6px; }
+.trip-card h2 { margin: 17px 0 23px; color: #1e3553; font-size: 22px; letter-spacing: -.55px; }
+.journey-line { position: relative; display: grid; gap: 19px; }
+.journey-stop { position: relative; z-index: 1; display: flex; align-items: center; gap: 13px; background: #fff; }
+.stop-dot { width: 11px; height: 11px; flex: 0 0 11px; border: 2px solid #3b82f6; border-radius: 50%; background: white; }
+.stop-dot.end { border-color: #ee9c64; background: #fff8f2; }
+.journey-connector { position: absolute; top: 9px; left: 5px; height: 37px; border-left: 1px dashed #bfccda; }
+.journey-stop strong, .journey-stop small { display: block; }
+.journey-stop strong { color: #34445c; font-size: 13px; }
+.journey-stop small { margin-top: 4px; color: #8a95a5; font-size: 11px; }
+.trip-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; padding: 16px 0; border-top: 1px solid #edf0f5; border-bottom: 1px solid #edf0f5; }
+.trip-meta > div { display: flex; align-items: center; gap: 9px; }
+.meta-icon { color: #2563eb; font-size: 19px; }
+.trip-meta small, .trip-meta strong { display: block; }
+.trip-meta small { margin-bottom: 5px; color: #8793a1; font-size: 10px; }
+.trip-meta strong { color: #3b4a60; font-size: 11px; }
+.availability { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #2563eb; font-size: 12px; font-weight: 700; }
+.availability-dot { width: 7px; height: 7px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 0 3px #eaf1ff; }
+.availability.sold-out { color: #a34940; }
+.availability.sold-out .availability-dot { background: #c95d50; box-shadow: 0 0 0 3px #f9ecea; }
+.capacity-note { margin-left: auto; color: #99a3b0; font-size: 10px; font-weight: 500; }
+.capacity-meter-wrap { margin-top: 14px; }
+.capacity-meter { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 5px; }
+.capacity-seat { height: 7px; border-radius: 5px; }
+.capacity-seat.occupied { background: #aebbd0; }
+.capacity-seat.free { background: #3b82f6; }
+.capacity-legend { display: flex; justify-content: space-between; margin-top: 8px; color: #94a0b0; font-size: 9px; }
+.capacity-legend span { display: flex; align-items: center; gap: 5px; }
+.capacity-legend i { width: 6px; height: 6px; border-radius: 50%; }
+.legend-booked { background: #aebbd0; }
+.legend-free { background: #3b82f6; }
+.details-card { padding: 25px 26px; }
+.card-heading h2 { margin: 7px 0 22px; color: #1e3553; font-size: 18px; letter-spacing: -.4px; }
+.step-pill { color: #78879b; font-size: 8px; }
+.field-label { display: block; margin-bottom: 10px; color: #40536b; font-size: 12px; font-weight: 700; }
+.passenger-control { display: flex; align-items: center; justify-content: space-between; max-width: 180px; padding: 5px; border: 1px solid #e3e9f2; border-radius: 9px; }
+.passenger-control button { width: 33px; height: 32px; border: 0; border-radius: 6px; color: #1d4ed8; background: #eff4ff; cursor: pointer; font-size: 18px; }
+.passenger-control button:disabled { color: #aeb7c5; background: #f4f6fa; cursor: not-allowed; }
+.passenger-control output { color: #34445c; font-size: 13px; font-weight: 700; }
+.passenger-control output span { color: #8491a4; font-weight: 400; }
+.field-hint { margin: 8px 0 20px; color: #9aa4b1; font-size: 10px; }
+.fare-breakdown { padding: 14px 0 4px; border-top: 1px solid #edf0f5; }
+.fare-breakdown > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: #7d8998; font-size: 11px; }
+.fare-breakdown strong { color: #4a5b74; font-size: 11px; }
+.fare-breakdown .fare-total { margin-top: 15px; padding-top: 14px; border-top: 1px dashed #dce4ef; color: #34445c; font-size: 12px; font-weight: 700; }
+.fare-breakdown .fare-total strong { color: #2563eb; font-size: 17px; }
+.fare-note { margin: -1px 0 17px; color: #96a1b0; font-size: 10px; line-height: 1.5; }
+.confirm-button { display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; gap: 12px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; cursor: pointer; font-size: 12px; font-weight: 700; transition: background .15s ease; }
+.confirm-button:hover:not(:disabled) { background: #1d4ed8; }
+.confirm-button:disabled { background: #aab7cc; cursor: not-allowed; }
+.message { display: flex; flex-direction: column; gap: 6px; margin: 13px 0 0; padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.5; }
+.error-message { color: #943f37; background: #fff1ef; }
+.success-message { color: #1e40af; background: #eff6ff; }
+.success-message strong { font-size: 13px; }
+.success-message b { letter-spacing: .7px; }
+.booking-footnote { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; color: #95a0af; font-size: 10px; }
+.booking-footnote span { color: #4f76b8; font-size: 13px; }
+.mode-toggle { border: 1px solid #dfe7f3; border-radius: 7px; padding: 8px 12px; color: #1d4ed8; background: #fff; cursor: pointer; font-size: 12px; font-weight: 650; }
+.booking-input { display: block; width: 100%; min-height: 42px; margin: 0 0 15px; padding: 9px 11px; border: 1px solid #e0e7f0; border-radius: 7px; outline: none; color: #34445c; background: #fff; font: inherit; font-size: 12px; }
+.booking-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px #2563eb1a; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row .field-label { font-size: 11px; }
+.bookings-panel { margin-top: 24px; padding: 25px 26px; border: 1px solid #e6ebf2; border-radius: 14px; background: #fff; box-shadow: 0 8px 28px #17314a08; }
+.bookings-panel .card-heading h2 { margin-bottom: 8px; }
+.empty-bookings { margin: 16px 0 2px; color: #8995a5; font-size: 12px; }
+.booking-list { display: grid; gap: 10px; margin-top: 16px; }
+.booking-record { display: flex; justify-content: space-between; gap: 20px; padding: 14px; border: 1px solid #edf0f5; border-radius: 9px; }
+.booking-record-main { display: grid; gap: 5px; color: #7b8999; font-size: 11px; }
+.booking-record-main strong { color: #34445c; font-size: 13px; }
+.booking-record-main b { color: #1d4ed8; letter-spacing: .4px; }
+.booking-record-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.status-tag { padding: 5px 8px; border-radius: 20px; color: #1d4ed8; background: #eff6ff; font-size: 10px; font-weight: 700; text-transform: capitalize; }
+.status-tag.cancelled { color: #943f37; background: #fff1ef; }
+.text-action { border: 0; padding: 6px 8px; color: #a44e43; background: transparent; cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; }
+.text-action:hover { text-decoration: underline; }
+.home-shell { min-height: 100vh; padding: 0 max(8vw, 24px); color: #1e2934; background: #f5f7f8; font-family: Arial, Helvetica, sans-serif; }
+.home-nav { display: flex; height: 76px; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8edef; }
+.home-nav-link { color: #1d4ed8; text-decoration: none; font-size: 13px; font-weight: 700; }
+.home-hero { max-width: 760px; margin: 0 auto; padding: 108px 0 85px; text-align: center; }
+.home-hero h1 { margin: 15px 0; color: #1e3553; font-size: clamp(42px, 7vw, 72px); letter-spacing: -3px; line-height: 1.08; }
+.home-hero h1 span { color: #2563eb; }
+.home-hero > p { max-width: 520px; margin: 0 auto 26px; color: #718096; font-size: 16px; line-height: 1.7; }
+.home-cta { width: fit-content; min-width: 220px; margin: 0 auto; padding: 0 20px; text-decoration: none; }
+.home-hero > small { display: block; margin-top: 13px; color: #96a1b0; font-size: 10px; }
+.home-feature-row { display: grid; max-width: 900px; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0 auto; padding-bottom: 60px; }
+.home-feature-row article { padding: 22px; border: 1px solid #e6ebf2; border-radius: 12px; background: #fff; }
+.home-feature-row article > span { display: block; margin-bottom: 18px; color: #2563eb; font-size: 11px; font-weight: 800; }
+.home-feature-row strong { color: #34445c; font-size: 14px; }
+.home-feature-row p { margin: 7px 0 0; color: #8491a4; font-size: 11px; line-height: 1.6; }
+ 
+.trip-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 31px; }
+.trip-option { display: flex; min-height: 276px; flex-direction: column; padding: 21px; }
+.trip-option h2 { margin: 19px 0 17px; }
+.trip-option-meta { display: grid; gap: 12px; margin-bottom: 20px; color: #65748a; font-size: 11px; }
+.trip-option-meta span:last-child { color: #2563eb; font-size: 16px; font-weight: 750; }
+.trip-option-meta small { color: #96a1b0; font-size: 10px; font-weight: 400; }
+.trip-choose { min-height: 43px; margin-top: auto; text-decoration: none; }
+.confirmation-card { max-width: 620px; margin: 18px auto; padding: 37px; border: 1px solid #e6ebf2; border-radius: 16px; background: #fff; box-shadow: 0 8px 28px #17314a08; text-align: center; }
+.confirmation-check { display: grid; width: 54px; height: 54px; place-items: center; margin: 0 auto 23px; border-radius: 50%; color: #2563eb; background: #eaf1ff; font-size: 27px; font-weight: 700; }
+.confirmation-card h1 { margin-bottom: 10px; }
+.confirmation-card .intro { margin: 0 auto; }
+.reference-box { display: grid; gap: 8px; margin: 25px 0 18px; padding: 17px; border: 1px dashed #b8c9e8; border-radius: 10px; background: #f6f8ff; }
+.reference-box span { color: #7889a5; font-size: 9px; font-weight: 750; letter-spacing: 1px; }
+.reference-box strong { color: #1d4ed8; font-size: 23px; letter-spacing: 1.3px; }
+.confirmation-details { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; padding: 7px 0; text-align: left; }
+.confirmation-details > div { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid #edf0f5; }
+.confirmation-details span { color: #889590; font-size: 10px; }
+.confirmation-details strong { color: #394a63; font-size: 12px; }
+.confirmation-card .fare-note { margin: 17px 0; }
+.confirmation-cta { text-decoration: none; }
+.lookup-form { max-width: 620px; margin: 28px 0 20px; padding: 23px; border: 1px solid #e6ebf2; border-radius: 12px; background: white; }
+.lookup-row { display: grid; grid-template-columns: 1fr 175px; gap: 11px; }
+.lookup-row .booking-input { margin: 0; }
+.lookup-row .confirm-button { min-height: 42px; }
+.booking-record-main a { color: #2563eb; font-size: 11px; font-weight: 700; text-decoration: none; }
+.booking-record-main a:hover { text-decoration: underline; }
+ 
+@media (max-width: 720px) {
+  .booking-header { height: 64px; }
+  .booking-content { padding: 26px 18px 48px; }
+  .back-link { margin-bottom: 29px; }
+  .booking-grid { grid-template-columns: 1fr; gap: 15px; margin-top: 25px; }
+  .trip-card, .details-card { padding: 21px; }
+  .bookings-panel { padding: 21px; }
+  .booking-record { flex-direction: column; gap: 10px; }
+  .booking-record-actions { justify-content: flex-start; }
+  .home-shell { padding: 0 18px; }
+  .home-hero { padding: 80px 0 60px; }
+  .home-feature-row { grid-template-columns: 1fr; }
+  .trip-options { grid-template-columns: 1fr; }
+  .trip-option { min-height: 250px; }
+  .confirmation-card { padding: 26px 20px; }
+}
+ 
+@media (max-width: 380px) {
+  .header-note { font-size: 11px; }
+  .trip-meta { grid-template-columns: 1fr; }
+  .booking-content { padding-right: 14px; padding-left: 14px; }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .lookup-row { grid-template-columns: 1fr; }
+  .confirmation-details { grid-template-columns: 1fr; }
+}
+ 
+/* Accounts and routes/fare module styles */
+>>>>>>> origin/main
 .register-container{
   width:90%;
   max-width: 550px;
@@ -42,17 +220,29 @@ body {
   margin-bottom: 12px;
   color: #16324f;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .register-container form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+<<<<<<< HEAD
 
 .register-container label {
   font-weight: 600;
 }
 
+=======
+ 
+.register-container label {
+  font-weight: 600;
+}
+ 
+>>>>>>> origin/main
 .register-container input {
   width: 100%;
   box-sizing: border-box;
@@ -61,7 +251,11 @@ body {
   border-radius: 6px;
   font-size: 16px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .register-container button {
   margin-top: 12px;
   padding: 12px;
@@ -72,7 +266,11 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .register-container button:hover {
   background: #125488;
 }
@@ -82,23 +280,39 @@ body {
   margin: 40px auto;
   color: #222222;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .guest-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
 
 .guest-container > p {
   font-size: 17px;
 }
 
+=======
+ 
+.guest-container > p {
+  font-size: 17px;
+}
+ 
+>>>>>>> origin/main
 .guest-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin: 25px 0;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .guest-tabs button {
   padding: 12px 24px;
   border: none;
@@ -108,11 +322,19 @@ body {
   font-size: 16px;
   cursor: pointer;
 }
+<<<<<<< HEAD
 
 .guest-tabs button:hover {
   background: #125488;
 }
 
+=======
+ 
+.guest-tabs button:hover {
+  background: #125488;
+}
+ 
+>>>>>>> origin/main
 .guest-container section {
   padding: 20px;
   border: 1px solid #dddddd;
@@ -131,23 +353,39 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container input {
   width: 100%;
   box-sizing: border-box;
@@ -156,7 +394,11 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container button {
   margin-top: 12px;
   padding: 14px;
@@ -167,7 +409,11 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .profile-container button:hover {
   background: #125488;
 }
@@ -183,23 +429,39 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .report-container h1 {
   color: #16324f;
   font-size: 32px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .report-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .report-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .report-container input,
 .report-container select,
 .report-container textarea {
@@ -210,11 +472,19 @@ body {
   border-radius: 7px;
   font: inherit;
 }
+<<<<<<< HEAD
 
 .report-container textarea {
   resize: vertical;
 }
 
+=======
+ 
+.report-container textarea {
+  resize: vertical;
+}
+ 
+>>>>>>> origin/main
 .report-container button {
   margin-top: 12px;
   padding: 14px;
@@ -225,7 +495,11 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .report-container button:hover {
   background: #125488;
 }
@@ -241,29 +515,49 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container h1 {
   color: #16324f;
   font-size: 34px;
   text-align: center;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container > p {
   text-align: center;
   font-size: 17px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container label {
   font-size: 17px;
   font-weight: 600;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container input {
   width: 100%;
   box-sizing: border-box;
@@ -272,7 +566,11 @@ body {
   border-radius: 7px;
   font-size: 16px;
 }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
 .login-container button {
   margin-top: 12px;
   padding: 14px;
@@ -284,11 +582,19 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+<<<<<<< HEAD
 
 .login-container button:hover {
   background: #125488;
 }
 
+=======
+ 
+.login-container button:hover {
+  background: #125488;
+}
+ 
+>>>>>>> origin/main
 .login-container a {
   color: #1769aa;
   font-weight: 600;
@@ -296,4 +602,12 @@ body {
 html, body {
     min-height: 100%;
     overflow-y: auto;
+<<<<<<< HEAD
 }
+=======
+}
+ 
+.home-nav-links { display: flex; align-items: center; gap: 18px; }
+@media (max-width: 520px) { .home-nav-links { gap: 10px; } .home-nav-link { font-size: 11px; } }
+ 
+>>>>>>> origin/main
