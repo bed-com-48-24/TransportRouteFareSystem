@@ -1,16 +1,16 @@
-import type { FareItem, RouteItem, StopItem, Trip } from "./types";
+import type { FareItem, RouteItem, StopItem } from "./types";
 
 export const KEYS = {
   routes: "routewise-routes-v1",
   fares: "routewise-fares-v1",
   stops: "routewise-stops-v1",
   reports: "routewise-reports-v1",
-  bookings: "routewise-bookings-v1", 
+  bookings: "routewise-bookings-v1",
   session: "routewise-session-v1",
 } as const;
 
 const ROUTE_ROWS: [string, string, string, string, number][] = [
-  
+  // id, origin, destination, service, estimated fare (MWK)
   ["blantyre-limbe-minibus", "Blantyre", "Limbe", "Minibus", 2500],
   ["blantyre-lilongwe-coach", "Blantyre", "Lilongwe", "Intercity coach", 30000],
   ["blantyre-zomba-minibus", "Blantyre", "Zomba", "Minibus", 8000],
@@ -41,11 +41,4 @@ export const SEED_STOPS: StopItem[] = [
   { id: "s-12", name: "Salima Bus Stage", kind: "pickup", city: "Salima", lat: -13.7804, lng: 34.4587 },
   { id: "s-13", name: "Salima Drop-off", kind: "dropoff", city: "Salima", lat: -13.7790, lng: 34.4600 },
   { id: "s-14", name: "Mzuzu Drop-off", kind: "dropoff", city: "Mzuzu", lat: -11.4656, lng: 34.0207 },
-];
-
-
-export const TRIPS: Trip[] = [
-  { id: "BT-LB-0800", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-20", departure: "08:00", arrival: "08:45", capacity: 14, fare: 2500 },
-  { id: "BT-LB-1030", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-20", departure: "10:30", arrival: "11:15", capacity: 18, fare: 2500 },
-  { id: "BT-ZO-0900", route: "Blantyre → Zomba", pickup: ["Blantyre Bus Depot", "Limbe Bus Station"], dropoff: ["Zomba Bus Depot", "Zomba Market"], date: "2026-10-21", departure: "09:00", arrival: "10:30", capacity: 22, fare: 5000 },
 ];
