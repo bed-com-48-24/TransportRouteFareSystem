@@ -61,7 +61,8 @@ export default function HomePage() {
 
             <div className="relative">
             <button
-              onClick={() => router.push("/accounts-reports/register")}
+            
+              onClick={() => setShowAccountMenu(!showAccountMenu)}
               className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
             >
               <svg
