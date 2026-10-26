@@ -44,7 +44,7 @@ export default function HomePage() {
             <span className="text-3xl">🚌</span>
             <span>
               <span className="block text-lg font-bold text-slate-900">
-                Transport Hub
+                SBUS
               </span>
               <span className="block text-xs text-slate-500">
                 Route & Fare Information System
@@ -62,7 +62,7 @@ export default function HomePage() {
 
             <button
               onClick={() => router.push("/accounts-reports/register")}
-              className="rounded-lg bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800"
+              className="rounded-lg bg-[#14233b] px-4 py-2 font-medium text-white hover:bg-[#29466d]"
             >
               Register
             </button>
@@ -132,7 +132,7 @@ export default function HomePage() {
                 {service.description}
               </p>
 
-              <span className="mt-5 inline-block text-sm font-semibold text-blue-700">
+              <span className="mt-5 inline-block text-sm font-semibold text-[#14233b]">
                 Explore →
               </span>
             </button>

@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-export { default } from "./routes-fares/page";
-=======
 import Link from "next/link";
 
 export default function Home() {
@@ -8,7 +5,7 @@ export default function Home() {
     <main className="home-shell">
       <nav className="home-nav">
         <Link className="brand" href="/">
-          <span className="brand-mark">R</span> RouteWise
+          <span className="brand-mark">S</span> SBUS
         </Link>
         <div className="home-nav-links">
           <Link className="home-nav-link" href="/routes-fares">Routes & fares</Link>
@@ -54,4 +51,3 @@ export default function Home() {
     </main>
   );
 }
->>>>>>> origin/main
