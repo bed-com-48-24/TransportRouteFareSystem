@@ -718,4 +718,8 @@ export default function RoutesFaresPage() {
       </div>
     </main>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 7fd1fa0 (updates)

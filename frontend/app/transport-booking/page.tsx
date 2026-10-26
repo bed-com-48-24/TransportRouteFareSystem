@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> feature/transport-booking
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -174,3 +179,41 @@ export default function TransportBookingPage() {
     </main>
   );
 }
+=======
+"use client";
+
+import Link from "next/link";
+
+export default function TransportBookingPage() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-16 text-[#26364d]">
+      <section className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-12">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+          Mthunzi Express
+        </p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#14233b] sm:text-4xl">
+          Plan your next journey
+        </h1>
+        <p className="mt-4 max-w-xl leading-7 text-[#52627a]">
+          Compare available sample routes and estimated fares before you
+          travel. Choose a destination to see route details and boarding points.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/routes-fares"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#14233b] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#29466d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d]"
+          >
+            Browse routes &amp; fares
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-[#26364d] transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d]"
+          >
+            Back to home
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}
+>>>>>>> 7fd1fa0 (updates)
