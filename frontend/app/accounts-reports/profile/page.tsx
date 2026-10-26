@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -10,7 +12,15 @@ export default function ProfilePage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("Profile changes successfully");
+    setMessage("");
+
+    if(!fullName || !email.trim()){
+      setMessage("please fill in the spaces");
+      return;
+    }
+       setMessage("Profile updated successfully");
+      router.push("/accounts-reports/home");
+    
   }
 
   return (
