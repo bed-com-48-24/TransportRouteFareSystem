@@ -7,25 +7,21 @@ const services = [
   {
     title: "Bus Routes",
     description: "Explore available routes and destinations.",
-    icon: "🚌",
     href: "/routes",
   },
   {
     title: "Fare Information",
     description: "Check fares before travelling.",
-    icon: "💰",
     href: "/routes-fares",
   },
   {
     title: "Staff Portal",
     description: "Access authorized company services.",
-    icon: "💼",
     href: "/login",
   },
   {
     title: "Report Information",
     description: "Report incorrect route or fare details.",
-    icon: "📝",
     href: "/accounts-reports/report",
   },
 ];
@@ -35,7 +31,7 @@ export default function HomePage() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   return (
-    <main className="min-h-screen bg-[#EDF4FA] px-4 py-6">
+    <main className="min-h-screen bg-white px-4 py-6">
       <div className="mx-auto max-w-2xl rounded-xl bg-white shadow-md">
       {/* Navigation */}
       <header className="bg-white shadow-sm">
@@ -44,10 +40,10 @@ export default function HomePage() {
             onClick={() => router.push("/")}
             className="flex items-center gap-2 text-left"
           >
-            <span className="text-2xl">🚌</span>
+            <span className="text-2xl"></span>
             <span>
-              <span className="block text-base font-bold text-[#12304A]">
-                Transport Hub
+              <span className="block text-base font-bold text-slate-900">
+                SBUS
               </span>
               <span className="block text-xs text-[#617B96]">
                 Route & Fare Information System
@@ -65,10 +61,8 @@ export default function HomePage() {
 
             <div className="relative">
             <button
-              onClick={() => setShowAccountMenu(!showAccountMenu)}
-              aria-expanded={showAccountMenu}
-              aria-haspopup="menu"
-              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#12304A] px-4 py-2 text-sm font-medium text-white hover:bg-[#0D2438]"
+              onClick={() => router.push("/accounts-reports/register")}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
             >
               <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -112,7 +106,7 @@ export default function HomePage() {
       {/* Hero section */}
       <section className="bg-[#12304A] text-white">
         <div className=" px-5 py-5">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#D7E6F4]">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-white">
             Your journey starts here
           </p>
 
@@ -132,7 +126,7 @@ export default function HomePage() {
               onClick={() => router.push("/fares")}
               className="rounded-lg border border-[#AABBD0] px-6 py-3 font-semibold text-white hover:bg-white/10"
             >
-              💰 Check Fares
+               Check Fares
             </button>
           </div>
         </div>
@@ -154,7 +148,6 @@ export default function HomePage() {
               onClick={() => router.push(service.href)}
               className="rounded-lg border border-[#D7E2EF] bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
-              <span className="text-xl">{service.icon}</span>
 
               <h3 className="mt-2 text-lg font-semibold text-[#12304A]">
                 {service.title}
@@ -164,7 +157,7 @@ export default function HomePage() {
                 {service.description}
               </p>
 
-              <span className="mt-2 inline-block text-xs font-semibold text-[#12304A]">
+              <span className="mt-2 inline-block text-xs font-semibold text-[#14233b]">
                 Explore →
               </span>
             </button>

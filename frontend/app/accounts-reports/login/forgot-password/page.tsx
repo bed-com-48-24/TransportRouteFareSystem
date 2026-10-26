@@ -71,7 +71,11 @@ export default function ForgotPasswordPage() {
         {message && (
           <p
             role="status"
+<<<<<<< HEAD
             className="mb-4 text-sm text-[#12304A]"
+=======
+            className="mb-4 text-sm text-[#14233b]"
+>>>>>>> 1976155e63f21920be544a8c36aaf5abb66cefd8
           >
             {message}
           </p>
@@ -81,7 +85,11 @@ export default function ForgotPasswordPage() {
           type="button"
           onClick={handleResetPassword}
           disabled={loading || !email.trim()}
+<<<<<<< HEAD
           className="w-full rounded-lg bg-[#12304A] px-4 py-3 font-semibold text-white hover:bg-[#0D2438] disabled:cursor-not-allowed disabled:opacity-50"
+=======
+          className="w-full rounded-lg bg-[#14233b] px-4 py-3 font-semibold text-white hover:bg-[#29466d] disabled:cursor-not-allowed disabled:opacity-50"
+>>>>>>> 1976155e63f21920be544a8c36aaf5abb66cefd8
         >
           {loading ? "Sending request..." : "Send Reset Link"}
         </button>
