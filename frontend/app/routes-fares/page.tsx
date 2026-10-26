@@ -226,21 +226,21 @@ export default function RoutesFaresPage() {
       : findJourneyOptions(searchedOrigin, searchedDestination);
 
   return (
-    <main className="min-h-screen bg-white text-[#26364d]">
+    <main className="min-h-screen bg-white text-[#12304A]">
       <a
         href="#destination-search"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-semibold focus:text-[#14233b] focus:shadow-lg focus:outline-2 focus:outline-offset-2 focus:outline-[#29466d]"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:font-semibold focus:text-[#0D2438] focus:shadow-lg focus:outline-2 focus:outline-offset-2 focus:outline-[#1B4B72]"
       >
         Skip to destination search
       </a>
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-[#D7E2EF] bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
           <Link
             href="/"
             className="flex items-center gap-2.5"
             aria-label="SBUS home"
           >
-            <span className="flex size-10 items-center justify-center rounded-xl bg-[#14233b] text-white shadow-sm">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-[#0D2438] text-white shadow-sm">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
@@ -256,9 +256,9 @@ export default function RoutesFaresPage() {
                 />
               </svg>
             </span>
-            <span className="text-base font-bold tracking-tight text-[#14233b]">
+            <span className="text-base font-bold tracking-tight text-[#0D2438]">
               {brandName}
-              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.18em] text-[#64748b]">
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.18em] text-[#526D87]">
                 Travel • Connect • Belong
               </span>
             </span>
@@ -289,7 +289,7 @@ export default function RoutesFaresPage() {
         </div>
       </header>
 
-      <section className="relative isolate overflow-hidden bg-[#14233b]">
+      <section className="relative isolate overflow-hidden bg-[#0D2438]">
         <div
           aria-hidden="true"
           className="absolute inset-0 -z-20 bg-cover bg-center"
@@ -300,7 +300,7 @@ export default function RoutesFaresPage() {
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[#111c30]/75"
+          className="absolute inset-0 -z-10 bg-[#0D2438]/75"
         />
         <div className="mx-auto flex max-w-6xl flex-col items-center px-5 pb-12 pt-14 text-center sm:px-8 sm:pb-16 sm:pt-20">
           <section className="max-w-3xl">
@@ -346,7 +346,7 @@ export default function RoutesFaresPage() {
             id="destination-search"
             aria-label="Search for a journey"
             tabIndex={-1}
-            className="mt-8 w-full max-w-3xl rounded-2xl border border-white/80 bg-white p-4 text-left shadow-2xl shadow-[#101b30]/20 focus:outline-2 focus:outline-offset-4 focus:outline-white sm:p-6"
+            className="mt-8 w-full max-w-3xl rounded-2xl border border-white/80 bg-white p-4 text-left shadow-2xl shadow-[#0D2438]/20 focus:outline-2 focus:outline-offset-4 focus:outline-white sm:p-6"
           >
             <form onSubmit={handleSearch} noValidate>
               <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -408,7 +408,7 @@ export default function RoutesFaresPage() {
                 </div>
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#14233b] px-6 text-sm font-semibold text-white transition hover:bg-[#29466d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d] motion-reduce:transition-none"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#0D2438] px-6 text-sm font-semibold text-white transition hover:bg-[#1B4B72] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1B4B72] motion-reduce:transition-none"
               >
                 Find journey
                 <svg
@@ -431,7 +431,7 @@ export default function RoutesFaresPage() {
               <p
                 id="journey-error"
                 role="alert"
-                className="mt-2 text-sm font-medium text-red-700"
+                className="mt-2 text-sm font-medium text-[#12304A]"
               >
                 {error}
               </p>
@@ -446,8 +446,8 @@ export default function RoutesFaresPage() {
                 </p>
               </div>
             )}
-              <fieldset className="mt-5 border-t border-slate-100 pt-4">
-                <legend className="mb-2.5 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <fieldset className="mt-5 border-t border-[#D7E2EF] pt-4">
+                <legend className="mb-2.5 pt-4 text-xs font-semibold uppercase tracking-wider text-[#526D87]">
                   Popular destinations
                 </legend>
                 <div className="flex flex-wrap gap-2">
@@ -471,28 +471,28 @@ export default function RoutesFaresPage() {
       <div className="mx-auto max-w-6xl px-5 pb-16 pt-8 sm:px-8 sm:pt-10">
         <section
           aria-labelledby="routes-fares-heading"
-          className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          className="mb-8 overflow-hidden rounded-2xl border border-[#D7E2EF] bg-white shadow-sm"
         >
-          <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64748b]">
+          <div className="border-b border-[#D7E2EF] px-6 py-6 sm:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#526D87]">
               PLAN WITH CONFIDENCE
             </p>
             <h2
               id="routes-fares-heading"
-              className="mt-2 text-2xl font-bold tracking-tight text-[#14233b]"
+              className="mt-2 text-2xl font-bold tracking-tight text-[#0D2438]"
             >
               Routes &amp; fares, at a glance
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526D87]">
               Browse routes matching your destination, with sample fare
               estimates and boarding points. Information is for demonstration
               only and is not confirmed operator data.
             </p>
           </div>
-          <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+          <div className="grid gap-px bg-[#EDF4FA] sm:grid-cols-2">
             <article className="bg-white p-6 sm:p-8">
               <div className="flex items-start gap-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eef2f7] text-[#29466d]">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72]">
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 24 24"
@@ -509,14 +509,14 @@ export default function RoutesFaresPage() {
                   </svg>
                 </span>
                 <div>
-                  <h3 className="font-semibold text-[#14233b]">
+                  <h3 className="font-semibold text-[#0D2438]">
                     Route options
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
                     Search between towns to see direct coach and minibus routes
                     or follow a longer journey through its transfer stops.
                   </p>
-                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                  <span className="mt-3 inline-flex rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
                     Sample route information
                   </span>
                 </div>
@@ -524,7 +524,7 @@ export default function RoutesFaresPage() {
             </article>
             <article className="bg-white p-6 sm:p-8">
               <div className="flex items-start gap-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#eef2f7] text-[#29466d]">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72]">
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 24 24"
@@ -541,15 +541,15 @@ export default function RoutesFaresPage() {
                   </svg>
                 </span>
                 <div>
-                  <h3 className="font-semibold text-[#14233b]">
+                  <h3 className="font-semibold text-[#0D2438]">
                     Fare estimates
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <p className="mt-1 text-sm leading-6 text-[#526D87]">
                     Example estimates are shown in Malawi kwacha (MWK). Actual
                     fares may differ by operator and service; confirm the
                     current fare with your provider.
                   </p>
-                  <span className="mt-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                  <span className="mt-3 inline-flex rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
                     Indicative estimates only
                   </span>
                 </div>
@@ -562,9 +562,9 @@ export default function RoutesFaresPage() {
           {searchedOrigin === null || searchedDestination === null ? (
             <section
               aria-labelledby="start-search-heading"
-              className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center"
+              className="mx-auto max-w-3xl rounded-2xl border border-dashed border-[#C7D8E8] bg-white px-6 py-10 text-center"
             >
-              <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#eef2f7] text-[#29466d]">
+              <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#EDF4FA] text-[#1B4B72]">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -588,7 +588,7 @@ export default function RoutesFaresPage() {
               </span>
               <h2
                 id="start-search-heading"
-                className="mt-4 text-lg font-semibold text-[#14233b]"
+                className="mt-4 text-lg font-semibold text-[#0D2438]"
               >
                 Plan your full journey
               </h2>
@@ -605,7 +605,7 @@ export default function RoutesFaresPage() {
               <div className="mb-5">
                 <h2
                   id="travel-information-heading"
-                  className="text-xl font-bold text-[#14233b]"
+                  className="text-xl font-bold text-[#0D2438]"
                 >
                   Journey from {searchedOrigin} to {searchedDestination}
                 </h2>
@@ -702,7 +702,7 @@ export default function RoutesFaresPage() {
                   </p>
                 </div>
               )}
-              <p className="mt-4 text-xs leading-5 text-slate-500">
+              <p className="mt-4 text-xs leading-5 text-[#617B96]">
                 These sample stops and fare estimates are for demonstration
                 only, not confirmed operator information. Check the actual
                 pickup point and current fare with your transport provider
@@ -712,7 +712,7 @@ export default function RoutesFaresPage() {
           )}
         </div>
 
-        <footer className="mx-auto mt-12 max-w-3xl border-t border-slate-200 pt-5 text-center text-xs leading-5 text-slate-500">
+        <footer className="mx-auto mt-12 max-w-3xl border-t border-[#D7E2EF] pt-5 text-center text-xs leading-5 text-[#617B96]">
           Sample route information is for planning demonstrations only.
         </footer>
       </div>

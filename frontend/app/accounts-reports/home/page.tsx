@@ -7,25 +7,21 @@ const services = [
   {
     title: "Bus Routes",
     description: "Explore available routes and destinations.",
-    icon: "🚌",
     href: "/routes",
   },
   {
     title: "Fare Information",
     description: "Check fares before travelling.",
-    icon: "💰",
-    href: "/fares",
+    href: "/routes-fares",
   },
   {
     title: "Staff Portal",
     description: "Access authorized company services.",
-    icon: "💼",
     href: "/login",
   },
   {
     title: "Report Information",
     description: "Report incorrect route or fare details.",
-    icon: "📝",
     href: "/accounts-reports/report",
   },
 ];
@@ -44,12 +40,12 @@ export default function HomePage() {
             onClick={() => router.push("/")}
             className="flex items-center gap-2 text-left"
           >
-            <span className="text-2xl">🚌</span>
+            <span className="text-2xl"></span>
             <span>
               <span className="block text-base font-bold text-slate-900">
                 SBUS
               </span>
-              <span className="block text-xs text-slate-500">
+              <span className="block text-xs text-[#617B96]">
                 Route & Fare Information System
               </span>
             </span>
@@ -58,17 +54,23 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/accounts-reports/login")}
-              className="rounded-lg px-4 py-2 font-medium text-slate-700 hover:bg-slate-100"
+              className="rounded-lg px-4 py-2 font-medium text-[#29466D] hover:bg-[#EAF2FA]"
             >
               Login
             </button>
 
             <div className="relative">
+<<<<<<< HEAD
 
             <button
 <<<<<<< HEAD
 <<<<<<< HEAD
               onClick={() => router.push("/accounts-reports/register")}
+=======
+            <button
+            
+              onClick={() => setShowAccountMenu(!showAccountMenu)}
+>>>>>>> origin/feature/accounts-reports
               className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
 =======
 =======
@@ -96,22 +98,38 @@ export default function HomePage() {
             </button>
 
             {showAccountMenu && (
+<<<<<<< HEAD
               <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg boarder boarder-slate-200 bg-white py-2 shadow-lg">
+=======
+              <div role="menu" className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-[#D7E2EF] bg-white py-2 shadow-lg">
+>>>>>>> origin/feature/accounts-reports
                 <button onClick={() =>{
                   setShowAccountMenu(false);
                   router.push("/accounts-reports/profile");
                 }}
+<<<<<<< HEAD
               className = "block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+=======
+              className = "block w-full px-4 py-2 text-left text-sm text-[#29466D] hover:bg-[#EAF2FA]"
+>>>>>>> origin/feature/accounts-reports
             > Manage profile</button>
             <button onClick={() => {setShowAccountMenu(false);
               router.push("/accounts-reports/login")
             }}
+<<<<<<< HEAD
             className = "block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100">
+=======
+            className = "block w-full px-4 py-2 text-left text-sm text-[#12304A] hover:bg-[#EAF2FA]">
+>>>>>>> origin/feature/accounts-reports
               Logout
             </button>
             </div>
             )}
+<<<<<<< HEAD
           </div>
+=======
+            </div>
+>>>>>>> origin/feature/accounts-reports
           </div>
         </nav>
       </header>
@@ -130,16 +148,16 @@ export default function HomePage() {
           <div className="mt-4 flex flex-wrap gap-4">
             <button
               onClick={() => router.push("/routes")}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-sky-100"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-[#EAF2FA]"
             >
               🗺️ Find Routes
             </button>
 
             <button
               onClick={() => router.push("/fares")}
-              className="rounded-lg border border-slate-400 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              className="rounded-lg border border-[#AABBD0] px-6 py-3 font-semibold text-white hover:bg-white/10"
             >
-              💰 Check Fares
+               Check Fares
             </button>
           </div>
         </div>
@@ -148,7 +166,7 @@ export default function HomePage() {
       {/* Services */}
       <section className="px-5 py-4">
         <div className="mb-8">
-          <h2 className="text-base font-bold text-slate-900">
+          <h2 className="text-base font-bold text-[#12304A]">
             Explore Our Services
           </h2>
           
@@ -159,15 +177,14 @@ export default function HomePage() {
             <button
               key={service.title}
               onClick={() => router.push(service.href)}
-              className="rounded-lg border border-slate-200 bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="rounded-lg border border-[#D7E2EF] bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
-              <span className="text-xl">{service.icon}</span>
 
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">
+              <h3 className="mt-2 text-lg font-semibold text-[#12304A]">
                 {service.title}
               </h3>
 
-              <p className="mt-1 text-sm leading-4 text-slate-600">
+              <p className="mt-1 text-sm leading-4 text-[#526D87]">
                 {service.description}
               </p>
 
@@ -180,8 +197,8 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="px-5 py-3 text-xs text-slate-500">
+      <footer className="border-t border-[#D7E2EF] bg-white">
+        <div className="px-5 py-3 text-xs text-[#617B96]">
           Transport Route and Fare Information System
           <span className="mt-1 block">
             Helping passengers access transport information.
