@@ -71,11 +71,7 @@ export default function ForgotPasswordPage() {
         {message && (
           <p
             role="status"
-<<<<<<< HEAD
-            className="mb-4 text-sm text-[#12304A]"
-=======
             className="mb-4 text-sm text-[#14233b]"
->>>>>>> 1976155e63f21920be544a8c36aaf5abb66cefd8
           >
             {message}
           </p>
