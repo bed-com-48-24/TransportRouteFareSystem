@@ -14,7 +14,7 @@ const services = [
     title: "Fare Information",
     description: "Check fares before travelling.",
     icon: "💰",
-    href: "/fares",
+    href: "/routes-fares",
   },
   {
     title: "Staff Portal",
@@ -35,7 +35,7 @@ export default function HomePage() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   return (
-    <main className="min-h-screen bg-slate-200 px-4 py-6">
+    <main className="min-h-screen bg-[#EDF4FA] px-4 py-6">
       <div className="mx-auto max-w-2xl rounded-xl bg-white shadow-md">
       {/* Navigation */}
       <header className="bg-white shadow-sm">
@@ -46,10 +46,10 @@ export default function HomePage() {
           >
             <span className="text-2xl">🚌</span>
             <span>
-              <span className="block text-base font-bold text-slate-900">
+              <span className="block text-base font-bold text-[#12304A]">
                 Transport Hub
               </span>
-              <span className="block text-xs text-slate-500">
+              <span className="block text-xs text-[#617B96]">
                 Route & Fare Information System
               </span>
             </span>
@@ -58,16 +58,17 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/accounts-reports/login")}
-              className="rounded-lg px-4 py-2 font-medium text-slate-700 hover:bg-slate-100"
+              className="rounded-lg px-4 py-2 font-medium text-[#29466D] hover:bg-[#EAF2FA]"
             >
               Login
             </button>
 
             <div className="relative">
-
             <button
-              onClick={() => setShowAccountMenu(!showAccountMenu)}  
-              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+              onClick={() => setShowAccountMenu(!showAccountMenu)}
+              aria-expanded={showAccountMenu}
+              aria-haspopup="menu"
+              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#12304A] px-4 py-2 text-sm font-medium text-white hover:bg-[#0D2438]"
             >
               <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -88,22 +89,22 @@ export default function HomePage() {
             </button>
 
             {showAccountMenu && (
-              <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg boarder boarder-slate-200 bg-white py-2 shadow-lg">
+              <div role="menu" className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-[#D7E2EF] bg-white py-2 shadow-lg">
                 <button onClick={() =>{
                   setShowAccountMenu(false);
                   router.push("/accounts-reports/profile");
                 }}
-              className = "block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+              className = "block w-full px-4 py-2 text-left text-sm text-[#29466D] hover:bg-[#EAF2FA]"
             > Manage profile</button>
             <button onClick={() => {setShowAccountMenu(false);
               router.push("/accounts-reports/login")
             }}
-            className = "block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100">
+            className = "block w-full px-4 py-2 text-left text-sm text-[#12304A] hover:bg-[#EAF2FA]">
               Logout
             </button>
             </div>
             )}
-          </div>
+            </div>
           </div>
         </nav>
       </header>
@@ -111,7 +112,7 @@ export default function HomePage() {
       {/* Hero section */}
       <section className="bg-[#12304A] text-white">
         <div className=" px-5 py-5">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-sky-300">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#D7E6F4]">
             Your journey starts here
           </p>
 
@@ -122,14 +123,14 @@ export default function HomePage() {
           <div className="mt-4 flex flex-wrap gap-4">
             <button
               onClick={() => router.push("/routes")}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-sky-100"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-[#EAF2FA]"
             >
               🗺️ Find Routes
             </button>
 
             <button
               onClick={() => router.push("/fares")}
-              className="rounded-lg border border-slate-400 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              className="rounded-lg border border-[#AABBD0] px-6 py-3 font-semibold text-white hover:bg-white/10"
             >
               💰 Check Fares
             </button>
@@ -140,7 +141,7 @@ export default function HomePage() {
       {/* Services */}
       <section className="px-5 py-4">
         <div className="mb-8">
-          <h2 className="text-base font-bold text-slate-900">
+          <h2 className="text-base font-bold text-[#12304A]">
             Explore Our Services
           </h2>
           
@@ -151,19 +152,19 @@ export default function HomePage() {
             <button
               key={service.title}
               onClick={() => router.push(service.href)}
-              className="rounded-lg border border-slate-200 bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+              className="rounded-lg border border-[#D7E2EF] bg-white p-2.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-md"
             >
               <span className="text-xl">{service.icon}</span>
 
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">
+              <h3 className="mt-2 text-lg font-semibold text-[#12304A]">
                 {service.title}
               </h3>
 
-              <p className="mt-1 text-sm leading-4 text-slate-600">
+              <p className="mt-1 text-sm leading-4 text-[#526D87]">
                 {service.description}
               </p>
 
-              <span className="mt-2 inline-block text-xs font-semibold text-blue-700">
+              <span className="mt-2 inline-block text-xs font-semibold text-[#12304A]">
                 Explore →
               </span>
             </button>
@@ -172,8 +173,8 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="px-5 py-3 text-xs text-slate-500">
+      <footer className="border-t border-[#D7E2EF] bg-white">
+        <div className="px-5 py-3 text-xs text-[#617B96]">
           Transport Route and Fare Information System
           <span className="mt-1 block">
             Helping passengers access transport information.

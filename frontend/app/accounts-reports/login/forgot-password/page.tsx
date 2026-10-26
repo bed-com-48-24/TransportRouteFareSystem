@@ -50,20 +50,20 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-[#F4F8FC] px-4">
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-md">
-        <h1 className="mb-2 text-2xl font-bold text-gray-800">
+        <h1 className="mb-2 text-2xl font-bold text-[#12304A]">
           Reset Password
         </h1>
 
-        <p className="mb-6 text-sm text-gray-600">
+        <p className="mb-6 text-sm text-[#29466D]">
           Request a secure password reset link for the email
           address you entered on the login page.
         </p>
 
-        <div className="mb-5 rounded-lg bg-gray-100 p-3">
-          <p className="text-sm text-gray-500">Email address</p>
-          <p className="break-all font-medium text-gray-800">
+        <div className="mb-5 rounded-lg bg-[#F4F8FC] p-3">
+          <p className="text-sm text-[#617B96]">Email address</p>
+          <p className="break-all font-medium text-[#12304A]">
             {email || "No email provided"}
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
         {message && (
           <p
             role="status"
-            className="mb-4 text-sm text-blue-700"
+            className="mb-4 text-sm text-[#12304A]"
           >
             {message}
           </p>
@@ -81,7 +81,7 @@ export default function ForgotPasswordPage() {
           type="button"
           onClick={handleResetPassword}
           disabled={loading || !email.trim()}
-          className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-[#12304A] px-4 py-3 font-semibold text-white hover:bg-[#0D2438] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Sending request..." : "Send Reset Link"}
         </button>
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
           onClick={() =>
             router.push("/accounts-reports/login")
           }
-          className="mt-4 w-full text-sm text-gray-600 hover:underline"
+          className="mt-4 w-full text-sm text-[#29466D] hover:underline"
         >
           Back to Login
         </button>
