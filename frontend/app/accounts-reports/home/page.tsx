@@ -67,9 +67,12 @@ export default function HomePage() {
 
             <button
 <<<<<<< HEAD
+<<<<<<< HEAD
               onClick={() => router.push("/accounts-reports/register")}
               className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
 =======
+=======
+>>>>>>> origin/feature/accounts-reports
               onClick={() => setShowAccountMenu(!showAccountMenu)}  
               className="flex flex-col items-center justify-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
 >>>>>>> origin/feature/accounts-reports
