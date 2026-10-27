@@ -69,6 +69,11 @@ function findJourneyOptions(origin: string, destination: string, sampleRoutes: R
   );
 }
 
+function findTripForRoute(route: RouteOption) {
+  const routeName = `${route.origin} → ${route.destination}`.toLocaleLowerCase();
+  return TRIPS.find((trip) => trip.route.toLocaleLowerCase() === routeName);
+}
+
 export default function RoutesFaresPage() {
   const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
   const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
@@ -96,6 +101,21 @@ export default function RoutesFaresPage() {
     event.preventDefault();
 
     searchJourney(origin, destination);
+  }
+
+  function swapLocations() {
+    setOrigin(destination);
+    setDestination(origin);
+    setError("");
+    setSearchedOrigin(null);
+    setSearchedDestination(null);
+  }
+
+  function focusJourneySearch(field: "origin" | "destination") {
+    const searchPanel = document.getElementById("destination-search");
+    const input = document.getElementById(field);
+    searchPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    input?.focus({ preventScroll: true });
   }
 
   function searchJourney(originValue: string, destinationValue: string) {
@@ -234,7 +254,7 @@ export default function RoutesFaresPage() {
             className="mt-8 w-full max-w-3xl rounded-2xl border border-white/80 bg-white p-4 text-left shadow-2xl shadow-[#0D2438]/20 focus:outline-2 focus:outline-offset-4 focus:outline-white sm:p-6"
           >
             <form onSubmit={handleSearch} noValidate>
-              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-end">
                 <div>
                   <label
                     htmlFor="origin"
@@ -246,6 +266,7 @@ export default function RoutesFaresPage() {
                     id="origin"
                     name="origin"
                     type="search"
+                    list="journey-cities"
                     autoComplete="off"
                     maxLength={60}
                     required
@@ -263,6 +284,17 @@ export default function RoutesFaresPage() {
                     className="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base text-[#26364d] outline-none transition placeholder:text-slate-500 focus:border-[#29466d] focus:ring-4 focus:ring-[#29466d]/10 aria-[invalid=true]:border-red-500 motion-reduce:transition-none"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={swapLocations}
+                  aria-label="Swap starting point and destination"
+                  title="Swap locations"
+                  className="inline-flex size-12 items-center justify-self-center rounded-xl border border-slate-300 text-[#29466d] transition hover:border-[#29466d] hover:bg-[#eef2f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d] motion-reduce:transition-none md:h-12 md:w-auto md:px-3"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-5">
+                    <path d="M7 7h13m0 0-3-3m3 3-3 3M17 17H4m0 0 3 3m-3-3 3-3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
                 <div>
                   <label
                     htmlFor="destination"
@@ -274,6 +306,7 @@ export default function RoutesFaresPage() {
                     id="destination"
                     name="destination"
                     type="search"
+                    list="journey-cities"
                     autoComplete="off"
                     maxLength={60}
                     required
@@ -293,7 +326,7 @@ export default function RoutesFaresPage() {
                 </div>
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#0D2438] px-6 text-sm font-semibold text-white transition hover:bg-[#1B4B72] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1B4B72] motion-reduce:transition-none"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0D2438] px-6 text-sm font-semibold text-white transition hover:bg-[#1B4B72] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1B4B72] motion-reduce:transition-none md:w-auto"
               >
                 Find journey
                 <svg
@@ -312,6 +345,9 @@ export default function RoutesFaresPage() {
                 </svg>
               </button>
             </div>
+            <datalist id="journey-cities">
+              {cities.map((city) => <option key={city} value={city} />)}
+            </datalist>
             {error ? (
               <p
                 id="journey-error"
@@ -358,13 +394,13 @@ export default function RoutesFaresPage() {
           aria-labelledby="routes-fares-heading"
           className="mb-8 overflow-hidden rounded-2xl border border-[#D7E2EF] bg-white shadow-sm"
         >
-          <div className="border-b border-[#D7E2EF] px-6 py-6 sm:px-8">
+          <div className="border-b border-[#D7E2EF] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#526D87]">
               PLAN WITH CONFIDENCE
             </p>
             <h2
               id="routes-fares-heading"
-              className="mt-2 text-2xl font-bold tracking-tight text-[#0D2438]"
+              className="mt-2 text-xl font-bold tracking-tight text-[#0D2438] sm:text-2xl"
             >
               Routes &amp; fares, at a glance
             </h2>
@@ -374,10 +410,10 @@ export default function RoutesFaresPage() {
               only and is not confirmed operator data.
             </p>
           </div>
-          <div className="grid gap-px bg-[#EDF4FA] sm:grid-cols-2">
-            <article className="bg-white p-6 sm:p-8">
-              <div className="flex items-start gap-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72]">
+          <div className="grid grid-cols-1 gap-px bg-[#EDF4FA] lg:grid-cols-2">
+            <article className="min-w-0 bg-white p-4 sm:p-6 lg:p-8">
+              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72] sm:size-11">
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 24 24"
@@ -393,23 +429,23 @@ export default function RoutesFaresPage() {
                     />
                   </svg>
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-[#0D2438]">
                     Route options
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Search between towns to see direct coach and minibus routes
-                    or follow a longer journey through its transfer stops.
+                  <p className="mt-1 break-words text-sm leading-6 text-slate-600">
+                    Find direct coach and minibus routes, or see each leg and
+                    transfer stop for a longer journey.
                   </p>
-                  <span className="mt-3 inline-flex rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
-                    Sample route information
+                  <span className="mt-3 inline-flex max-w-full rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
+                    Direct and connecting journeys
                   </span>
                 </div>
               </div>
             </article>
-            <article className="bg-white p-6 sm:p-8">
-              <div className="flex items-start gap-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72]">
+            <article className="min-w-0 bg-white p-4 sm:p-6 lg:p-8">
+              <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#EDF4FA] text-[#1B4B72] sm:size-11">
                   <svg
                     aria-hidden="true"
                     viewBox="0 0 24 24"
@@ -425,21 +461,31 @@ export default function RoutesFaresPage() {
                     />
                   </svg>
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-[#0D2438]">
                     Fare estimates
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-[#526D87]">
-                    Example estimates are shown in Malawi kwacha (MWK). Actual
-                    fares may differ by operator and service; confirm the
-                    current fare with your provider.
+                  <p className="mt-1 break-words text-sm leading-6 text-[#526D87]">
+                    Check available sample fares in Malawi kwacha (MWK) for
+                    your route. Estimates are indicative; confirm the current
+                    fare with your provider.
                   </p>
-                  <span className="mt-3 inline-flex rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
-                    Indicative estimates only
+                  <span className="mt-3 inline-flex max-w-full rounded-full bg-[#EAF2FA] px-3 py-1 text-xs font-semibold text-[#12304A]">
+                    Estimates shown with route results
                   </span>
                 </div>
               </div>
             </article>
+          </div>
+          <div className="flex justify-center border-t border-[#D7E2EF] bg-white p-4 sm:p-5">
+            <button
+              type="button"
+              onClick={() => focusJourneySearch("origin")}
+              aria-controls="destination-search"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#12304A] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#29466D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D] sm:w-auto"
+            >
+              Search routes &amp; fares <span aria-hidden="true">→</span>
+            </button>
           </div>
         </section>
 
@@ -447,7 +493,7 @@ export default function RoutesFaresPage() {
           {searchedOrigin === null || searchedDestination === null ? (
             <section
               aria-labelledby="start-search-heading"
-              className="mx-auto max-w-3xl rounded-2xl border border-dashed border-[#C7D8E8] bg-white px-6 py-10 text-center"
+              className="mx-auto max-w-4xl rounded-2xl border border-dashed border-[#C7D8E8] bg-white px-4 py-8 text-center sm:px-6 sm:py-10"
             >
               <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#EDF4FA] text-[#1B4B72]">
                 <svg
@@ -490,7 +536,7 @@ export default function RoutesFaresPage() {
               <div className="mb-5">
                 <h2
                   id="travel-information-heading"
-                  className="text-xl font-bold text-[#0D2438]"
+                  className="break-words text-xl font-bold text-[#0D2438] sm:text-2xl"
                 >
                   Journey from {searchedOrigin} to {searchedDestination}
                 </h2>
@@ -502,22 +548,28 @@ export default function RoutesFaresPage() {
               </div>
               {matchingJourneys.length ? (
                 <ul className="grid gap-4">
-                  {matchingJourneys.map((journey, journeyIndex) => (
+                  {matchingJourneys.map((journey, journeyIndex) => {
+                    const firstLeg = journey.legs[0];
+                    const bookingTrip =
+                      journey.legs.length === 1 && firstLeg
+                        ? findTripForRoute(firstLeg)
+                        : undefined;
+                    return (
                     <li
                       key={`${journey.legs.map((leg) => leg.id).join("-")}-${journeyIndex}`}
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                      className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
                     >
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-lg font-bold text-[#14233b]">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words text-lg font-bold text-[#14233b]">
                             Option {journeyIndex + 1}: {journey.legs.length === 1 ? "Direct journey" : `${journey.legs.length} legs, ${journey.legs.length - 1} ${journey.legs.length === 2 ? "change" : "changes"}`}
                           </h3>
-                          <p className="mt-1 text-sm text-slate-600">
+                          <p className="mt-1 break-words text-sm text-slate-600">
                             {journey.legs.map((leg) => leg.origin).join(" → ")}{" "}
                             → {searchedDestination}
                           </p>
                         </div>
-                        <div className="rounded-xl bg-[#eef2f7] px-4 py-2 sm:text-right">
+                        <div className="w-full rounded-xl bg-[#eef2f7] px-4 py-2 sm:w-auto sm:text-right">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Sample total fare
                           </p>
@@ -530,24 +582,24 @@ export default function RoutesFaresPage() {
                         {journey.legs.map((leg, legIndex) => (
                           <li
                             key={leg.id}
-                            className="rounded-xl border border-slate-200 p-4"
+                            className="min-w-0 rounded-xl border border-slate-200 p-3 sm:p-4"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <h4 className="font-semibold text-[#14233b]">
+                              <h4 className="min-w-0 break-words font-semibold text-[#14233b]">
                                 Leg {legIndex + 1}: {leg.origin}{" "}
                                 <span aria-hidden="true">→</span>{" "}
                                 {leg.destination}
                               </h4>
-                              <span className="rounded-full bg-[#eef2f7] px-3 py-1 text-xs font-semibold text-[#29466d]">
+                              <span className="max-w-full rounded-full bg-[#eef2f7] px-3 py-1 text-xs font-semibold text-[#29466d]">
                                 {leg.service}
                               </span>
                             </div>
-                            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <dl className="mt-3 grid gap-3 md:grid-cols-2">
                               <div>
                                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                   Board at
                                 </dt>
-                                <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                                <dd className="mt-1 break-words text-sm font-medium text-[#26364d]">
                                   {leg.pickupPoint}
                                 </dd>
                               </div>
@@ -555,7 +607,7 @@ export default function RoutesFaresPage() {
                                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                   Get off at
                                 </dt>
-                                <dd className="mt-1 text-sm font-medium text-[#26364d]">
+                                <dd className="mt-1 break-words text-sm font-medium text-[#26364d]">
                                   {leg.dropOffPoint}
                                 </dd>
                               </div>
@@ -574,13 +626,32 @@ export default function RoutesFaresPage() {
                           </li>
                         ))}
                       </ol>
-                      {journey.legs.length === 1 && TRIPS.some((trip) => trip.route.toLowerCase() === `${journey.legs[0].origin} → ${journey.legs[0].destination}`.toLowerCase()) && (
-                        <Link href="/transport-booking" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#12304A] px-4 text-sm font-bold text-white transition hover:bg-[#29466D]">
-                          Reserve a seat on this route <span className="ml-2" aria-hidden="true">→</span>
+                      <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+                        {bookingTrip ? (
+                          <Link
+                            href={`/transport-booking/details/${encodeURIComponent(bookingTrip.id)}`}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#12304A] px-4 text-sm font-bold text-white transition hover:bg-[#29466D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                          >
+                            Reserve this trip <span className="ml-2" aria-hidden="true">→</span>
+                          </Link>
+                        ) : (
+                          <Link
+                            href="/transport-booking"
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#AABBD0] px-4 text-sm font-bold text-[#12304A] transition hover:bg-[#EAF2FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                          >
+                            Browse available trips <span className="ml-2" aria-hidden="true">→</span>
+                          </Link>
+                        )}
+                        <Link
+                          href="/maps-admin-integration/nearby"
+                          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#AABBD0] px-4 text-sm font-bold text-[#12304A] transition hover:bg-[#EAF2FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                        >
+                          Find nearby stops <span className="ml-2" aria-hidden="true">→</span>
                         </Link>
-                      )}
+                      </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center">
@@ -600,6 +671,58 @@ export default function RoutesFaresPage() {
             </section>
           )}
         </div>
+
+        <section aria-labelledby="journey-tools-heading" className="mx-auto mt-12 max-w-5xl">
+          <div className="mb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#526D87]">MORE WAYS TO TRAVEL</p>
+            <h2 id="journey-tools-heading" className="mt-2 text-2xl font-bold tracking-tight text-[#0D2438]">
+              Plan, book, and manage your journey
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#526D87]">
+              Continue from route planning to nearby stops, seat reservations, or your passenger account.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                href: "/maps-admin-integration/nearby",
+                title: "Nearby stops",
+                description: "Explore pickup and drop-off points by town or location.",
+                action: "Open stop finder",
+              },
+              {
+                href: "/transport-booking",
+                title: "Book a trip",
+                description: "Compare scheduled departures and reserve available seats.",
+                action: "View available trips",
+              },
+              {
+                href: "/accounts-reports/login",
+                title: "Passenger account",
+                description: "Sign in or create an account to manage your details.",
+                action: "Manage account",
+              },
+              {
+                href: "/transport-booking/my-bookings",
+                title: "My bookings",
+                description: "Look up or manage an existing seat reservation.",
+                action: "Find a booking",
+              },
+            ].map((tool) => (
+              <Link
+                key={tool.href}
+                href={tool.href}
+                className="group flex min-h-40 flex-col rounded-2xl border border-[#D7E2EF] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#AABBD0] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D] motion-reduce:transform-none motion-reduce:transition-none"
+              >
+                <h3 className="font-semibold text-[#0D2438]">{tool.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#526D87]">{tool.description}</p>
+                <span className="mt-auto pt-4 text-sm font-semibold text-[#29466D] group-hover:text-[#0D2438]">
+                  {tool.action} <span aria-hidden="true">→</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
 
         <footer className="mx-auto mt-12 max-w-3xl border-t border-[#D7E2EF] pt-5 text-center text-xs leading-5 text-[#617B96]">
           Sample route information is for planning demonstrations only.
