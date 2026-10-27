@@ -59,13 +59,8 @@ function ForgotPasswordContent() {
           <span>Email address</span>
           <strong>{email || "No email provided"}</strong>
         </div>
-<<<<<<< HEAD
-
         {message && (
-          <p
-            role="status"
-            className="mb-4 text-sm text-[#12304A]"
-          >
+          <p role="status" className="mb-4 text-sm text-[#12304A]">
             {message}
           </p>
         )}
@@ -77,13 +72,14 @@ function ForgotPasswordContent() {
           className="w-full rounded-lg bg-[#12304A] px-4 py-3 font-semibold text-white hover:bg-[#0D2438] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Sending request..." : "Send Reset Link"}
-=======
-        {message && <p role="status" className="account-message">{message}</p>}
-        <button type="button" onClick={handleResetPassword} disabled={loading || !email.trim()} className="account-submit" style={{ opacity: loading || !email.trim() ? 0.55 : 1 }}>
-          {loading ? "Sending request…" : "Send reset link"} <span aria-hidden="true">→</span>
->>>>>>> origin/feature/integration
         </button>
-        <button type="button" onClick={() => router.push("/accounts-reports/login")} className="account-reset-back">Back to sign in</button>
+        <button
+          type="button"
+          onClick={() => router.push("/accounts-reports/login")}
+          className="account-reset-back"
+        >
+          Back to sign in
+        </button>
       </section>
     </main>
   );
@@ -93,23 +89,14 @@ export default function ForgotPasswordPage() {
   return (
     <Suspense
       fallback={
-<<<<<<< HEAD
         <main className="flex min-h-screen items-center justify-center bg-[#F4F8FC] px-4">
           <p role="status" className="text-sm text-[#12304A]">
             Loading password reset...
           </p>
-=======
-        <main className="account-page">
-          <section className="account-card"><p className="account-description">Loading account support…</p></section>
->>>>>>> origin/feature/integration
         </main>
       }
     >
       <ForgotPasswordContent />
     </Suspense>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/feature/integration
