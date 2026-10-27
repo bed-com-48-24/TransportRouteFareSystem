@@ -5,11 +5,11 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { loginAdmin, logout, useSession } from "@/lib/auth";
 
 const links = [
-  ["routes", "Routes"],
-  ["fares", "Fares"],
-  ["stops", "Stops"],
-  ["reports", "Reports"],
-  ["bookings", "Bookings"],
+  ["/maps-admin-integration/admin/routes", "Routes"],
+  ["/maps-admin-integration/admin/fares", "Fares"],
+  ["/maps-admin-integration/admin/stops", "Stops"],
+  ["/transport-booking/manage", "Bookings"],
+  ["/maps-admin-integration/admin/reports", "Reports"],
 ] as const;
 
 export default function RequireAdmin({ children }: { children: ReactNode }) {
@@ -25,31 +25,37 @@ export default function RequireAdmin({ children }: { children: ReactNode }) {
 
   if (session?.role !== "admin") {
     return (
-      <main style={{ maxWidth: 380, margin: "48px auto", padding: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Administrator sign in</h1>
-        <p style={{ margin: "8px 0 16px" }}>Only authorised administrators can open this area.</p>
-        <form onSubmit={submit} style={{ display: "grid", gap: 10 }}>
-          <input className="booking-input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className="booking-input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button className="confirm-button" type="submit">Sign in</button>
-          {error && <p role="alert" style={{ color: "#b91c1c" }}>{error}</p>}
-        </form>
+      <main className="account-page">
+        <section className="account-card" aria-labelledby="admin-login-title">
+          <Link href="/" className="account-back">← Back to SBUS</Link>
+          <p className="account-kicker">ADMINISTRATION</p>
+          <h1 id="admin-login-title">Administrator sign in</h1>
+          <p className="account-description">Sign in to maintain routes, fare estimates, stops, reports, and bookings.</p>
+          <form className="account-form" onSubmit={submit}>
+            <label htmlFor="admin-email">Email address</label>
+            <input id="admin-email" type="email" placeholder="Administrator email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <label htmlFor="admin-password">Password</label>
+            <input id="admin-password" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <button className="account-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
+            {error && <p className="account-message" role="alert">{error}</p>}
+          </form>
+        </section>
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 1000, margin: "0 auto", padding: 24 }}>
-      <nav style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+    <div className="admin-shell">
+      <nav className="admin-nav" aria-label="Administration navigation">
         <Link href="/">Home</Link>
-        {links.map(([slug, label]) => (
-          <Link key={slug} href={`/maps-admin-integration/admin/${slug}`}>{label}</Link>
+        {links.map(([href, label]) => (
+          <Link key={href} href={href}>{label}</Link>
         ))}
-        <button type="button" className="text-action" onClick={logout} style={{ marginLeft: "auto" }}>
+        <button type="button" className="text-action admin-signout" onClick={logout}>
           Sign out ({session.email})
         </button>
       </nav>
       {children}
-    </main>
+    </div>
   );
 }

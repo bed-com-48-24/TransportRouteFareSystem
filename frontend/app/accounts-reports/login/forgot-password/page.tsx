@@ -50,52 +50,21 @@ function ForgotPasswordContent() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F4F8FC] px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-md">
-        <h1 className="mb-2 text-2xl font-bold text-[#12304A]">
-          Reset Password
-        </h1>
-
-        <p className="mb-6 text-sm text-[#29466D]">
-          Request a secure password reset link for the email
-          address you entered on the login page.
-        </p>
-
-        <div className="mb-5 rounded-lg bg-[#F4F8FC] p-3">
-          <p className="text-sm text-[#617B96]">Email address</p>
-          <p className="break-all font-medium text-[#12304A]">
-            {email || "No email provided"}
-          </p>
+    <main className="account-page">
+      <section className="account-card" aria-labelledby="reset-title">
+        <p className="account-kicker">ACCOUNT SUPPORT</p>
+        <h1 id="reset-title">Reset your password</h1>
+        <p className="account-description">Request a password reset link for the email address you entered at sign in.</p>
+        <div className="account-summary">
+          <span>Email address</span>
+          <strong>{email || "No email provided"}</strong>
         </div>
-
-        {message && (
-          <p
-            role="status"
-            className="mb-4 text-sm text-[#12304A]"
-          >
-            {message}
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={handleResetPassword}
-          disabled={loading || !email.trim()}
-          className="w-full rounded-lg bg-[#12304A] px-4 py-3 font-semibold text-white hover:bg-[#0D2438] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? "Sending request..." : "Send Reset Link"}
+        {message && <p role="status" className="account-message">{message}</p>}
+        <button type="button" onClick={handleResetPassword} disabled={loading || !email.trim()} className="account-submit" style={{ opacity: loading || !email.trim() ? 0.55 : 1 }}>
+          {loading ? "Sending request…" : "Send reset link"} <span aria-hidden="true">→</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            router.push("/accounts-reports/login")
-          }
-          className="mt-4 w-full text-sm text-[#29466D] hover:underline"
-        >
-          Back to Login
-        </button>
-      </div>
+        <button type="button" onClick={() => router.push("/accounts-reports/login")} className="account-reset-back">Back to sign in</button>
+      </section>
     </main>
   );
 }
@@ -104,8 +73,8 @@ export default function ForgotPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#F4F8FC] px-4">
-          <p className="text-sm text-[#29466D]">Loading...</p>
+        <main className="account-page">
+          <section className="account-card"><p className="account-description">Loading account support…</p></section>
         </main>
       }
     >

@@ -39,8 +39,11 @@ export default function AdminStops() {
 
   return (
     <RequireAdmin>
-      <h1 style={{ fontSize: 26, fontWeight: 700 }}>Manage pickup and drop-off stops</h1>
-      <form onSubmit={submit} style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
+      <section className="admin-content">
+      <p className="admin-kicker">PICKUP AND DROP-OFF POINTS</p>
+      <h1 className="admin-title">Manage stops</h1>
+      <p className="admin-description">Maintain boarding and alighting points used by nearby search and route results.</p>
+      <form className="admin-form" onSubmit={submit}>
         <input className="booking-input" placeholder="Stop name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <select className="booking-input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as StopKind })}>
           <option value="pickup">Pickup</option>
@@ -52,7 +55,7 @@ export default function AdminStops() {
         <button className="confirm-button" type="submit">{editingId ? "Save changes" : "Add stop"}</button>
       </form>
       {error && <p role="alert" style={{ color: "#b91c1c" }}>{error}</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="admin-table-wrap"><table className="admin-table" style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr><th align="left">Name</th><th align="left">Type</th><th align="left">City</th><th align="left">Coordinates</th><th /></tr></thead>
         <tbody>
           {stops.map((s) => (
@@ -67,6 +70,8 @@ export default function AdminStops() {
           ))}
         </tbody>
       </table>
+      </div>
+      </section>
     </RequireAdmin>
   );
 }
