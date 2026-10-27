@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { useStoredList } from "@/lib/storage";
@@ -185,6 +185,21 @@ export default function RoutesFaresPage() {
     searchedOrigin === null || searchedDestination === null
       ? []
       : findJourneyOptions(searchedOrigin, searchedDestination, sampleRoutes);
+
+  useEffect(() => {
+    if (searchedOrigin === null || searchedDestination === null) {
+      return;
+    }
+
+    const results = document.getElementById("journey-results");
+    results?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "start",
+    });
+    results?.focus({ preventScroll: true });
+  }, [searchedOrigin, searchedDestination]);
 
   return (
     <main className="min-h-screen bg-white text-[#12304A]">
@@ -530,8 +545,10 @@ export default function RoutesFaresPage() {
             </section>
           ) : (
             <section
+              id="journey-results"
               aria-labelledby="travel-information-heading"
-              className="mx-auto max-w-4xl"
+              tabIndex={-1}
+              className="mx-auto max-w-4xl scroll-mt-6 focus:outline-none"
             >
               <div className="mb-5">
                 <h2
