@@ -1,36 +1,17 @@
-"use client";
+import Link from "next/link";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-const services = [
-  {
-    title: "Bus Routes",
-    description: "Explore available routes and destinations.",
-    href: "/routes",
-  },
-  {
-    title: "Fare Information",
-    description: "Check fares before travelling.",
-    href: "/routes-fares",
-  },
-  {
-    title: "Staff Portal",
-    description: "Access authorized company services.",
-    href: "/login",
-  },
-  {
-    title: "Report Information",
-    description: "Report incorrect route or fare details.",
-    href: "/accounts-reports/report",
-  },
+const links = [
+  ["Plan a journey", "Search routes, connected legs, boarding points, and estimated fares.", "/routes-fares"],
+  ["Nearby stops", "Find pickup and drop-off points on the map.", "/maps-admin-integration/nearby"],
+  ["Book a trip", "Reserve seats and receive a booking reference.", "/transport-booking"],
+  ["My bookings", "Look up or cancel a reservation using your email.", "/transport-booking/my-bookings"],
+  ["Report information", "Send a correction about a route, fare, or stop.", "/accounts-reports/report"],
+  ["Manage profile", "Update personal information saved on this browser.", "/accounts-reports/profile"],
 ];
 
-export default function HomePage() {
-  const router = useRouter();
-  const [showAccountMenu, setShowAccountMenu] = useState(false);
-
+export default function AccountHomePage() {
   return (
+<<<<<<< HEAD
     <main className="min-h-screen bg-white px-4 py-6">
       <div className="mx-auto max-w-2xl rounded-xl bg-white shadow-md">
       {/* Navigation */}
@@ -170,20 +151,24 @@ export default function HomePage() {
                 Explore →
               </span>
             </button>
+=======
+    <main className="min-h-screen bg-[#F5F8FB] px-5 py-10 text-[#12304A]">
+      <section className="mx-auto max-w-5xl">
+        <Link href="/" className="text-sm font-semibold text-[#29466D]">← Passenger home</Link>
+        <p className="mt-8 text-xs font-bold uppercase tracking-[0.18em] text-[#617B96]">SBUS account</p>
+        <h1 className="mt-2 text-3xl font-bold">Your travel dashboard</h1>
+        <p className="mt-2 max-w-2xl text-[#526D87]">Manage your details and continue planning a journey.</p>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {links.map(([title, description, href]) => (
+            <Link key={href} href={href} className="rounded-2xl border border-[#D7E2EF] bg-white p-5 shadow-sm transition hover:border-[#AABBD0] hover:shadow-md">
+              <h2 className="font-bold">{title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#617B96]">{description}</p>
+              <span className="mt-4 inline-block text-sm font-bold text-[#29466D]">Open →</span>
+            </Link>
+>>>>>>> origin/feature/integration
           ))}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-[#D7E2EF] bg-white">
-        <div className="px-5 py-3 text-xs text-[#617B96]">
-          Transport Route and Fare Information System
-          <span className="mt-1 block">
-            Helping passengers access transport information.
-          </span>
-        </div>
-      </footer>
-      </div>
     </main>
   );
 }

@@ -27,9 +27,9 @@ export type Booking = {
 };
 
 export const TRIPS: Trip[] = [
-  { id: "BT-LB-0800", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-20", departure: "08:00", arrival: "08:45", capacity: 14, fare: 2500 },
-  { id: "BT-LB-1030", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-20", departure: "10:30", arrival: "11:15", capacity: 18, fare: 2500 },
-  { id: "BT-ZO-0900", route: "Blantyre → Zomba", pickup: ["Blantyre Bus Depot", "Limbe Bus Station"], dropoff: ["Zomba Bus Depot", "Zomba Market"], date: "2026-10-21", departure: "09:00", arrival: "10:30", capacity: 22, fare: 5000 },
+  { id: "BT-LB-0800", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-28", departure: "08:00", arrival: "08:45", capacity: 14, fare: 2500 },
+  { id: "BT-LB-1030", route: "Blantyre → Limbe", pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"], dropoff: ["Limbe Bus Station", "Limbe Market"], date: "2026-10-28", departure: "10:30", arrival: "11:15", capacity: 18, fare: 2500 },
+  { id: "BT-ZO-0900", route: "Blantyre → Zomba", pickup: ["Blantyre Bus Depot", "Limbe Bus Station"], dropoff: ["Zomba Bus Depot", "Zomba Market"], date: "2026-10-29", departure: "09:00", arrival: "10:30", capacity: 22, fare: 8000 },
 ];
 
 export const STORAGE_KEY = "routewise-bookings-v1";

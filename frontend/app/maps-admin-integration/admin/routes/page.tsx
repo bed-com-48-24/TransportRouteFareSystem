@@ -47,8 +47,11 @@ export default function AdminRoutes() {
 
   return (
     <RequireAdmin>
-      <h1 style={{ fontSize: 26, fontWeight: 700 }}>Manage routes</h1>
-      <form onSubmit={submit} style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
+      <section className="admin-content">
+      <p className="admin-kicker">NETWORK INFORMATION</p>
+      <h1 className="admin-title">Manage routes</h1>
+      <p className="admin-description">Add and maintain the routes passengers can find in journey search.</p>
+      <form className="admin-form" onSubmit={submit}>
         <input className="booking-input" placeholder="Origin" value={form.origin} onChange={(e) => setForm({ ...form, origin: e.target.value })} />
         <input className="booking-input" placeholder="Destination" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} />
         <select className="booking-input" value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}>
@@ -60,7 +63,7 @@ export default function AdminRoutes() {
         {editingId && <button type="button" className="text-action" onClick={() => { setEditingId(null); setForm(empty); }}>Cancel</button>}
       </form>
       {error && <p role="alert" style={{ color: "#b91c1c" }}>{error}</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="admin-table-wrap"><table className="admin-table" style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr><th align="left">Origin</th><th align="left">Destination</th><th align="left">Service</th><th /></tr></thead>
         <tbody>
           {routes.map((r) => (
@@ -74,7 +77,9 @@ export default function AdminRoutes() {
           ))}
         </tbody>
       </table>
+      </div>
       {routes.length === 0 && <p>No routes yet.</p>}
+      </section>
     </RequireAdmin>
   );
 }

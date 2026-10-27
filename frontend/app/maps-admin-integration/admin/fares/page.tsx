@@ -38,8 +38,11 @@ export default function AdminFares() {
 
   return (
     <RequireAdmin>
-      <h1 style={{ fontSize: 26, fontWeight: 700 }}>Manage estimated fares</h1>
-      <form onSubmit={submit} style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "16px 0" }}>
+      <section className="admin-content">
+      <p className="admin-kicker">FARE INFORMATION</p>
+      <h1 className="admin-title">Manage estimated fares</h1>
+      <p className="admin-description">Set indicative fares shown alongside routes in passenger journey search.</p>
+      <form className="admin-form" onSubmit={submit}>
         <select className="booking-input" value={routeId || routes[0]?.id || ""} onChange={(e) => setRouteId(e.target.value)}>
           {routes.map((r) => <option key={r.id} value={r.id}>{label(r.id)}</option>)}
         </select>
@@ -47,7 +50,7 @@ export default function AdminFares() {
         <button className="confirm-button" type="submit">Set fare</button>
       </form>
       {error && <p role="alert" style={{ color: "#b91c1c" }}>{error}</p>}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="admin-table-wrap"><table className="admin-table" style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr><th align="left">Route</th><th align="right">Estimated fare</th><th /></tr></thead>
         <tbody>
           {fares.map((f) => (
@@ -61,7 +64,9 @@ export default function AdminFares() {
           ))}
         </tbody>
       </table>
-      <p style={{ marginTop: 12, fontSize: 13 }}>Fares are estimates and may differ from what an operator charges.</p>
+      </div>
+      <p className="admin-footnote">Fares are estimates and may differ from what an operator charges.</p>
+      </section>
     </RequireAdmin>
   );
 }
