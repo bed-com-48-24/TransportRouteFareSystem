@@ -3,21 +3,23 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="home-shell">
-      <section className="home-hero">
-        <span className="eyebrow">SBUS · PUBLIC TRANSPORT, MADE CLEAR</span>
+      <section
+        className="home-hero"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(18, 48, 74, 0.76), rgba(18, 48, 74, 0.76)), url('https://images.unsplash.com/photo-1557223562-6c77ef16210f?auto=format&fit=crop&w=2000&q=90')",
+          backgroundPosition: "center",
+          backgroundSize: "cover",
+        }}
+      >
         <h1>
           Find the right route.
           <br />
           <span>Travel with confidence.</span>
         </h1>
-        <p>
-          Search routes and stops, compare estimated fares, and plan direct or
-          connecting journeys across Malawi.
-        </p>
         <Link className="confirm-button home-cta" href="/routes-fares">
           Search routes and fares <span aria-hidden="true">→</span>
         </Link>
-        <small>Fare amounts are estimates and may differ from operator prices.</small>
       </section>
 
       <section className="home-feature-row">
