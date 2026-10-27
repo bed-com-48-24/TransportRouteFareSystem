@@ -27,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/accounts-reports/report">Report an issue</Link>
             <Link href="/accounts-reports/login">Account</Link>
             <Link href="/maps-admin-integration">Admin tools</Link>
+            <Link href="/accounts-reports/login">Logout</Link>
           </nav>
         </header>
         {children}
