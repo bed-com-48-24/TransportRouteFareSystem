@@ -60,76 +60,54 @@ export default function HomePage() {
             </button>
 
             <div className="relative">
-<<<<<<< HEAD
+              <button
+                onClick={() => setShowAccountMenu(!showAccountMenu)}
+                className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="7" r="4" />
+                  <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+                </svg>
+                My Account
+              </button>
 
-            <button
-<<<<<<< HEAD
-<<<<<<< HEAD
-              onClick={() => router.push("/accounts-reports/register")}
-=======
-            <button
-            
-              onClick={() => setShowAccountMenu(!showAccountMenu)}
->>>>>>> origin/feature/accounts-reports
-              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-[#14233b] px-4 py-2 text-sm font-medium text-white hover:bg-[#29466d]"
-=======
-=======
->>>>>>> origin/feature/accounts-reports
-              onClick={() => setShowAccountMenu(!showAccountMenu)}  
-              className="flex flex-col items-center justify-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
->>>>>>> origin/feature/accounts-reports
-            >
-              <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor" 
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true">
-                <circle cx="12" cy="7" r="4"/>
-                <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
-
-              </svg>
-            My Account
-            </button>
-
-            {showAccountMenu && (
-<<<<<<< HEAD
-              <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg boarder boarder-slate-200 bg-white py-2 shadow-lg">
-=======
-              <div role="menu" className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-[#D7E2EF] bg-white py-2 shadow-lg">
->>>>>>> origin/feature/accounts-reports
-                <button onClick={() =>{
-                  setShowAccountMenu(false);
-                  router.push("/accounts-reports/profile");
-                }}
-<<<<<<< HEAD
-              className = "block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-=======
-              className = "block w-full px-4 py-2 text-left text-sm text-[#29466D] hover:bg-[#EAF2FA]"
->>>>>>> origin/feature/accounts-reports
-            > Manage profile</button>
-            <button onClick={() => {setShowAccountMenu(false);
-              router.push("/accounts-reports/login")
-            }}
-<<<<<<< HEAD
-            className = "block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100">
-=======
-            className = "block w-full px-4 py-2 text-left text-sm text-[#12304A] hover:bg-[#EAF2FA]">
->>>>>>> origin/feature/accounts-reports
-              Logout
-            </button>
+              {showAccountMenu && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
+                >
+                  <button
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      router.push("/accounts-reports/profile");
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+                  >
+                    Manage profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAccountMenu(false);
+                      router.push("/accounts-reports/login");
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
-            )}
-<<<<<<< HEAD
-          </div>
-=======
-            </div>
->>>>>>> origin/feature/accounts-reports
           </div>
         </nav>
       </header>

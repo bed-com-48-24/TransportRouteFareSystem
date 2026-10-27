@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -71,11 +71,7 @@ export default function ForgotPasswordPage() {
         {message && (
           <p
             role="status"
-<<<<<<< HEAD
             className="mb-4 text-sm text-[#12304A]"
-=======
-            className="mb-4 text-sm text-[#14233b]"
->>>>>>> 1976155e63f21920be544a8c36aaf5abb66cefd8
           >
             {message}
           </p>
@@ -85,11 +81,7 @@ export default function ForgotPasswordPage() {
           type="button"
           onClick={handleResetPassword}
           disabled={loading || !email.trim()}
-<<<<<<< HEAD
           className="w-full rounded-lg bg-[#12304A] px-4 py-3 font-semibold text-white hover:bg-[#0D2438] disabled:cursor-not-allowed disabled:opacity-50"
-=======
-          className="w-full rounded-lg bg-[#14233b] px-4 py-3 font-semibold text-white hover:bg-[#29466d] disabled:cursor-not-allowed disabled:opacity-50"
->>>>>>> 1976155e63f21920be544a8c36aaf5abb66cefd8
         >
           {loading ? "Sending request..." : "Send Reset Link"}
         </button>
@@ -105,5 +97,21 @@ export default function ForgotPasswordPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#F4F8FC] px-4">
+          <p role="status" className="text-sm text-[#12304A]">
+            Loading password reset...
+          </p>
+        </main>
+      }
+    >
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }
