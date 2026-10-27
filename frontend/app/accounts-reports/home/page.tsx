@@ -120,7 +120,7 @@ export default function HomePage() {
               onClick={() => router.push("/routes")}
               className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#12304A] hover:bg-[#EAF2FA]"
             >
-              🗺️ Find Routes
+              Find Routes
             </button>
 
             <button
