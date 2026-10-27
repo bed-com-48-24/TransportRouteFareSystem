@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { distanceKm, hasCoords } from "@/lib/geo";
@@ -8,17 +7,13 @@ import { KEYS, SEED_STOPS } from "@/lib/seed";
 import { useStoredList } from "@/lib/storage";
 import type { StopItem } from "@/lib/types";
 
-// Leaflet touches `window`, so it must only load in the browser.
-const NearbyMap = dynamic(() => import("@/components/NearbyMap"), {
-  ssr: false,
-  loading: () => <p>Loading map…</p>,
-});
-
 const CITIES: Record<string, [number, number]> = {
   Blantyre: [-15.7861, 35.0058],
   Limbe: [-15.8103, 35.0586],
   Zomba: [-15.3833, 35.3188],
   Lilongwe: [-13.9626, 33.7741],
+  Mzuzu: [-11.4656, 34.0207],
+  Salima: [-13.7804, 34.4587],
 };
 const RADIUS_KM = 15;
 
@@ -68,16 +63,18 @@ export default function NearbyPage() {
   }, [stops, origin]);
 
   return (
-    <main style={{ maxWidth: 960, margin: "0 auto", padding: 24 }}>
-      <Link href="/">← Home</Link>
-      <h1 style={{ fontSize: 28, fontWeight: 700, margin: "12px 0" }}>Nearby pickup and drop-off points</h1>
+    <main className="nearby-page">
+      <Link href="/" className="nearby-back">← Passenger home</Link>
+      <p className="admin-kicker">LOCAL TRAVEL</p>
+      <h1 className="admin-title">Nearby pickup and drop-off points</h1>
+      <p className="admin-description">Find stops near your current location or choose a town to explore.</p>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+      <div className="nearby-controls">
         <button type="button" onClick={locate} disabled={busy} className="mode-toggle">
           {busy ? "Locating…" : "Use my location"}
         </button>
-        <label>
-          Or choose an area:{" "}
+        <label className="nearby-city-label">
+          Choose a town
           <select
             value={city}
             onChange={(e) => {
@@ -92,19 +89,21 @@ export default function NearbyPage() {
         </label>
       </div>
 
-      {notice && <p role="alert" style={{ color: "#b45309" }}>{notice}</p>}
+      {notice && <p role="alert" className="nearby-alert">{notice}</p>}
 
-      <NearbyMap center={origin} stops={nearby} user={user} />
+      <p className="nearby-note">
+        Showing stops within {RADIUS_KM} km of {user ? "your current location" : city}. Distances use the stop coordinates on file.
+      </p>
 
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "20px 0 8px" }}>
+      <h2 className="nearby-heading">
         Within {RADIUS_KM} km ({nearby.length})
       </h2>
       {nearby.length === 0 ? (
         <p>No known stops within {RADIUS_KM} km. Try another area.</p>
       ) : (
-        <ul style={{ display: "grid", gap: 8 }}>
+        <ul className="nearby-list">
           {nearby.map((s) => (
-            <li key={s.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 10 }}>
+            <li key={s.id} className="nearby-item">
               <strong>{s.name}</strong> — {s.kind === "pickup" ? "Pickup" : "Drop-off"} · {s.city} ·{" "}
               {s.km.toFixed(1)} km
             </li>
@@ -114,8 +113,8 @@ export default function NearbyPage() {
 
       {unlocated.length > 0 && (
         <>
-          <h2 style={{ fontSize: 20, fontWeight: 600, margin: "20px 0 8px" }}>Location not available</h2>
-          <ul>
+          <h2 className="nearby-heading">Location not available</h2>
+          <ul className="nearby-list">
             {unlocated.map((s) => (
               <li key={s.id}>{s.name} ({s.city}) — map location not recorded yet</li>
             ))}

@@ -2,8 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
+import { useStoredList } from "@/lib/storage";
+import type { FareItem, RouteItem, StopItem } from "@/lib/types";
+import { TRIPS } from "../transport-booking/booking-data";
 
-const brandName = "SBUS";
 const popularDestinations = ["Blantyre", "Lilongwe", "Mzuzu", "Zomba", "Salima"];
 
 type RouteOption = {
@@ -13,94 +16,16 @@ type RouteOption = {
   service: string;
   pickupPoint: string;
   dropOffPoint: string;
-  estimatedFare: number;
+  estimatedFare: number | null;
 };
 
 type JourneyOption = {
   legs: RouteOption[];
-  totalFare: number;
+  totalFare: number | null;
 };
 
-const sampleRoutes: RouteOption[] = [
-  {
-    id: "blantyre-lilongwe-coach",
-    origin: "Blantyre",
-    destination: "Lilongwe",
-    service: "Intercity coach",
-    pickupPoint: "Blantyre central bus depot (sample stop)",
-    dropOffPoint: "Lilongwe bus terminal (sample stop)",
-    estimatedFare: 30000,
-  },
-  {
-    id: "blantyre-zomba-minibus",
-    origin: "Blantyre",
-    destination: "Zomba",
-    service: "Minibus",
-    pickupPoint: "Blantyre central bus depot (sample stop)",
-    dropOffPoint: "Zomba bus terminal (sample stop)",
-    estimatedFare: 8000,
-  },
-  {
-    id: "lilongwe-blantyre-coach",
-    origin: "Lilongwe",
-    destination: "Blantyre",
-    service: "Intercity coach",
-    pickupPoint: "Lilongwe bus terminal (sample stop)",
-    dropOffPoint: "Blantyre central bus depot (sample stop)",
-    estimatedFare: 30000,
-  },
-  {
-    id: "lilongwe-mzuzu-coach",
-    origin: "Lilongwe",
-    destination: "Mzuzu",
-    service: "Intercity coach",
-    pickupPoint: "Lilongwe bus terminal (sample stop)",
-    dropOffPoint: "Mzuzu bus terminal (sample stop)",
-    estimatedFare: 22000,
-  },
-  {
-    id: "lilongwe-salima-minibus",
-    origin: "Lilongwe",
-    destination: "Salima",
-    service: "Minibus",
-    pickupPoint: "Lilongwe bus terminal (sample stop)",
-    dropOffPoint: "Salima bus terminal (sample stop)",
-    estimatedFare: 7000,
-  },
-  {
-    id: "mzuzu-lilongwe-coach",
-    origin: "Mzuzu",
-    destination: "Lilongwe",
-    service: "Intercity coach",
-    pickupPoint: "Mzuzu bus terminal (sample stop)",
-    dropOffPoint: "Lilongwe bus terminal (sample stop)",
-    estimatedFare: 22000,
-  },
-  {
-    id: "zomba-blantyre-minibus",
-    origin: "Zomba",
-    destination: "Blantyre",
-    service: "Minibus",
-    pickupPoint: "Zomba bus terminal (sample stop)",
-    dropOffPoint: "Blantyre central bus depot (sample stop)",
-    estimatedFare: 8000,
-  },
-  {
-    id: "salima-lilongwe-minibus",
-    origin: "Salima",
-    destination: "Lilongwe",
-    service: "Minibus",
-    pickupPoint: "Salima bus terminal (sample stop)",
-    dropOffPoint: "Lilongwe bus terminal (sample stop)",
-    estimatedFare: 7000,
-  },
-];
-
-const cities = [
-  ...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination])),
-];
-
-function findJourneyOptions(origin: string, destination: string): JourneyOption[] {
+function findJourneyOptions(origin: string, destination: string, sampleRoutes: RouteOption[]): JourneyOption[] {
+  const cities = [...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination]))];
   const journeys: JourneyOption[] = [];
 
   function findPaths(
@@ -124,7 +49,9 @@ function findJourneyOptions(origin: string, destination: string): JourneyOption[
       if (route.destination.toLocaleLowerCase() === destination.toLocaleLowerCase()) {
         journeys.push({
           legs: nextLegs,
-          totalFare: nextLegs.reduce((total, leg) => total + leg.estimatedFare, 0),
+          totalFare: nextLegs.some((leg) => leg.estimatedFare === null)
+            ? null
+            : nextLegs.reduce((total, leg) => total + (leg.estimatedFare ?? 0), 0),
         });
         continue;
       }
@@ -137,12 +64,26 @@ function findJourneyOptions(origin: string, destination: string): JourneyOption[
 
   findPaths(origin, new Set([origin.toLocaleLowerCase()]), []);
   return journeys.sort(
-    (first, second) =>
-      first.legs.length - second.legs.length || first.totalFare - second.totalFare,
+      (first, second) =>
+      first.legs.length - second.legs.length || (first.totalFare ?? Infinity) - (second.totalFare ?? Infinity),
   );
 }
 
 export default function RoutesFaresPage() {
+  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
+  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
+  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
+  const sampleRoutes: RouteOption[] = routes.map((route) => {
+    const pickup = stops.find((stop) => stop.city.toLowerCase() === route.origin.toLowerCase() && stop.kind === "pickup");
+    const dropoff = stops.find((stop) => stop.city.toLowerCase() === route.destination.toLowerCase() && stop.kind === "dropoff");
+    return {
+      ...route,
+      pickupPoint: pickup?.name ?? `Pickup point in ${route.origin}`,
+      dropOffPoint: dropoff?.name ?? `Drop-off point in ${route.destination}`,
+      estimatedFare: fares.find((fare) => fare.routeId === route.id)?.amount ?? null,
+    };
+  });
+  const cities = [...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination]))];
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [searchedOrigin, setSearchedOrigin] = useState<string | null>(null);
@@ -223,7 +164,7 @@ export default function RoutesFaresPage() {
   const matchingJourneys =
     searchedOrigin === null || searchedDestination === null
       ? []
-      : findJourneyOptions(searchedOrigin, searchedDestination);
+      : findJourneyOptions(searchedOrigin, searchedDestination, sampleRoutes);
 
   return (
     <main className="min-h-screen bg-white text-[#12304A]">
@@ -233,62 +174,6 @@ export default function RoutesFaresPage() {
       >
         Skip to destination search
       </a>
-      <header className="border-b border-[#D7E2EF] bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5"
-            aria-label="SBUS home"
-          >
-            <span className="flex size-10 items-center justify-center rounded-xl bg-[#0D2438] text-white shadow-sm">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="size-5"
-              >
-                <path
-                  d="M4 15.5 5.5 9a2 2 0 0 1 1.94-1.5h9.12A2 2 0 0 1 18.5 9l1.5 6.5V19h-2v-2H6v2H4v-3.5ZM6 13h12M8 10h.01M16 10h.01M8 15.5h.01M16 15.5h.01M8 4.5l4-2 4 2"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="text-base font-bold tracking-tight text-[#0D2438]">
-              {brandName}
-              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.18em] text-[#526D87]">
-                Travel • Connect • Belong
-              </span>
-            </span>
-          </Link>
-          <nav
-            aria-label="Main navigation"
-            className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-xs font-medium text-[#52627a] sm:gap-5 sm:text-sm"
-          >
-            <Link href="/" className="transition hover:text-[#14233b]">
-              Home
-            </Link>
-            <span className="rounded-full bg-[#eef2f7] px-3 py-1.5 text-xs font-semibold text-[#29466d]">
-              Routes &amp; fares
-            </span>
-            <Link
-              href="/transport-booking"
-              className="transition hover:text-[#14233b]"
-            >
-              Bookings
-            </Link>
-            <Link
-              href="/accounts-reports/login"
-              className="transition hover:text-[#14233b]"
-            >
-              Account
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       <section className="relative isolate overflow-hidden bg-[#0D2438]">
         <div
           aria-hidden="true"
@@ -637,7 +522,7 @@ export default function RoutesFaresPage() {
                             Sample total fare
                           </p>
                           <p className="mt-0.5 text-xl font-bold text-[#14233b]">
-                            MWK {journey.totalFare.toLocaleString("en-MW")}
+                            {journey.totalFare === null ? "Fare unavailable" : `MWK ${journey.totalFare.toLocaleString("en-MW")}`}
                           </p>
                         </div>
                       </div>
@@ -676,8 +561,7 @@ export default function RoutesFaresPage() {
                               </div>
                             </dl>
                             <p className="mt-3 text-sm font-semibold text-[#26364d]">
-                              Sample leg fare: MWK{" "}
-                              {leg.estimatedFare.toLocaleString("en-MW")}
+                              Sample leg fare: {leg.estimatedFare === null ? "Unavailable" : `MWK ${leg.estimatedFare.toLocaleString("en-MW")}`}
                             </p>
                             {legIndex < journey.legs.length - 1 && (
                               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -690,6 +574,11 @@ export default function RoutesFaresPage() {
                           </li>
                         ))}
                       </ol>
+                      {journey.legs.length === 1 && TRIPS.some((trip) => trip.route.toLowerCase() === `${journey.legs[0].origin} → ${journey.legs[0].destination}`.toLowerCase()) && (
+                        <Link href="/transport-booking" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#12304A] px-4 text-sm font-bold text-white transition hover:bg-[#29466D]">
+                          Reserve a seat on this route <span className="ml-2" aria-hidden="true">→</span>
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>

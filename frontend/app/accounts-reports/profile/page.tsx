@@ -1,35 +1,56 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+
+const PROFILE_KEY = "routewise-profile-v1";
 
 export default function ProfilePage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? "null");
+      if (saved && typeof saved === "object") {
+        setFullName(typeof saved.fullName === "string" ? saved.fullName : "");
+        setEmail(typeof saved.email === "string" ? saved.email : "");
+        setPhone(typeof saved.phone === "string" ? saved.phone : "");
+      }
+    } catch {
+      setMessage("Saved profile details could not be loaded.");
+    }
+  }, []);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
 
-    if(!fullName || !email.trim()){
-      setMessage("please fill in the spaces");
+    if (!fullName.trim() || !email.trim()) {
+      setMessage("Enter your name and email address.");
       return;
     }
-       setMessage("Profile updated successfully");
-      router.push("/accounts-reports/home");
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({ fullName: fullName.trim(), email: email.trim(), phone: phone.trim() }));
+      setMessage("Profile updated successfully.");
+    } catch {
+      setMessage("We could not save your profile on this device.");
+    }
     
   }
 
   return (
-    <main className="profile-container">
-      <h1>My Profile</h1>
-      <p>View and update your personal information.</p>
+    <main className="account-page">
+      <section className="account-card" aria-labelledby="profile-title">
+      <Link href="/accounts-reports/home" className="account-back">← Dashboard</Link>
+      <p className="account-kicker">PASSENGER ACCOUNT</p>
+      <h1 id="profile-title">My profile</h1>
+      <p className="account-description">Update the personal information saved for this browser.</p>
 
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="fullName">Full Name</label>
+      <form className="account-form" onSubmit={handleSubmit}>
+        <label htmlFor="fullName">Full name</label>
         <input
           id="fullName"
           type="text"
@@ -39,7 +60,7 @@ export default function ProfilePage() {
           required
         />
 
-        <label htmlFor="email">Email Address</label>
+        <label htmlFor="email">Email address</label>
         <input
           id="email"
           type="email"
@@ -49,7 +70,7 @@ export default function ProfilePage() {
           required
         />
 
-        <label htmlFor="phone">Phone Number (optional)</label>
+        <label htmlFor="phone">Phone number <span className="account-optional">Optional</span></label>
         <input
           id="phone"
           type="tel"
@@ -58,10 +79,11 @@ export default function ProfilePage() {
           autoComplete="tel"
         />
 
-        <button type="submit">Save Changes</button>
+        <button className="account-submit" type="submit">Save changes <span aria-hidden="true">→</span></button>
 
-        {message && <p role="status">{message}</p>}
+        {message && <p className="account-message" role="status">{message}</p>}
       </form>
+      </section>
     </main>
   );
 }
