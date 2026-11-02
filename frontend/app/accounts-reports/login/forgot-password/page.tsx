@@ -1,113 +1,99 @@
-
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-function ForgotPasswordContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+const links = [
+  ["Routes & fares", "Compare routes and fares.", "/routes-fares"],
+  ["Nearby stops", "View stops on the map.", "/maps-admin-integration/nearby"],
+  ["Book seats", "Reserve seats for your trip.", "/transport-booking"],
+  ["My bookings", "View or cancel a booking.", "/transport-booking/my-bookings"],
+  [
+    "Report an issue",
+    "Report incorrect route, fare, or stop details.",
+    "/accounts-reports/report",
+  ],
+  ["Profile", "Update your personal details.", "/accounts-reports/profile"],
+];
 
-  const email = searchParams.get("email") || "";
+const backgroundImages = [
+  "/bus-outside.jpeg",
+  "/bus-inside.jpeg",
+];
 
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function AccountHomePage() {
+  const [currentImage, setCurrentImage] = useState(0);
 
-  async function handleResetPassword() {
-    if (!email.trim()) {
-      setMessage(
-        "Please return to login and enter your email address first."
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImage((current) =>
+        (current + 1) % backgroundImages.length
       );
-      return;
-    }
+    }, 20000);
 
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Unable to request a password reset.");
-      }
-
-      setMessage(
-        "If an account exists for this email, a password reset link will be sent."
-      );
-    } catch {
-      setMessage(
-        "Password reset is currently unavailable. Please try again later."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <main className="account-page">
-      <section className="account-card" aria-labelledby="reset-title">
-        <p className="account-kicker">ACCOUNT SUPPORT</p>
-        <h1 id="reset-title">Reset your password</h1>
-        <p className="account-description">
-          Request a password reset link for the email address you entered at sign in.
+    <main className="relative min-h-screen overflow-hidden px-5 py-10 text-[#12304A]">
+      
+      {/* Background images */}
+      {backgroundImages.map((image, index) => (
+        <div
+          key={image}
+          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
+            index === currentImage ? "opacity-100" : "opacity-0"
+          }`}
+          style={{
+            backgroundImage: `url(${image})`,
+          }}
+        />
+      ))}
+
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Dashboard content */}
+      <section className="relative z-10 mx-auto max-w-5xl">
+        <Link
+          href="/"
+          className="text-sm font-semibold text-white"
+        >
+          ← Home
+        </Link>
+
+        <p className="mt-8 text-xs font-bold uppercase tracking-[0.18em] text-white/80">
+          SBUS
         </p>
 
-        <div className="account-summary">
-          <span>Email address</span>
-          <strong>{email || "No email provided"}</strong>
+        <h1 className="mt-2 text-3xl font-bold text-white">
+          Travel dashboard
+        </h1>
+
+        <p className="mt-2 max-w-2xl text-white/90">
+          Plan trips and manage your account.
+        </p>
+
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {links.map(([title, description, href]) => (
+            <Link
+              key={href}
+              href={href}
+              className="rounded-2xl border border-white/30 bg-white/90 p-5 shadow-sm backdrop-blur-sm transition hover:bg-white hover:shadow-md"
+            >
+              <h2 className="font-bold">{title}</h2>
+
+              <p className="mt-2 text-sm leading-6 text-[#617B96]">
+                {description}
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-bold text-[#29466D]">
+                Open →
+              </span>
+            </Link>
+          ))}
         </div>
-
-        {message && (
-          <p role="status" className="account-message">
-            {message}
-          </p>
-        )}
-
-        <button
-          type="button"
-          onClick={handleResetPassword}
-          disabled={loading || !email.trim()}
-          className="account-submit"
-          style={{
-            opacity: loading || !email.trim() ? 0.55 : 1,
-          }}
-        >
-          {loading ? "Sending request..." : "Send reset link"}
-          <span aria-hidden="true"> →</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/accounts-reports/login")}
-          className="account-reset-back"
-        >
-          Back to sign in
-        </button>
       </section>
     </main>
-  );
-}
-
-export default function ForgotPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="account-page">
-          <section className="account-card">
-            <p className="account-description">
-              Loading account support...
-            </p>
-          </section>
-        </main>
-      }
-    >
-      <ForgotPasswordContent />
-    </Suspense>
   );
 }
