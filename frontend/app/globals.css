@@ -892,14 +892,7 @@ body { background: var(--background); color: var(--foreground); }
 .text-action { border: 0; padding: 5px; color: var(--navy-light); background: none; font-size: 10px; font-weight: 750; cursor: pointer; }
 .danger-action { color: #944343; }
 .admin-report-record > div:first-child { max-width: 75%; }
-.admin-report-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
-.report-category-badge { border-radius: 20px; padding: 4px 8px; color: #315d78; background: #eaf2f7; font-size: 9px; font-weight: 800; }
-.report-category-badge.complaint { color: #845345; background: #f7eee9; }
-.report-category-badge.feedback { color: #526247; background: #eef4e9; }
-.report-filters { margin: 12px 0; }
-.report-filters button { padding: 0 10px; }
 .admin-report-record p { margin: 8px 0 0; color: #526b80; font-size: 11px; line-height: 1.6; }
-.help-report-form { max-width: 760px; margin-top: 18px; }
 .status-control { display: grid; flex: 0 0 145px; gap: 5px; color: var(--muted); font-size: 9px; font-weight: 700; }
 .status-control select { min-height: 36px; font-size: 11px; }
 

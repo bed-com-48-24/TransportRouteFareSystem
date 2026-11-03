@@ -23,17 +23,13 @@ export type StopItem = {
 };
 
 export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
-export type ReportCategory = "Issue report" | "Complaint" | "Feedback";
 
 export type ReportItem = {
   id: string;
-  category?: ReportCategory;
   type: "Route" | "Fare" | "Stop" | "Other";
   itemName: string;
   description: string;
   location: string;
-  customerName?: string;
-  customerEmail?: string;
   status: ReportStatus;
   adminNote: string;
   createdAt: string;

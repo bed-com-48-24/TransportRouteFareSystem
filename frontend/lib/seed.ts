@@ -5,12 +5,12 @@ export const KEYS = {
   fares: "routewise-fares-v1",
   stops: "routewise-stops-v1",
   reports: "routewise-reports-v1",
-  bookings: "routewise-bookings-v1",
+  bookings: "routewise-bookings-v1", 
   session: "routewise-session-v1",
 } as const;
 
 const ROUTE_ROWS: [string, string, string, string, number][] = [
-  // id, origin, destination, service, estimated fare (MWK)
+  
   ["blantyre-limbe-minibus", "Blantyre", "Limbe", "Minibus", 2500],
   ["blantyre-lilongwe-coach", "Blantyre", "Lilongwe", "Intercity coach", 30000],
   ["blantyre-zomba-minibus", "Blantyre", "Zomba", "Minibus", 8000],
@@ -46,7 +46,6 @@ export const SEED_STOPS: StopItem[] = [
   { id: "s-12", name: "Salima Bus Stage", kind: "pickup", city: "Salima", lat: -13.7804, lng: 34.4587 },
   { id: "s-13", name: "Salima Drop-off", kind: "dropoff", city: "Salima", lat: -13.7790, lng: 34.4600 },
   { id: "s-14", name: "Mzuzu Drop-off", kind: "dropoff", city: "Mzuzu", lat: -11.4656, lng: 34.0207 },
-<<<<<<< HEAD
   { id: "s-15", name: "Dedza Bus Depot", kind: "both", city: "Dedza", lat: -14.3779, lng: 34.3332 },
   { id: "s-16", name: "Mchinji Bus Station", kind: "both", city: "Mchinji", lat: -13.8000, lng: 32.9000 },
   { id: "s-17", name: "Kasungu Bus Depot", kind: "pickup", city: "Kasungu", lat: -13.0333, lng: 33.4833 },
@@ -55,6 +54,3 @@ export const SEED_STOPS: StopItem[] = [
   { id: "s-20", name: "Mangochi Bus Depot", kind: "pickup", city: "Mangochi", lat: -14.4781, lng: 35.2645 },
   { id: "s-21", name: "Mangochi Market Drop-off", kind: "dropoff", city: "Mangochi", lat: -14.4810, lng: 35.2660 },
 ];
-=======
-];
->>>>>>> origin/feature/admin-reports-bookings

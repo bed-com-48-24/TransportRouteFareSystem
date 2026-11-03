@@ -8,7 +8,7 @@ import { distanceKm, hasCoords } from "@/lib/geo";
 import { DISTRICT_COORDINATES, MALAWI_LOCATIONS, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
-import type { Booking, FareItem, ReportCategory, ReportItem, ReportStatus, RouteItem, StopItem, StopKind } from "@/lib/types";
+import type { Booking, FareItem, ReportItem, ReportStatus, RouteItem, StopItem, StopKind } from "@/lib/types";
 
 type MainPanel = "map" | "admin";
 type AdminPanel = "routes" | "stops" | "reports" | "bookings";
@@ -502,16 +502,6 @@ function StopManagement() {
 function ReportManagement() {
   const reports = useStoredList<ReportItem>(KEYS.reports, []);
   const [feedback, setFeedback] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ReportCategory | "all">("all");
-  const categories: { id: ReportCategory | "all"; label: string }[] = [
-    { id: "all", label: "All messages" },
-    { id: "Issue report", label: "Issue reports" },
-    { id: "Complaint", label: "Complaints" },
-    { id: "Feedback", label: "Feedback" },
-  ];
-  const visibleReports = [...reports].reverse().filter((report) =>
-    categoryFilter === "all" || (report.category ?? "Issue report") === categoryFilter,
-  );
 
   function updateStatus(reportId: string, status: ReportStatus) {
     try {
@@ -528,33 +518,12 @@ function ReportManagement() {
   return (
     <div className="admin-section-content">
       <h3>Passenger reports</h3>
-      <p className="module-copy">Review customer issue reports, complaints, and feedback submitted from Help.</p>
       {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      <nav className="admin-tabs report-filters" aria-label="Filter passenger reports">
-        {categories.map((item) => {
-          const count = item.id === "all"
-            ? reports.length
-            : reports.filter((report) => (report.category ?? "Issue report") === item.id).length;
-          return (
-            <button key={item.id} type="button" aria-pressed={categoryFilter === item.id} className={categoryFilter === item.id ? "is-active" : ""} onClick={() => setCategoryFilter(item.id)}>
-              {item.label} ({count})
-            </button>
-          );
-        })}
-      </nav>
-      {visibleReports.length === 0 ? <p className="module-empty">{reports.length === 0 ? "There are no passenger reports to review yet." : "There are no messages in this category yet."}</p> : (
+      {reports.length === 0 ? <p className="module-empty">There are no passenger reports to review yet.</p> : (
         <div className="admin-record-list">
-          {visibleReports.map((report) => (
+          {[...reports].reverse().map((report) => (
             <article className="admin-report-record" key={report.id}>
-              <div>
-                <div className="admin-report-heading">
-                  <span className={`report-category-badge ${(report.category ?? "Issue report").toLowerCase().replace(" ", "-")}`}>{report.category ?? "Issue report"}</span>
-                  <strong>{report.type}: {report.itemName}</strong>
-                </div>
-                <small>{report.location || "Location not provided"} · {new Date(report.createdAt).toLocaleDateString()}</small>
-                <small>From {report.customerName || "Customer"}{report.customerEmail ? ` · ${report.customerEmail}` : ""}</small>
-                <p>{report.description}</p>
-              </div>
+              <div><strong>{report.type}: {report.itemName}</strong><small>{report.location || "Location not provided"} · {new Date(report.createdAt).toLocaleDateString()}</small><p>{report.description}</p></div>
               <label className="status-control">Status<select value={report.status} onChange={(event) => updateStatus(report.id, event.target.value as ReportStatus)}><option value="open">Open</option><option value="reviewing">Reviewing</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
             </article>
           ))}

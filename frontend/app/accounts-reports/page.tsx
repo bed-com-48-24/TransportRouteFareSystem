@@ -149,13 +149,10 @@ export default function AccountsReportsPage() {
 
     const report: ReportItem = {
       id: newId("report"),
-      category: "Issue report",
       type: reportType,
       itemName: itemName.trim(),
       description: description.trim(),
       location: location.trim(),
-      customerName: session?.fullName ?? "",
-      customerEmail: session?.email ?? "",
       status: "open",
       adminNote: "",
       createdAt: new Date().toISOString(),
