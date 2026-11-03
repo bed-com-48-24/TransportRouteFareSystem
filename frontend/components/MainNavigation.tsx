@@ -1,14 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout, useSession } from "@/lib/auth";
 
 export default function MainNavigation() {
-  const router = useRouter();
   const session = useSession();
+  const pathname = usePathname();
   const [error, setError] = useState("");
+
+  const navItems = [
+    { href: "/", label: "Home" },
+    { href: "/routes-fares", label: "Routes & fares" },
+    { href: "/transport-booking", label: "Bookings" },
+    { href: "/help", label: "Help" },
+    { href: "/login", label: "Login" },
+  ];
+
+  function isActive(href: string) {
+    if (href === "/login") {
+      return pathname === "/login" || (pathname === "/maps-admin-integration" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("panel") === "admin");
+    }
+    return pathname === href;
+  }
 
   function handleLogout() {
     setError("");
@@ -16,11 +31,7 @@ export default function MainNavigation() {
     try {
       if (session?.role === "admin") {
         logout();
-        router.push("/maps-admin-integration");
-        return;
       }
-
-      router.push("/accounts-reports/login");
     } catch {
       setError("Could not log out. Please try again.");
     }
@@ -29,17 +40,19 @@ export default function MainNavigation() {
   return (
     <>
       <nav className="site-nav" aria-label="Main navigation">
-        <Link href="/">Home</Link>
-        <Link href="/routes-fares">Routes &amp; fares</Link>
-        <Link href="/maps-admin-integration/nearby">Nearby stops</Link>
-        <Link href="/transport-booking">Bookings</Link>
-        <Link href="/transport-booking/my-bookings">My bookings</Link>
-        <Link href="/accounts-reports/report">Report an issue</Link>
-        <Link href="/accounts-reports/login">Account</Link>
-        <Link href="/maps-admin-integration">Admin tools</Link>
-        <button type="button" className="site-nav-logout" onClick={handleLogout}>
-          Logout
-        </button>
+        {navItems.filter((item) => item.href !== "/login" || session?.role !== "admin").map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={isActive(item.href) ? "is-active" : ""}
+            aria-current={isActive(item.href) ? "page" : undefined}
+          >
+            {item.label}
+          </Link>
+        ))}
+        {session?.role === "admin" && (
+          <button type="button" className="site-nav-logout" onClick={handleLogout}>Admin sign out</button>
+        )}
       </nav>
       {error && <span className="site-nav-error" role="alert">{error}</span>}
     </>

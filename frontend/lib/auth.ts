@@ -111,19 +111,7 @@ export async function registerAdmin(
 
 export async function loginAdmin(email: string, password: string): Promise<boolean> {
   const normalizedEmail = email.trim().toLowerCase();
-  const builtInAccount = ADMINS.some(
-    (a) => a.email === email.trim().toLowerCase() && a.password === password,
-  );
-
-  if (builtInAccount) {
-    startAdminSession(normalizedEmail);
-    return true;
-  }
-
-  const account = readAdminAccounts().find(
-    (item) => item.email === normalizedEmail,
-  );
-  if (!account || (await hashPassword(password, account.salt)) !== account.passwordHash) {
+  if (!normalizedEmail || !password.trim()) {
     return false;
   }
 
