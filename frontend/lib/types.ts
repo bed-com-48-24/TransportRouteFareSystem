@@ -26,6 +26,8 @@ export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
 
 export type ReportItem = {
   id: string;
+  reporterName?: string;
+  reporterEmail?: string;
   type: "Route" | "Fare" | "Stop" | "Other";
   itemName: string;
   description: string;

@@ -523,7 +523,7 @@ function ReportManagement() {
         <div className="admin-record-list">
           {[...reports].reverse().map((report) => (
             <article className="admin-report-record" key={report.id}>
-              <div><strong>{report.type}: {report.itemName}</strong><small>{report.location || "Location not provided"} · {new Date(report.createdAt).toLocaleDateString()}</small><p>{report.description}</p></div>
+              <div><strong>{report.type}: {report.itemName}</strong><small>Reported by {report.reporterName || "Unknown sender"}{report.reporterEmail ? ` · ${report.reporterEmail}` : ""} · {report.location || "Location not provided"} · {new Date(report.createdAt).toLocaleDateString()}</small><p>{report.description}</p></div>
               <label className="status-control">Status<select value={report.status} onChange={(event) => updateStatus(report.id, event.target.value as ReportStatus)}><option value="open">Open</option><option value="reviewing">Reviewing</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
             </article>
           ))}

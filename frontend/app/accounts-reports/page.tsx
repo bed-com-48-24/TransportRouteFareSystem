@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
+import PassengerReportForm from "@/components/PassengerReportForm";
 import { loginPassenger, logoutPassenger, readPassengerSession, registerPassenger, updatePassengerName, type PassengerSession } from "@/lib/passenger-auth";
 import { KEYS } from "@/lib/seed";
-import { loadList, newId, saveList } from "@/lib/storage";
-import type { ReportItem } from "@/lib/types";
+import { loadList, saveList } from "@/lib/storage";
 
 type AccountTab = "sign-in" | "create-account" | "profile" | "report";
 type Feedback = { kind: "success" | "error"; message: string } | null;
@@ -23,11 +23,6 @@ export default function AccountsReportsPage() {
   const [phone, setPhone] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [busy, setBusy] = useState(false);
-
-  const [reportType, setReportType] = useState<ReportItem["type"]>("Route");
-  const [itemName, setItemName] = useState("");
-  const [location, setLocation] = useState("");
-  const [description, setDescription] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -139,36 +134,6 @@ export default function AccountsReportsPage() {
     }
   }
 
-  function submitReport(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFeedback(null);
-    if (itemName.trim().length < 2 || description.trim().length < 10) {
-      setFeedback({ kind: "error", message: "Add the route or stop name and at least 10 characters describing the issue." });
-      return;
-    }
-
-    const report: ReportItem = {
-      id: newId("report"),
-      type: reportType,
-      itemName: itemName.trim(),
-      description: description.trim(),
-      location: location.trim(),
-      status: "open",
-      adminNote: "",
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      saveList(KEYS.reports, [...loadList<ReportItem>(KEYS.reports, []), report]);
-      setItemName("");
-      setLocation("");
-      setDescription("");
-      setFeedback({ kind: "success", message: "Thank you. Your report has been submitted for review." });
-    } catch {
-      setFeedback({ kind: "error", message: "Your report could not be saved on this device. Please try again." });
-    }
-  }
-
   function signOut() {
     try {
       logoutPassenger();
@@ -272,17 +237,7 @@ export default function AccountsReportsPage() {
               <div><p className="module-eyebrow">HELP IMPROVE TRAVEL INFORMATION</p><h2>Report an issue</h2></div>
             </div>
             <p className="module-copy">Tell us what is inaccurate or out of date. Our team can review the route, fare, or stop details.</p>
-            <form className="module-form narrow-form" onSubmit={submitReport}>
-              <label>What needs attention?
-                <select value={reportType} onChange={(event) => setReportType(event.target.value as ReportItem["type"])}>
-                  <option value="Route">Route</option><option value="Fare">Fare</option><option value="Stop">Pickup or drop-off point</option><option value="Other">Other</option>
-                </select>
-              </label>
-              <label>Route, fare, or stop name<input maxLength={120} value={itemName} onChange={(event) => setItemName(event.target.value)} placeholder="e.g. Blantyre to Zomba" required /></label>
-              <label>Town or area <span className="optional-label">Optional</span><input maxLength={100} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Where did you see the issue?" /></label>
-              <label>Describe the issue<textarea minLength={10} maxLength={1000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Explain what is wrong or what has changed…" required /></label>
-              <button className="primary-button form-submit" type="submit">Submit report</button>
-            </form>
+            <PassengerReportForm />
           </>
         )}
       </section>

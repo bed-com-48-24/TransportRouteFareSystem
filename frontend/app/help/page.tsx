@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PassengerReportForm from "@/components/PassengerReportForm";
 
 const bookingSteps = [
   {
@@ -28,12 +29,25 @@ export default function HelpPage() {
     <main className="module-shell">
       <header className="module-intro">
         <p className="module-eyebrow">PASSENGER HELP</p>
-        <h1>How to book a trip</h1>
-        <p>Follow these steps to choose a departure and get a mock QR ticket.</p>
+        <h1>Passenger help</h1>
+        <p>Find help with booking, or report incorrect travel information to the team.</p>
         <div className="module-shortcuts">
           <Link className="primary-button" href="/transport-booking">Browse trips <span aria-hidden="true">→</span></Link>
+          <Link href="#report-issue">Report an issue <span aria-hidden="true">→</span></Link>
         </div>
       </header>
+
+      <section className="module-section" id="report-issue" aria-labelledby="report-issue-heading">
+        <div className="module-section-heading">
+          <div>
+            <p className="module-eyebrow">PASSENGER REPORTS</p>
+            <h2 id="report-issue-heading">Report an issue</h2>
+          </div>
+        </div>
+        <p className="module-copy">Tell us about incorrect or out-of-date route, fare, or stop information. Include your contact details so staff can identify who submitted the report.</p>
+        <PassengerReportForm />
+        <p className="module-footnote">Reports are saved in this browser for this project demonstration; they are not sent to a live service.</p>
+      </section>
 
       <section className="module-section" aria-labelledby="booking-help-heading">
         <div className="module-section-heading">

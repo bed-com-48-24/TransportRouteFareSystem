@@ -37,7 +37,7 @@ export default function AdminReports() {
           <article key={r.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
             <strong>{r.type}: {r.itemName}</strong>
             <p>{r.description}</p>
-            <small>{r.location ? `Location: ${r.location} · ` : ""}{new Date(r.createdAt).toLocaleString()}</small>
+            <small>Reported by {r.reporterName || "Unknown sender"}{r.reporterEmail ? ` · ${r.reporterEmail}` : ""} · {r.location ? `Location: ${r.location} · ` : ""}{new Date(r.createdAt).toLocaleString()}</small>
             <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               <select value={r.status} onChange={(e) => update(r.id, { status: e.target.value as ReportStatus })}>
                 {STATUSES.map((s) => <option key={s}>{s}</option>)}
