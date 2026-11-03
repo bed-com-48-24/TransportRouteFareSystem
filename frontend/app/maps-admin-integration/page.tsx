@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
 import RequireAdmin from "@/components/RequireAdmin";
 import { fmtDate } from "@/lib/booking-data";
 import { distanceKm, hasCoords } from "@/lib/geo";

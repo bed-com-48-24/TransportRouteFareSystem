@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
 import QRCode from "qrcode";
 import { availableSeats, createBooking, fmtDate, TRIPS } from "@/lib/booking-data";
 import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
