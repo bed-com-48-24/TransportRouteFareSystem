@@ -1,54 +1,58 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import RequireAdmin from "@/components/RequireAdmin";
 import { KEYS } from "@/lib/seed";
 import { loadList, saveList, useStoredList } from "@/lib/storage";
 import type { ReportItem, ReportStatus } from "@/lib/types";
 
-const statuses: ReportStatus[] = ["open", "reviewing", "resolved", "dismissed"];
+const NONE: ReportItem[] = []; // stable reference for the hook
+const STATUSES: ReportStatus[] = ["open", "reviewing", "resolved", "dismissed"];
 
-export default function AdminReportsPage() {
-  const reports = useStoredList<ReportItem>(KEYS.reports, []);
+export default function AdminReports() {
+  const reports = useStoredList<ReportItem>(KEYS.reports, NONE);
+  const [filter, setFilter] = useState<"all" | ReportStatus>("all");
 
-  function updateStatus(id: string, status: ReportStatus) {
-    const latest = loadList<ReportItem>(KEYS.reports, []);
-    saveList(KEYS.reports, latest.map((report) => report.id === id ? { ...report, status } : report));
+  function update(id: string, patch: Partial<ReportItem>) {
+    saveList(KEYS.reports, loadList<ReportItem>(KEYS.reports, NONE).map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
+
+  const shown = [...reports]
+    .filter((r) => filter === "all" || r.status === filter)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <RequireAdmin>
-      <section className="admin-content">
-        <Link href="/maps-admin-integration" className="nearby-back">← Administration</Link>
-        <p className="admin-kicker">PASSENGER FEEDBACK</p>
-        <h1 className="admin-title">Information reports</h1>
-        <p className="admin-description">Review and update passenger reports saved in this browser.</p>
-      {reports.length === 0 ? (
-        <p className="admin-empty">No passenger reports have been submitted yet.</p>
-      ) : (
-        <ul className="admin-report-list">
-          {[...reports].reverse().map((report) => (
-            <li key={report.id}>
-              <div className="admin-report-main">
-                <div>
-                  <p className="admin-report-meta">{report.type} · {new Date(report.createdAt).toLocaleDateString()}</p>
-                  <h2>{report.itemName}</h2>
-                  {report.location && <p className="admin-report-location">Location: {report.location}</p>}
-                  <p className="admin-report-description">{report.description}</p>
-                </div>
-                <label className="admin-status-label">
-                  Review status
-                  <select className="booking-input" value={report.status} onChange={(event) => updateStatus(report.id, event.target.value as ReportStatus)}>
-                    {statuses.map((status) => <option key={status} value={status}>{status[0].toUpperCase() + status.slice(1)}</option>)}
-                  </select>
-                </label>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="admin-footnote">Prototype reports are stored in this browser. Production review requires shared server storage.</p>
-      </section>
+      <h1 style={{ fontSize: 26, fontWeight: 700 }}>Passenger reports</h1>
+      <label style={{ display: "block", margin: "12px 0" }}>
+        Show:{" "}
+        <select value={filter} onChange={(e) => setFilter(e.target.value as "all" | ReportStatus)}>
+          <option value="all">All ({reports.length})</option>
+          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </label>
+      {shown.length === 0 && <p>No reports to show.</p>}
+      <div style={{ display: "grid", gap: 12 }}>
+        {shown.map((r) => (
+          <article key={r.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
+            <strong>{r.type}: {r.itemName}</strong>
+            <p>{r.description}</p>
+            <small>Reported by {r.reporterName || "Unknown sender"}{r.reporterEmail ? ` · ${r.reporterEmail}` : ""} · {r.location ? `Location: ${r.location} · ` : ""}{new Date(r.createdAt).toLocaleString()}</small>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <select value={r.status} onChange={(e) => update(r.id, { status: e.target.value as ReportStatus })}>
+                {STATUSES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+              <input
+                className="booking-input"
+                placeholder="Admin note (saved when you leave the box)"
+                defaultValue={r.adminNote}
+                onBlur={(e) => e.target.value !== r.adminNote && update(r.id, { adminNote: e.target.value })}
+              />
+              <button className="text-action" onClick={() => confirm("Delete this report?") && saveList(KEYS.reports, loadList<ReportItem>(KEYS.reports, NONE).filter((x) => x.id !== r.id))}>Delete</button>
+            </div>
+          </article>
+        ))}
+      </div>
     </RequireAdmin>
   );
 }

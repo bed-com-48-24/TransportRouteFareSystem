@@ -53,6 +53,89 @@
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Generate frontend route types",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"exec",
+				"--",
+				"next",
+				"typegen"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "SBUS seat availability tests",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"run",
+				"test:seat-availability"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "SBUS lint check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"run",
+				"lint"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "SBUS production build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "SBUS source lint",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"run",
+				"lint",
+				"--",
+				"app",
+				"components",
+				"lib"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Install OpenStreetMap dependencies",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend",
+				"install"
+			],
+			"isBackground": false,
+			"problemMatcher": []
 		}
 	]
 }

@@ -1,12 +1,11 @@
 import Link from "next/link";
 
 const links = [
-  ["Plan a journey", "Search routes, connected legs, boarding points, and estimated fares.", "/routes-fares"],
-  ["Nearby stops", "Find pickup and drop-off points on the map.", "/maps-admin-integration/nearby"],
-  ["Book a trip", "Reserve seats and receive a booking reference.", "/transport-booking"],
-  ["My bookings", "Look up or cancel a reservation using your email.", "/transport-booking/my-bookings"],
-  ["Report information", "Send a correction about a route, fare, or stop.", "/accounts-reports/report"],
-  ["Manage profile", "Update personal information saved on this browser.", "/accounts-reports/profile"],
+  ["Plan a journey", "Compare routes and fares.", "/routes-fares"],
+  ["Nearby stops", "Find pickup and drop-off points on the map.", "/maps-admin-integration"],
+  ["Book a trip", "Reserve seats for your trip.", "/transport-booking"],
+  ["My bookings", "View or cancel a booking.", "/transport-booking/my-bookings"],
+  ["Account and support", "Manage your profile or report travel information.", "/accounts-reports"],
 ];
 
 export default function AccountHomePage() {
@@ -31,7 +30,9 @@ export default function AccountHomePage() {
               className="rounded-2xl border border-[#D7E2EF] bg-white p-5 shadow-sm transition hover:border-[#AABBD0] hover:shadow-md"
             >
               <h2 className="font-bold">{title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#617B96]">{description}</p>
+              <p className="mt-2 text-sm leading-6 text-[#617B96]">
+                {description}
+              </p>
               <span className="mt-4 inline-block text-sm font-bold text-[#29466D]">
                 Open →
               </span>

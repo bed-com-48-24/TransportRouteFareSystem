@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SBUS Transport Information System
 
-## Getting Started
+A simple transport information prototype for passengers planning journeys in Malawi. The interface uses a white and dark-blue palette and keeps each passenger workflow together on one page.
 
-First, run the development server:
+## Run locally
+
+From the repository root, run:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run start:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+From the `frontend` directory, either command works:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run start:dev
+# or
+npm run dev
+```
 
-## Learn More
+## Passenger pages
 
-To learn more about Next.js, take a look at the following resources:
+- `/routes-fares` — search between towns and see direct or connecting routes, estimated fares, and pickup/drop-off points.
+- `/transport-booking` — compare departures, select a trip, enter passenger details, confirm a reservation, and view or cancel bookings.
+- `/accounts-reports` — sign in, create an account, reset a password, update a profile, continue as a guest, or report incorrect transport information.
+- `/maps-admin-integration` — explore the route map and nearby stops; authorized administrators can manage routes, fares, stops, reports, and bookings.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Stops can be pickup points, drop-off points, or both. Route and stop information is shared between search, booking, map, and administration views.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## API documentation
 
-## Deploy on Vercel
+See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for the project API and data contract reference, including the browser storage model, Supabase authentication flow, booking logic, and seat reservation rules.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Validation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run test:seat-availability
+npm run lint
+npm run build
+```
+
+## Passenger authentication setup
+
+Passenger sign-in, account creation, and password recovery use Supabase Auth. Create a Supabase project, enable email/password authentication, and copy `.env.example` to `.env.local` with the project URL and public anon key. These `NEXT_PUBLIC_` values are intentionally public; never put a Supabase service-role key in the frontend.
+
+In the Supabase Auth URL configuration, set the local site URL to `http://localhost:3000` and allow the deployed site URL too. Allow `/accounts-reports?mode=reset` and `/accounts-reports?mode=confirmed` as redirect URLs (or use an appropriately scoped wildcard). Configure email delivery in Supabase before expecting real messages.
+
+Passenger accounts created by the earlier browser-only prototype are not migrated. Those passengers must create new Supabase accounts; existing routes and bookings remain in browser storage.
+
+## Prototype limitations
+
+This project stores reports, routes, fares, stops, and reservations in the current browser. Passenger credentials and authentication sessions are managed by Supabase, but bookings are not shared between devices. Browser-side administrator access is not production security. Trip schedules and fares are examples; reservations do not collect payment.

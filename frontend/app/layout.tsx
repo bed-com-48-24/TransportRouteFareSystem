@@ -1,36 +1,32 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import MainNavigation from "@/components/MainNavigation";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SBUS | Routes, Fares & Bookings",
-  description: "Plan local journeys, compare estimated fares, and reserve seats with SBUS.",
+  title: "SBUS | Transport routes, fares and bookings",
+  description: "Find transport routes, estimated fares, nearby stops, and available trips.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className="h-full antialiased"
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="en">
+      <body>
+        <a className="skip-link" href="#main-content">Skip to content</a>
         <header className="site-header">
-          <Link className="site-brand" href="/">
-            <span className="brand-mark">S</span>
-            <span>SBUS<small>Travel information system</small></span>
+          <Link href="/" className="site-brand" aria-label="SBUS home">
+            <span className="site-brand-mark" aria-hidden="true">S</span>
+            <span>SBUS<small>Travel information</small></span>
           </Link>
-          <nav className="site-nav" aria-label="Main navigation">
-            <Link href="/routes-fares">Routes &amp; fares</Link>
-            <Link href="/maps-admin-integration/nearby">Nearby stops</Link>
-            <Link href="/transport-booking">Bookings</Link>
-            <Link href="/transport-booking/my-bookings">My bookings</Link>
-            <Link href="/accounts-reports/report">Report an issue</Link>
-            <Link href="/accounts-reports/login">Account</Link>
-            <Link href="/maps-admin-integration">Admin tools</Link>
-            <Link href="/accounts-reports/login">Logout</Link>
-          </nav>
+          <MainNavigation />
         </header>
-        {children}
+        <div id="main-content">{children}</div>
+        <footer className="site-footer">
+          <span>SBUS · Transport information made easier</span>
+          <span>Route and fare information is estimated for this demonstration.</span>
+        </footer>
       </body>
     </html>
   );
