@@ -3,10 +3,27 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { readPassengerSession } from "@/lib/passenger-auth";
 import { KEYS } from "@/lib/seed";
-import { loadList, newId, saveList } from "@/lib/storage";
-import type { ReportItem } from "@/lib/types";
+import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
+import type { ReportItem, ReportStatus } from "@/lib/types";
+
+const EMPTY_REPORTS: ReportItem[] = [];
+
+const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  open: "Awaiting review",
+  reviewing: "Being considered",
+  resolved: "Resolved",
+  dismissed: "Closed",
+};
+
+const REPORT_STATUS_MESSAGES: Record<ReportStatus, string> = {
+  open: "Your report has been received and is waiting for staff review.",
+  reviewing: "Staff are considering your report.",
+  resolved: "Staff marked this report as resolved.",
+  dismissed: "Staff closed this report without further action.",
+};
 
 export default function PassengerReportForm() {
+  const reports = useStoredList<ReportItem>(KEYS.reports, EMPTY_REPORTS);
   const [reporterName, setReporterName] = useState("");
   const [reporterEmail, setReporterEmail] = useState("");
   const [reportType, setReportType] = useState<ReportItem["type"]>("Route");
@@ -14,6 +31,9 @@ export default function PassengerReportForm() {
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const matchingReports = reports
+    .filter((report) => report.reporterEmail?.trim().toLowerCase() === reporterEmail.trim().toLowerCase())
+    .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
 
   useEffect(() => {
     let active = true;
@@ -60,7 +80,10 @@ export default function PassengerReportForm() {
       setItemName("");
       setLocation("");
       setDescription("");
-      setFeedback({ kind: "success", message: "Thank you. Your report has been submitted for review." });
+      setFeedback({
+        kind: "success",
+        message: `Report ${report.id.toUpperCase()} submitted. You can check its status and staff updates below.`,
+      });
     } catch {
       setFeedback({ kind: "error", message: "Your report could not be saved on this device. Please try again." });
     }
@@ -86,6 +109,44 @@ export default function PassengerReportForm() {
           {feedback.message}
         </p>
       )}
+      <section className="report-updates" aria-labelledby="report-updates-heading" aria-live="polite">
+        <div>
+          <p className="module-eyebrow">YOUR UPDATES</p>
+          <h3 id="report-updates-heading">Report status and staff updates</h3>
+          <p className="module-copy">
+            Enter the same email address used for your report to see its current status and any staff note.
+            Updates are saved in this browser. These are on-page demo notifications only; no email is sent.
+          </p>
+        </div>
+        {!reporterEmail.trim() ? (
+          <p className="module-empty">Enter your email address above to check for report updates.</p>
+        ) : matchingReports.length === 0 ? (
+          <p className="module-empty">No reports were found for this email address in this browser.</p>
+        ) : (
+          <div className="report-update-list">
+            {matchingReports.map((report) => (
+              <article className="report-update-card" key={report.id}>
+                <div className="report-update-heading">
+                  <div>
+                    <strong>{report.type}: {report.itemName}</strong>
+                    <small>Reference: {report.id.toUpperCase()} · Submitted {new Date(report.createdAt).toLocaleDateString()}</small>
+                  </div>
+                  <span className={`report-status-badge is-${report.status}`}>
+                    {REPORT_STATUS_LABELS[report.status]}
+                  </span>
+                </div>
+                <p>{REPORT_STATUS_MESSAGES[report.status]}</p>
+                {report.adminNote.trim() && (
+                  <div className="report-staff-note">
+                    <strong>Staff update</strong>
+                    <p>{report.adminNote}</p>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }
