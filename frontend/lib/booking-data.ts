@@ -1,9 +1,12 @@
-import { getAvailableSeats, reserveBooking } from "./seat-inventory.mjs";
+import { getAvailableSeats, getBookedSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
 import { KEYS } from "./seed";
 import { loadList, saveList } from "./storage";
 import type { Booking, Trip } from "./types";
 
 export type { Booking, Trip } from "./types";
+export { getBookedSeatNumbers };
+
+const STANDARD_BUS_CAPACITY = 60;
 
 export const TRIPS: Trip[] = [
   {
@@ -14,7 +17,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "08:00",
     arrival: "08:45",
-    capacity: 14,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 2500,
   },
   {
@@ -25,7 +28,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "10:30",
     arrival: "11:15",
-    capacity: 18,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 2500,
   },
   {
@@ -36,7 +39,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-04",
     departure: "09:00",
     arrival: "10:30",
-    capacity: 22,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 8000,
   },
   {
@@ -47,7 +50,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "06:00",
     arrival: "14:00",
-    capacity: 40,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 22000,
   },
   {
@@ -58,7 +61,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-04",
     departure: "06:30",
     arrival: "14:30",
-    capacity: 40,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 22000,
   },
   {
@@ -69,7 +72,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "09:00",
     arrival: "11:00",
-    capacity: 18,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 7000,
   },
   {
@@ -80,7 +83,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-04",
     departure: "08:00",
     arrival: "12:00",
-    capacity: 28,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 12000,
   },
   {
@@ -91,7 +94,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-05",
     departure: "07:00",
     arrival: "10:30",
-    capacity: 24,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 10000,
   },
   {
@@ -102,7 +105,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-05",
     departure: "06:00",
     arrival: "12:00",
-    capacity: 32,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 18000,
   },
   {
@@ -113,7 +116,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "10:30",
     arrival: "12:00",
-    capacity: 20,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 6500,
   },
   {
@@ -124,7 +127,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-03",
     departure: "06:00",
     arrival: "14:30",
-    capacity: 44,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 30000,
   },
   {
@@ -135,7 +138,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-04",
     departure: "06:15",
     arrival: "14:45",
-    capacity: 44,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 30000,
   },
   {
@@ -146,7 +149,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-04",
     departure: "07:30",
     arrival: "12:00",
-    capacity: 24,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 10000,
   },
   {
@@ -157,7 +160,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-05",
     departure: "09:00",
     arrival: "10:30",
-    capacity: 22,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 8000,
   },
   {
@@ -168,7 +171,7 @@ export const TRIPS: Trip[] = [
     date: "2026-11-05",
     departure: "08:00",
     arrival: "10:00",
-    capacity: 18,
+    capacity: STANDARD_BUS_CAPACITY,
     fare: 7000,
   },
 ];
@@ -191,17 +194,19 @@ export function availableSeats(trip: Trip, bookings = readBookings()) {
 }
 
 export async function createBooking(
-  input: Omit<Booking, "reference" | "status" | "createdAt">,
+  input: Omit<Booking, "reference" | "status" | "createdAt" | "seatNumbers"> & { seatNumbers: number[] },
   trip: Trip,
 ) {
   return reserveBooking<Booking>({
     trip,
     passengers: input.passengers,
+    seatNumbers: input.seatNumbers,
     locks: typeof navigator === "undefined" ? undefined : navigator.locks,
     readBookings,
     writeBookings: saveBookings,
-    createBooking: () => ({
+    createBooking: (seatNumbers) => ({
       ...input,
+      seatNumbers,
       reference: `TR-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
       status: "confirmed",
       createdAt: new Date().toISOString(),

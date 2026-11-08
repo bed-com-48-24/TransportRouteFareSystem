@@ -57,6 +57,7 @@ export type Booking = {
   pickup: string;
   dropoff: string;
   passengers: number;
+  seatNumbers?: number[];
   name: string;
   email: string;
   status: "confirmed" | "cancelled";

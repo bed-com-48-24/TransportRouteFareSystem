@@ -11,6 +11,7 @@
     "test:seat-availability": "node --test lib/seat-inventory.test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "leaflet": "^1.9.4",
     "next": "16.4.0",
     "qrcode": "^1.5.4",

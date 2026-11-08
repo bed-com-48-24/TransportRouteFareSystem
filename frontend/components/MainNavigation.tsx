@@ -15,13 +15,9 @@ export default function MainNavigation() {
     { href: "/routes-fares", label: "Routes & fares" },
     { href: "/transport-booking", label: "Bookings" },
     { href: "/help", label: "Help" },
-    { href: "/login", label: "Login" },
   ];
 
   function isActive(href: string) {
-    if (href === "/login") {
-      return pathname === "/login" || (pathname === "/maps-admin-integration" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("panel") === "admin");
-    }
     return pathname === href;
   }
 
@@ -40,11 +36,14 @@ export default function MainNavigation() {
   return (
     <>
       <nav className="site-nav" aria-label="Main navigation">
-        {navItems.filter((item) => item.href !== "/login" || session?.role !== "admin").map((item) => (
+        {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={isActive(item.href) ? "is-active" : ""}
+            className={[
+              isActive(item.href) ? "is-active" : "",
+              item.href === "/accounts-reports" ? "site-nav-login" : "",
+            ].filter(Boolean).join(" ")}
             aria-current={isActive(item.href) ? "page" : undefined}
           >
             {item.label}

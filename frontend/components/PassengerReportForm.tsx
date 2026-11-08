@@ -36,18 +36,22 @@ export default function PassengerReportForm() {
     .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
 
   useEffect(() => {
-    try {
-      const session = readPassengerSession();
-      if (session) {
+    let active = true;
+    void readPassengerSession().then((session) => {
+      if (active && session) {
         setReporterName(session.fullName);
         setReporterEmail(session.email);
       }
-    } catch (reason) {
+    }).catch((reason: unknown) => {
+      if (!active) return;
       setFeedback({
         kind: "error",
         message: reason instanceof Error ? reason.message : "Your passenger details could not be loaded.",
       });
-    }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function submitReport(event: FormEvent<HTMLFormElement>) {
