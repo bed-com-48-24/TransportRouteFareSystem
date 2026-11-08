@@ -1,12 +1,9 @@
-import { notFound } from "next/navigation";
-import { TRIPS } from "../../booking-data";
-import BookingDetailsForm from "./form";
+"use client";
 
-export const instant = false;
+import { useParams } from "next/navigation";
+import TransportBookingPage from "../../page";
 
-export default async function BookingDetailsPage({ params }: PageProps<"/transport-booking/details/[tripId]">) {
-  const { tripId } = await params;
-  const trip = TRIPS.find((item) => item.id === tripId);
-  if (!trip) notFound();
-  return <BookingDetailsForm trip={trip} />;
+export default function TripDetailsPage() {
+  const { tripId } = useParams<{ tripId: string }>();
+  return <TransportBookingPage initialTripId={tripId} />;
 }

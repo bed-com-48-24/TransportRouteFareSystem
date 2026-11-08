@@ -1,0 +1,8 @@
+{
+  "name": "transport-route-fare-system",
+  "private": true,
+  "scripts": {
+    "start:dev": "npm --prefix frontend run dev",
+    "dev": "npm --prefix frontend run dev"
+  }
+}

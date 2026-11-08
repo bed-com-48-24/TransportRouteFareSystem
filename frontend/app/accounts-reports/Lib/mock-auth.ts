@@ -38,9 +38,24 @@ export function mockLogin(
     localStorage.getItem(ACCOUNTS_KEY) || "[]"
   );
 
-  return accounts.some(
+  const account = accounts.find(
     (account) =>
       account.email === email.trim().toLowerCase() &&
       account.password === password
   );
+
+  if (!account) {
+    return false;
+  }
+
+  // Save the currently logged-in user
+  localStorage.setItem(
+    "loggedInUser",
+    JSON.stringify({
+      fullName: account.fullName,
+      email: account.email,
+    })
+  );
+
+  return true;
 }
