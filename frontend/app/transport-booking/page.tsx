@@ -2,17 +2,24 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, RouteLocationMarker, TileLayer } from "@/components/ClientLeaflet";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
 import QRCode from "qrcode";
 import { availableSeats, createBooking, fmtDate, getBookedSeatNumbers, TRIPS } from "@/lib/booking-data";
 import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS } from "@/lib/seed";
 import { useStoredList } from "@/lib/storage";
 import type { Booking } from "@/lib/types";
+// Leaflet needs the browser, so this map only loads on the client
+const TripRouteMap = dynamic(() => import("@/components/TripRouteMap"), {
+  ssr: false,
+  loading: () => <div className="summary-map summary-map-loading">Loading map…</div>,
+});
 
 const MAX_PASSENGERS = 8;
+const SEATS_PER_ROW = 2; // the design shows 2 seats per row; use 4 for a wider bus
 const BOOKING_DRAFT_KEY = "routewise-pending-booking-v1";
 const TRIP_CITY_COORDINATES: Record<string, Coordinates> = {
   ...DISTRICT_COORDINATES,
@@ -123,10 +130,10 @@ function isRoutingResponse(value: unknown): value is RoutingResponse {
   );
 }
 
-function formatRouteDuration(seconds: number) {
-  const minutes = Math.round(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  return hours > 0 ? `${hours} hr ${minutes % 60} min` : `${minutes} min`;
+function to12Hour(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time;
+  return `${String(h % 12 || 12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
 function SeatButton({
@@ -146,19 +153,14 @@ function SeatButton({
 
   return (
     <button
-      className={`booking-seat${isBooked ? " is-booked" : isSelected ? " is-selected" : ""}`}
       type="button"
+      className={`bus-seat${isBooked ? " is-booked" : isSelected ? " is-selected" : ""}`}
       aria-label={`Seat ${seatNumber}, ${state}`}
       aria-pressed={isSelected}
       disabled={isBooked || saving}
       onClick={() => onToggle(seatNumber)}
     >
-      <svg className="booking-seat-icon" viewBox="0 0 28 28" aria-hidden="true">
-        <path d="M7 3.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1v6h3v2H5v-2h3v-6H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-      <span>{seatNumber}</span>
-      {isBooked && <small>Booked</small>}
-      {isSelected && <small>Selected</small>}
+      {seatNumber}
     </button>
   );
 }
@@ -173,7 +175,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [dropoff, setDropoff] = useState(initialTrip?.dropoff[0] ?? "");
   const [passengers, setPassengers] = useState(1);
   const [selectedSeatNumbers, setSelectedSeatNumbers] = useState<number[]>([]);
-  const [showSeatSelector, setShowSeatSelector] = useState(false);
+  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -228,11 +230,14 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     ? getBookedSeatNumbers(selectedTrip.capacity, bookings, selectedTrip.id)
     : [];
   const activeSelectedSeatNumbers = selectedSeatNumbers.filter((seatNumber) => !bookedSeatNumbers.includes(seatNumber));
-  const seatRows = selectedTrip
-    ? Array.from({ length: Math.ceil(selectedTrip.capacity / 5) }, (_, row) =>
-        Array.from({ length: 5 }, (_, column) => row * 5 + column + 1).filter((seatNumber) => seatNumber <= selectedTrip.capacity),
-      )
+    const seatNumbers = selectedTrip
+    ? Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1)
     : [];
+  const selectedCount = activeSelectedSeatNumbers.length;
+  const seatSummary =
+    selectedCount === 0
+      ? "No seat selected"
+      : `${selectedCount} seat${selectedCount === 1 ? "" : "s"} (Seat${selectedCount === 1 ? "" : "s"} ${activeSelectedSeatNumbers.join(", ")})`;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -259,27 +264,28 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     return () => window.clearTimeout(timer);
   }, []);
 
-  function toggleSeat(seatNumber: number) {
+    function toggleSeat(seatNumber: number) {
     if (bookedSeatNumbers.includes(seatNumber)) return;
 
+    let next: number[];
     if (activeSelectedSeatNumbers.includes(seatNumber)) {
-      setSelectedSeatNumbers(activeSelectedSeatNumbers.filter((selected) => selected !== seatNumber));
-      setError("");
-      return;
+      next = activeSelectedSeatNumbers.filter((selected) => selected !== seatNumber);
+    } else {
+      if (activeSelectedSeatNumbers.length >= MAX_PASSENGERS) {
+        setError(`You can book up to ${MAX_PASSENGERS} seats at a time.`);
+        return;
+      }
+      next = [...activeSelectedSeatNumbers, seatNumber].sort((first, second) => first - second);
     }
 
-    if (activeSelectedSeatNumbers.length >= passengers) {
-      setError(`You selected ${passengers} seat${passengers === 1 ? "" : "s"}. Deselect a seat or increase the passenger count to choose another.`);
-      return;
-    }
-
-    setSelectedSeatNumbers([...activeSelectedSeatNumbers, seatNumber].sort((first, second) => first - second));
+    setSelectedSeatNumbers(next);
+    setPassengers(Math.max(1, next.length));
     setError("");
   }
 
-  function changePassengerCount(count: number) {
-    setPassengers(count);
-    setSelectedSeatNumbers(activeSelectedSeatNumbers.slice(0, count));
+  function clearSeats() {
+    setSelectedSeatNumbers([]);
+    setPassengers(1);
     setError("");
   }
 
@@ -341,7 +347,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     if (
       name.trim().length < 2 ||
       name.trim().length > 100 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      (email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ||
       travelDate < selectedTrip.date ||
       !selectedTrip.pickup.includes(pickup) ||
       !selectedTrip.dropoff.includes(dropoff) ||
@@ -475,7 +481,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   }
 
   return (
-    <main className="module-shell">
+      <main className={`module-shell${initialTripId ? " module-shell-wide" : ""}`}>
       <header className="module-intro">
         <p className="module-eyebrow">TRAVEL · RESERVATIONS</p>
         <h1>{initialTripId ? initialTrip ? `${initialTrip.route} trip details` : "Trip not found" : "Choose a trip and reserve your seats"}</h1>
@@ -602,13 +608,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       )}
 
       {(selectedTrip || initialTripId) && (
-      <section className="module-section" aria-labelledby="reservation-heading">
-        <div className="module-section-heading">
-          <div>
-            <p className="module-eyebrow">RESERVE YOUR SEAT</p>
-            <h2 id="reservation-heading" tabIndex={-1}>Trip and passenger details</h2>
-          </div>
-        </div>
+        <section className="module-section booking-section" aria-label="Reserve your seat">
         {!selectedTrip ? (
           ticket ? null : <p className="module-empty">This sample trip could not be found. Return to the available trips and choose another departure.</p>
         ) : paymentPending ? (
@@ -634,188 +634,147 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
             </div>
           </div>
         ) : (
-          <form className="module-form" onSubmit={submitBooking} noValidate>
-            <div className="booking-form-map-layout">
-              <section className="booking-route-preview" aria-labelledby="booking-route-heading">
-                <div className="booking-route-heading">
-                  <div>
-                    <h3 id="booking-route-heading">Route preview</h3>
-                    <p>{pickup} to {dropoff}</p>
-                  </div>
-                  <p className="booking-route-status" aria-live="polite">
-                    {currentRouteLookup.status === "loading"
-                      ? "Loading road route…"
-                      : currentRouteLookup.status === "ready" && currentRouteLookup.route
-                        ? `${(currentRouteLookup.route.distance / 1000).toFixed(0)} km · ${formatRouteDuration(currentRouteLookup.route.duration)}`
-                        : "Road route unavailable"}
-                  </p>
-                </div>
-                {currentRouteLookup.status === "error" && (
-                  <div className="booking-route-error" role="alert">
-                    <span>Driving directions could not be loaded. The map still shows the selected towns.</span>
-                    <button className="secondary-button" type="button" onClick={() => setRouteRetryKey((key) => key + 1)}>
-                      Retry directions
-                    </button>
-                  </div>
-                )}
-                {pickupPosition && dropoffPosition ? (
-                  <MapContainer
-                    key={`${routeKey}:${currentRouteLookup.status}`}
-                    bounds={currentRouteLookup.route?.positions ?? [pickupPosition, dropoffPosition]}
-                    scrollWheelZoom
-                    className="route-map booking-route-map"
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {currentRouteLookup.route && (
-                      <Polyline
-                        positions={currentRouteLookup.route.positions}
-                        pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.88 }}
-                      />
-                    )}
-                    <RouteLocationMarker position={pickupPosition} label="Pickup" town={pickup} />
-                    <RouteLocationMarker position={dropoffPosition} label="Drop-off" town={dropoff} />
-                  </MapContainer>
-                ) : (
-                  <p className="booking-route-error" role="alert">Map directions are unavailable for this trip.</p>
-                )}
-                <ul className="booking-route-legend" aria-label="Map location markers">
-                  <li><span className="booking-route-legend-pin" aria-hidden="true">P</span> Pickup point</li>
-                  <li><span className="booking-route-legend-pin" aria-hidden="true">D</span> Drop-off point</li>
-                </ul>
-                <p className="booking-route-attribution">Road route via OSRM using OpenStreetMap data. Stops are shown at town locations.</p>
-              </section>
+          <form className="booking-layout" onSubmit={submitBooking} noValidate>
+            {/* LEFT CARD: seats + passenger details */}
+            <section className="booking-card" aria-labelledby="reservation-heading">
+              <p className="module-eyebrow">RESERVE YOUR SEAT</p>
+              <h2 id="reservation-heading" tabIndex={-1}>Select your seats</h2>
+              <p className="booking-help">Click on the seats you want. Selected seats will be highlighted in dark blue.</p>
 
-              <div className="booking-form-fields">
-                <div className="reservation-summary">
-                  <div>
-                    <span>Your trip</span>
-                    <strong>{selectedTrip.route}</strong>
-                    <small>{fmtDate(selectedTrip.date)} · departs {selectedTrip.departure}</small>
-                  </div>
-                  <div>
-                    <span>Seats available</span>
-                    <strong>{available} of {selectedTrip.capacity}</strong>
-                    <small>Seat availability is checked again when you confirm.</small>
-                  </div>
-                  <div>
-                    <span>Estimated total</span>
-                    <strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
-                    <small>{passengers} passenger{passengers === 1 ? "" : "s"} · payment not taken</small>
-                  </div>
-                </div>
-
-                <div className="module-form-grid">
-                  <label>
-                    Travel date
-                    <input type="date" min={selectedTrip.date} value={travelDate} onChange={(event) => setTravelDate(event.target.value)} required />
-                  </label>
-                  <label>
-                    Number of passengers
-                    <select
-                      value={passengers}
-                      onChange={(event) => changePassengerCount(Number(event.target.value))}
-                      disabled={available === 0}
-                    >
-                      {Array.from({ length: Math.min(MAX_PASSENGERS, available) }, (_, index) => index + 1).map((count) => (
-                        <option key={count} value={count}>{count} passenger{count === 1 ? "" : "s"}</option>
+              <div className="booking-card-body">
+                {/* Bus diagram */}
+                <div className="bus-diagram" aria-label="Bus seat layout">
+                  <div className="bus-body">
+                    <span className="bus-chip bus-chip-top">Driver</span>
+                    <fieldset className="bus-seats" disabled={saving} style={{ "--cols": SEATS_PER_ROW } as CSSProperties}>
+                      <legend className="sr-only">Choose your seats</legend>
+                      {seatNumbers.map((seatNumber) => (
+                        <SeatButton
+                          key={seatNumber}
+                          seatNumber={seatNumber}
+                          isBooked={bookedSeatNumbers.includes(seatNumber)}
+                          isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
+                          saving={saving}
+                          onToggle={toggleSeat}
+                        />
                       ))}
-                    </select>
-                  </label>
-                  <div className="booking-seat-picker-toggle">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setShowSeatSelector((value) => !value)}
-                    >
-                      {showSeatSelector ? "Hide seat selection" : `Choose seat${passengers === 1 ? "" : "s"}`}
-                    </button>
-                    <span className="booking-seat-count" aria-live="polite">
-                      {activeSelectedSeatNumbers.length} of {passengers} selected
-                      {activeSelectedSeatNumbers.length > 0 && ` · ${activeSelectedSeatNumbers.join(", ")}`}
-                    </span>
-                  </div>
-                  {showSeatSelector && (
-                    <fieldset className="booking-seat-picker" disabled={saving}>
-                      <legend>Choose your seat{passengers === 1 ? "" : "s"} <span>({passengers} required)</span></legend>
-                      <p className="booking-seat-instructions">Select {passengers} available seat{passengers === 1 ? "" : "s"}. Booked seats are unavailable.</p>
-                      <div className="booking-seat-layout" aria-label="Bus seat layout">
-                        <span className="booking-seat-front">FRONT OF BUS</span>
-                        <div className="booking-seat-rows">
-                          {seatRows.map((row, rowIndex) => (
-                            <div className="booking-seat-row" key={rowIndex} aria-label={`Seat row ${rowIndex + 1}`}>
-                              {row.slice(0, 2).map((seatNumber) => {
-                                return (
-                                  <SeatButton
-                                    key={seatNumber}
-                                    seatNumber={seatNumber}
-                                    isBooked={bookedSeatNumbers.includes(seatNumber)}
-                                    isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
-                                    saving={saving}
-                                    onToggle={toggleSeat}
-                                  />
-                                );
-                              })}
-                              <span className="booking-seat-aisle" aria-hidden="true" />
-                              {row.slice(2, 5).map((seatNumber) => {
-                                return (
-                                  <SeatButton
-                                    key={seatNumber}
-                                    seatNumber={seatNumber}
-                                    isBooked={bookedSeatNumbers.includes(seatNumber)}
-                                    isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
-                                    saving={saving}
-                                    onToggle={toggleSeat}
-                                  />
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <ul className="booking-seat-legend" aria-label="Seat availability legend">
-                        <li><span className="booking-seat-legend-mark" /> Available</li>
-                        <li><span className="booking-seat-legend-mark is-selected" /> Selected</li>
-                        <li><span className="booking-seat-legend-mark is-booked" /> Booked</li>
-                      </ul>
-                      <p className="booking-seat-count" aria-live="polite">
-                        {activeSelectedSeatNumbers.length} of {passengers} selected
-                        {activeSelectedSeatNumbers.length > 0 && ` · Seat${activeSelectedSeatNumbers.length === 1 ? "" : "s"} ${activeSelectedSeatNumbers.join(", ")}`}
-                      </p>
                     </fieldset>
-                  )}
-                  <label>
-                    Pickup point
-                    <select value={pickup} onChange={(event) => setPickup(event.target.value)} required>
-                      {selectedTrip.pickup.map((point) => <option key={point} value={point}>{point}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Drop-off point
-                    <select value={dropoff} onChange={(event) => setDropoff(event.target.value)} required>
-                      {selectedTrip.dropoff.map((point) => <option key={point} value={point}>{point}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Passenger full name
-                    <input autoComplete="name" maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alex Banda" required />
-                  </label>
-                  <label>
-                    Email address
-                    <input type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
-                  </label>
+                    <span className="bus-chip bus-chip-bottom">Back</span>
+                  </div>
                 </div>
 
-                <div className="reservation-actions">
-                  <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-                  <button className="primary-button form-submit" type="submit" disabled={saving || available === 0 || passengers > available}>
-                    Continue to payment
+                {/* Legend + form fields */}
+                <div className="booking-fields">
+                  <ul className="seat-legend" aria-label="Seat legend">
+                    <li><i className="dot dot-available" /> Available</li>
+                    <li><i className="dot dot-selected" /> Selected</li>
+                    <li><i className="dot dot-booked" /> Booked</li>
+                  </ul>
+
+                  <div className="selected-seats-box" aria-live="polite">
+                    <span className="info-dot" aria-hidden="true">i</span>
+                    <span>Selected Seats: {selectedCount > 0 ? activeSelectedSeatNumbers.join(", ") : "none yet"}</span>
+                    {selectedCount > 0 && (
+                      <button type="button" className="link-button" onClick={clearSeats}>Clear</button>
+                    )}
+                  </div>
+
+                  <h3 className="booking-subheading">Passenger Details</h3>
+                  <label>
+                    Passenger 1{activeSelectedSeatNumbers[0] ? ` (Seat ${activeSelectedSeatNumbers[0]})` : ""}
+                    <input
+                      autoComplete="name"
+                      maxLength={100}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Full Name (e.g. Alex Banda)"
+                      required
+                    />
+                  </label>
+
+                  <h3 className="booking-subheading">Boarding Points</h3>
+                  <div className="booking-two-col">
+                    <label>
+                      Pickup point
+                      <select value={pickup} onChange={(event) => setPickup(event.target.value)} required>
+                        {selectedTrip.pickup.map((point) => <option key={point} value={point}>{point}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      Drop-off point
+                      <select value={dropoff} onChange={(event) => setDropoff(event.target.value)} required>
+                        {selectedTrip.dropoff.map((point) => <option key={point} value={point}>{point}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  <h3 className="booking-subheading">Contact Information</h3>
+                  <label>
+                    Email address (optional)
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="Email Address (optional)"
+                    />
+                  </label>
+
+                  <button className="primary-button booking-continue" type="submit" disabled={saving || available === 0}>
+                    Continue to Payment →
                   </button>
                 </div>
               </div>
-            </div>
+            </section>
+
+            {/* RIGHT CARD: trip summary + route map */}
+            <aside className="booking-summary" aria-label="Trip summary">
+              <h2 className="summary-title">
+                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+                  <path fill="currentColor" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM6 11V6h12v5H6Z" />
+                </svg>
+                Trip Summary
+              </h2>
+
+              <dl className="summary-rows">
+                <div><dt>Route</dt><dd>{selectedTrip.route}</dd></div>
+                <div><dt>Date</dt><dd>{fmtDate(travelDate || selectedTrip.date)}</dd></div>
+                <div><dt>Time</dt><dd>{to12Hour(selectedTrip.departure)}</dd></div>
+                <div><dt>Seats</dt><dd>{seatSummary}</dd></div>
+                <div><dt>Fare</dt><dd className="summary-fare">MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</dd></div>
+              </dl>
+
+              <h3 className="summary-map-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+                </svg>
+                Route Map
+              </h3>
+
+              {currentRouteLookup.status === "error" && (
+                <div className="booking-route-error" role="alert">
+                  <span>Driving directions could not be loaded.</span>
+                  <button className="secondary-button" type="button" onClick={() => setRouteRetryKey((key) => key + 1)}>
+                    Retry directions
+                  </button>
+                </div>
+              )}
+
+              {pickupPosition && dropoffPosition ? (
+                <TripRouteMap
+                  from={routeOrigin ?? ""}
+                  to={routeDestination ?? ""}
+                  start={pickupPosition}
+                  end={dropoffPosition}
+                  route={currentRouteLookup.route}
+                  loading={currentRouteLookup.status === "loading"}
+                />
+              ) : (
+                <p className="booking-route-error" role="alert">Map directions are unavailable for this trip.</p>
+              )}
+              <p className="booking-route-attribution">Road route via OSRM using OpenStreetMap data.</p>
+            </aside>
           </form>
         )}
         {ticket && ticketQr && (
