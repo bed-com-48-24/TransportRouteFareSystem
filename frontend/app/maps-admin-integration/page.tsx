@@ -76,7 +76,69 @@ function stopKindLabel(kind: StopKind) {
   if (kind === "both") return "Pickup & drop-off";
   return kind === "pickup" ? "Pickup" : "Drop-off";
 }
+function RoadRoute({
+  origin,
+  destination,
+  isSelected,
+  route,
+}: {
+  origin: Coordinates;
+  destination: Coordinates;
+  isSelected: boolean;
+  route: RouteItem;
+}) {
+  const [positions, setPositions] = useState<[number, number][]>([]);
 
+  useEffect(() => {
+    async function loadRoadRoute() {
+      try {
+        // OSRM expects longitude,latitude
+        const url =
+          `https://router.project-osrm.org/route/v1/driving/` +
+          `${origin.lng},${origin.lat};${destination.lng},${destination.lat}` +
+          `?overview=full&geometries=geojson`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.routes?.length) {
+          // OSRM returns coordinates as [longitude, latitude]
+          const roadPositions = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]: [number, number]) =>
+              [lat, lng] as [number, number]
+          );
+
+          setPositions(roadPositions);
+        }
+      } catch (error) {
+        console.error("Could not load road route", error);
+      }
+    }
+
+    loadRoadRoute();
+  }, [origin.lat, origin.lng, destination.lat, destination.lng]);
+
+  if (positions.length === 0) return null;
+
+  return (
+    <Polyline
+      positions={positions}
+      pathOptions={{
+        color: isSelected ? "#12304A" : "#8CA6BF",
+        weight: isSelected ? 5 : 2.5,
+        opacity: isSelected ? 1 : 0.7,
+      }}
+    >
+      <Popup>
+        <strong>
+          {route.origin} → {route.destination}
+        </strong>
+        <br />
+        {route.service}
+      </Popup>
+    </Polyline>
+  );
+}
 function MapAdminIntegrationPage() {
   const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
   const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
@@ -175,30 +237,24 @@ function MapAdminIntegrationPage() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-
                   {routes.map((route) => {
-                    const origin = coordinatesForCity(route.origin);
-                    const destination = coordinatesForCity(route.destination);
-                    if (!origin || !destination) return null;
+                  const origin = coordinatesForCity(route.origin);
+                  const destination = coordinatesForCity(route.destination);
 
-                    const isSelected = selectedRouteId === "all" || selectedRouteId === route.id;
+                  if (!origin || !destination) return null;
 
-                    return (
-                      <Polyline
-                        key={route.id}
-                        positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
-                        pathOptions={{
-                          color: isSelected ? "#12304A" : "#8CA6BF",
-                          weight: isSelected ? 5 : 2.5,
-                          opacity: isSelected ? 1 : 0.7,
-                        }}
-                      >
-                        <Popup>
-                          <strong>{route.origin} → {route.destination}</strong><br />
-                          {route.service}
-                        </Popup>
-                      </Polyline>
-                    );
+                  const isSelected =
+                  selectedRouteId === "all" || selectedRouteId === route.id;
+
+                  return (
+                  <RoadRoute
+                  key={route.id}
+                  origin={origin}
+                  destination={destination}
+                  isSelected={isSelected}
+                    route={route}
+                  />
+                  );
                   })}
 
                   {Object.entries(CITY_COORDINATES).map(([name, coordinates]) => (
@@ -207,10 +263,10 @@ function MapAdminIntegrationPage() {
                     </CircleMarker>
                   ))}
 
-                  {stops.filter(hasCoords).map((stop) => (
+                  {stops.filter((stop)=>hasCoords(stop) && (selectedRouteId==="all" || stop.routeId===selectedRouteId)).map((stop) => (
                     <CircleMarker
                       key={stop.id}
-                      center={[stop.lat, stop.lng]}
+                      center={[stop.lat!, stop.lng!]}
                       radius={stop.kind === "both" ? 6 : 5}
                       pathOptions={{
                         color: stop.kind === "pickup" ? "#2F80ED" : stop.kind === "dropoff" ? "#E67E22" : "#7E57C2",
@@ -408,11 +464,13 @@ function RouteFareManagement() {
 
 function StopManagement() {
   const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
+  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [kind, setKind] = useState<StopKind>("pickup");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
+  const [routeId, setRouteId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
 
@@ -423,6 +481,10 @@ function StopManagement() {
     if (name.trim().length < 2 || city.trim().length < 2) {
       setFeedback("Enter a stop name and town.");
       return;
+    }
+    if(!routeId){
+      setFeedback("Please select the route for this stop");
+      return ;
     }
     if ((parsedLat === null) !== (parsedLng === null)) {
       setFeedback("Enter both coordinates, or leave both blank.");
@@ -435,7 +497,8 @@ function StopManagement() {
 
     try {
       const current = loadList<StopItem>(KEYS.stops, SEED_STOPS);
-      const item = { name: name.trim(), city: city.trim(), kind, lat: parsedLat, lng: parsedLng };
+
+      const item = { name: name.trim(), city: city.trim(), kind, lat: parsedLat, lng: parsedLng, routeId};
       saveList(KEYS.stops, editingId
         ? current.map((stop) => stop.id === editingId ? { ...stop, ...item } : stop)
         : [...current, { id: newId("stop"), ...item }]);
@@ -444,6 +507,7 @@ function StopManagement() {
       setKind("pickup");
       setLat("");
       setLng("");
+      setRouteId("");
       setEditingId(null);
       setFeedback(editingId ? "Stop updated." : "Stop added.");
     } catch {
@@ -453,6 +517,7 @@ function StopManagement() {
 
   function editStop(stop: StopItem) {
     setEditingId(stop.id);
+    setRouteId(stop.routeId?? "");
     setName(stop.name);
     setCity(stop.city);
     setKind(stop.kind);

@@ -16,10 +16,12 @@ export type FareItem = {
 export type StopItem = {
   id: string;
   name: string;
-  kind: StopKind;
   city: string;
+  kind: StopKind;
   lat: number | null; 
   lng: number | null;
+
+  routeId?: string;
 };
 
 export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
