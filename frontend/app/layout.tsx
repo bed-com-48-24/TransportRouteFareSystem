@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import MainNavigation from "@/components/MainNavigation";
 import "./globals.css";
 
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             <span className="site-brand-mark" aria-hidden="true">S</span>
             <span>SBUS<small>Travel information</small></span>
           </Link>
-          <MainNavigation />
+          <Suspense fallback={null}>
+            <MainNavigation />
+          </Suspense>
         </header>
         <div id="main-content">{children}</div>
         <footer className="site-footer">
