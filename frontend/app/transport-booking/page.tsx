@@ -2,24 +2,40 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+<<<<<<< HEAD
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import L from "leaflet";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
 import QRCode from "qrcode";
 import { availableSeats, createBooking, fmtDate, TRIPS, unavailableSeatNumbers } from "@/lib/booking-data";
+=======
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
+import QRCode from "qrcode";
+import { availableSeats, createBooking, fmtDate, getBookedSeatNumbers, TRIPS } from "@/lib/booking-data";
+>>>>>>> origin/feature/integration
 import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS } from "@/lib/seed";
 import { useStoredList } from "@/lib/storage";
 import type { Booking } from "@/lib/types";
+// Leaflet needs the browser, so this map only loads on the client
+const TripRouteMap = dynamic(() => import("@/components/TripRouteMap"), {
+  ssr: false,
+  loading: () => <div className="summary-map summary-map-loading">Loading map…</div>,
+});
 
 const MAX_PASSENGERS = 8;
+const SEATS_PER_ROW = 2; // the design shows 2 seats per row; use 4 for a wider bus
+const BOOKING_DRAFT_KEY = "routewise-pending-booking-v1";
 const TRIP_CITY_COORDINATES: Record<string, Coordinates> = {
   ...DISTRICT_COORDINATES,
   Limbe: { lat: -15.8103, lng: 35.0586 },
   Mzuzu: { lat: -11.4656, lng: 34.0207 },
 };
 
+<<<<<<< HEAD
 function parseRoadRoute(payload: unknown): [number, number][] {
   if (
     typeof payload !== "object" ||
@@ -64,6 +80,144 @@ function parseRoadRoute(payload: unknown): [number, number][] {
   }
 
   return positions;
+=======
+type RoutePoint = [number, number];
+type RoadRoute = {
+  positions: RoutePoint[];
+  distance: number;
+  duration: number;
+};
+type RoutingRoute = {
+  distance: number;
+  duration: number;
+  geometry: { coordinates: [number, number][] };
+};
+type RoutingResponse = {
+  code: string;
+  routes: RoutingRoute[];
+};
+type BookingDraft = {
+  tripId: string;
+  travelDate: string;
+  pickup: string;
+  dropoff: string;
+  passengers: number;
+  seatNumbers: number[];
+};
+
+function isBookingDraft(value: unknown): value is BookingDraft {
+  if (typeof value !== "object" || value === null) return false;
+  if (
+    !("tripId" in value) ||
+    typeof value.tripId !== "string" ||
+    !("travelDate" in value) ||
+    typeof value.travelDate !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value.travelDate) ||
+    !("pickup" in value) ||
+    typeof value.pickup !== "string" ||
+    !("dropoff" in value) ||
+    typeof value.dropoff !== "string" ||
+    !("passengers" in value) ||
+    typeof value.passengers !== "number" ||
+    !Number.isInteger(value.passengers) ||
+    value.passengers < 1 ||
+    value.passengers > MAX_PASSENGERS ||
+    !("seatNumbers" in value) ||
+    !Array.isArray(value.seatNumbers) ||
+    !value.seatNumbers.every((seat): seat is number => typeof seat === "number" && Number.isInteger(seat))
+  ) {
+    return false;
+  }
+
+  const trip = TRIPS.find((item) => item.id === value.tripId);
+  return Boolean(
+    trip &&
+    trip.pickup.includes(value.pickup) &&
+    trip.dropoff.includes(value.dropoff) &&
+    value.seatNumbers.length <= value.passengers &&
+    new Set(value.seatNumbers).size === value.seatNumbers.length &&
+    value.seatNumbers.every((seat) => seat >= 1 && seat <= trip.capacity),
+  );
+}
+
+function isRoutingRoute(value: unknown): value is RoutingRoute {
+  if (typeof value !== "object" || value === null || !("distance" in value) || !("duration" in value) || !("geometry" in value)) {
+    return false;
+  }
+  if (
+    typeof value.distance !== "number" ||
+    !Number.isFinite(value.distance) ||
+    typeof value.duration !== "number" ||
+    !Number.isFinite(value.duration) ||
+    typeof value.geometry !== "object" ||
+    value.geometry === null ||
+    !("coordinates" in value.geometry) ||
+    !Array.isArray(value.geometry.coordinates) ||
+    value.geometry.coordinates.length < 2
+  ) {
+    return false;
+  }
+  return value.geometry.coordinates.every((point: unknown) =>
+    Array.isArray(point) &&
+    point.length >= 2 &&
+    typeof point[0] === "number" &&
+    Number.isFinite(point[0]) &&
+    point[0] >= -180 &&
+    point[0] <= 180 &&
+    typeof point[1] === "number" &&
+    Number.isFinite(point[1]) &&
+    point[1] >= -90 &&
+    point[1] <= 90,
+  );
+}
+
+function isRoutingResponse(value: unknown): value is RoutingResponse {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    value.code === "Ok" &&
+    "routes" in value &&
+    Array.isArray(value.routes) &&
+    value.routes.length > 0 &&
+    isRoutingRoute(value.routes[0])
+  );
+}
+
+function to12Hour(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time;
+  return `${String(h % 12 || 12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+function SeatButton({
+  seatNumber,
+  isBooked,
+  isSelected,
+  saving,
+  onToggle,
+}: {
+  seatNumber: number;
+  isBooked: boolean;
+  isSelected: boolean;
+  saving: boolean;
+  onToggle: (seatNumber: number) => void;
+}) {
+  const state = isBooked ? "Booked" : isSelected ? "Selected" : "Available";
+
+  return (
+    <button
+      type="button"
+      className={`bus-seat${isBooked ? " is-booked" : isSelected ? " is-selected" : ""}`}
+      aria-label={`Seat ${seatNumber}, ${state}`}
+      aria-pressed={isSelected}
+      disabled={isBooked || saving}
+      onClick={() => onToggle(seatNumber)}
+    >
+      {seatNumber}
+    </button>
+  );
+>>>>>>> origin/feature/integration
 }
 
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
@@ -76,6 +230,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [dropoff, setDropoff] = useState(initialTrip?.dropoff[0] ?? "");
   const [passengers, setPassengers] = useState(1);
   const [selectedSeatNumbers, setSelectedSeatNumbers] = useState<number[]>([]);
+<<<<<<< HEAD
+=======
+  
+>>>>>>> origin/feature/integration
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -88,6 +246,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [tripView, setTripView] = useState<"cards" | "map">("cards");
   const [destinationFilter, setDestinationFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+<<<<<<< HEAD
   const [roadRoute, setRoadRoute] = useState<[number, number][]>([]);
   const [roadRouteLoading, setRoadRouteLoading] = useState(false);
   const [roadRouteError, setRoadRouteError] = useState("");
@@ -155,6 +314,33 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     iconAnchor: [9, 9],
     popupAnchor: [0, -12],
   });
+=======
+  const [routeRetryKey, setRouteRetryKey] = useState(0);
+  const [routeLookup, setRouteLookup] = useState<{
+    key: string;
+    status: "loading" | "ready" | "error";
+    route?: RoadRoute;
+  }>({ key: "", status: "loading" });
+
+  const selectedTrip = TRIPS.find((trip) => trip.id === selectedTripId);
+  const [routeOrigin, routeDestination] = selectedTrip?.route.split(" → ") ?? [];
+  const routeOriginCoordinates = routeOrigin ? TRIP_CITY_COORDINATES[routeOrigin] : undefined;
+  const routeDestinationCoordinates = routeDestination ? TRIP_CITY_COORDINATES[routeDestination] : undefined;
+  const pickupPosition = useMemo<RoutePoint | null>(
+    () => routeOriginCoordinates ? [routeOriginCoordinates.lat, routeOriginCoordinates.lng] : null,
+    [routeOriginCoordinates],
+  );
+  const dropoffPosition = useMemo<RoutePoint | null>(
+    () => routeDestinationCoordinates ? [routeDestinationCoordinates.lat, routeDestinationCoordinates.lng] : null,
+    [routeDestinationCoordinates],
+  );
+  const routeKey = `${selectedTripId}:${pickup}:${dropoff}:${routeRetryKey}`;
+  const currentRouteLookup = !pickupPosition || !dropoffPosition
+    ? { key: routeKey, status: "error" as const }
+    : routeLookup.key === routeKey
+      ? routeLookup
+      : { key: routeKey, status: "loading" as const };
+>>>>>>> origin/feature/integration
   const destinations = [...new Set(TRIPS.map((trip) => trip.route.split(" → ")[1]))].sort();
   const travelDates = [...new Set(TRIPS.map((trip) => trip.date))].sort();
   const visibleTrips = TRIPS.filter((trip) => {
@@ -168,6 +354,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     [bookings],
   );
   const available = selectedTrip ? (seatsByTrip.get(selectedTrip.id) ?? 0) : 0;
+<<<<<<< HEAD
   const unavailableSeats = selectedTrip ? new Set(unavailableSeatNumbers(selectedTrip, bookings)) : new Set<number>();
   const seatRows = selectedTrip
     ? Array.from({ length: Math.ceil(selectedTrip.capacity / 4) }, (_, rowIndex) =>
@@ -201,6 +388,104 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       </button>
     );
   }
+=======
+  const bookedSeatNumbers = selectedTrip
+    ? getBookedSeatNumbers(selectedTrip.capacity, bookings, selectedTrip.id)
+    : [];
+  const activeSelectedSeatNumbers = selectedSeatNumbers.filter((seatNumber) => !bookedSeatNumbers.includes(seatNumber));
+    const seatNumbers = selectedTrip
+    ? Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1)
+    : [];
+  const selectedCount = activeSelectedSeatNumbers.length;
+  const seatSummary =
+    selectedCount === 0
+      ? "No seat selected"
+      : `${selectedCount} seat${selectedCount === 1 ? "" : "s"} (Seat${selectedCount === 1 ? "" : "s"} ${activeSelectedSeatNumbers.join(", ")})`;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const draft = sessionStorage.getItem(BOOKING_DRAFT_KEY);
+        if (draft) {
+          sessionStorage.removeItem(BOOKING_DRAFT_KEY);
+          const parsed: unknown = JSON.parse(draft);
+          if (!isBookingDraft(parsed)) {
+            throw new Error("Your saved booking details could not be restored. Please choose a trip again.");
+          }
+          setSelectedTripId(parsed.tripId);
+          setTravelDate(parsed.travelDate);
+          setPickup(parsed.pickup);
+          setDropoff(parsed.dropoff);
+          setPassengers(parsed.passengers);
+          setSelectedSeatNumbers(parsed.seatNumbers);
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Your booking details could not be restored.");
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+    function toggleSeat(seatNumber: number) {
+    if (bookedSeatNumbers.includes(seatNumber)) return;
+
+    let next: number[];
+    if (activeSelectedSeatNumbers.includes(seatNumber)) {
+      next = activeSelectedSeatNumbers.filter((selected) => selected !== seatNumber);
+    } else {
+      if (activeSelectedSeatNumbers.length >= MAX_PASSENGERS) {
+        setError(`You can book up to ${MAX_PASSENGERS} seats at a time.`);
+        return;
+      }
+      next = [...activeSelectedSeatNumbers, seatNumber].sort((first, second) => first - second);
+    }
+
+    setSelectedSeatNumbers(next);
+    setPassengers(Math.max(1, next.length));
+    setError("");
+  }
+
+  function clearSeats() {
+    setSelectedSeatNumbers([]);
+    setPassengers(1);
+    setError("");
+  }
+
+  useEffect(() => {
+    if (!selectedTrip || !pickupPosition || !dropoffPosition) return;
+    const controller = new AbortController();
+    const [startLat, startLng] = pickupPosition;
+    const [endLat, endLng] = dropoffPosition;
+    const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
+
+    async function loadRoadRoute() {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Routing service returned ${response.status}`);
+        const result: unknown = await response.json();
+        if (!isRoutingResponse(result)) throw new Error("Routing service returned an invalid route");
+
+        const route = result.routes[0];
+        setRouteLookup({
+          key: routeKey,
+          status: "ready",
+          route: {
+            positions: route.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+            distance: route.distance,
+            duration: route.duration,
+          },
+        });
+      } catch {
+        if (controller.signal.aborted) return;
+        setRouteLookup({ key: routeKey, status: "error" });
+      }
+    }
+
+    void loadRoadRoute();
+    return () => controller.abort();
+  }, [dropoffPosition, pickupPosition, routeKey, selectedTrip]);
+>>>>>>> origin/feature/integration
 
   function returnToTrips() {
     if (initialTripId) {
@@ -226,7 +511,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     if (
       name.trim().length < 2 ||
       name.trim().length > 100 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      (email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) ||
       travelDate < selectedTrip.date ||
       !selectedTrip.pickup.includes(pickup) ||
       !selectedTrip.dropoff.includes(dropoff) ||
@@ -237,11 +522,16 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       return;
     }
 
+<<<<<<< HEAD
     if (
       selectedSeatNumbers.length !== passengers ||
       selectedSeatNumbers.some((seatNumber) => unavailableSeats.has(seatNumber))
     ) {
       setError(`Select ${passengers} available seat${passengers === 1 ? "" : "s"} in the bus layout.`);
+=======
+    if (activeSelectedSeatNumbers.length !== passengers) {
+      setError(`Select ${passengers} available seat${passengers === 1 ? "" : "s"} on the bus before continuing.`);
+>>>>>>> origin/feature/integration
       return;
     }
 
@@ -262,7 +552,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           pickup,
           dropoff,
           passengers,
+<<<<<<< HEAD
           seatNumbers: selectedSeatNumbers,
+=======
+          seatNumbers: activeSelectedSeatNumbers,
+>>>>>>> origin/feature/integration
           name: name.trim(),
           email: email.trim().toLowerCase(),
         },
@@ -270,7 +564,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       );
 
       if (!booking) {
+<<<<<<< HEAD
         setError("A selected seat may have just been booked, or the trip no longer has enough capacity. Go back and choose available seats or another departure.");
+=======
+        setError("One or more selected seats have just been booked. Choose different available seat numbers and try again.");
+>>>>>>> origin/feature/integration
         return;
       }
 
@@ -329,10 +627,14 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         ["BOARDING", ticket.pickup],
         ["DESTINATION", ticket.dropoff],
         ["PASSENGERS", String(ticket.passengers)],
+<<<<<<< HEAD
         ["SEATS", ticket.seatNumbers?.join(", ") ?? "Not assigned"],
+=======
+        ["SEAT NUMBERS", ticket.seatNumbers?.join(", ") ?? "Not recorded"],
+>>>>>>> origin/feature/integration
         ["REFERENCE", ticket.reference],
       ];
-      let fieldY = 230;
+      let fieldY = 205;
       for (const [label, value] of ticketFields) {
         context.fillStyle = "#64788a";
         context.font = "700 16px sans-serif";
@@ -340,7 +642,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         context.fillStyle = "#12304a";
         context.font = "600 24px sans-serif";
         context.fillText(value, 78, fieldY + 34, 680);
-        fieldY += label === "ROUTE" ? 90 : 68;
+        fieldY += label === "ROUTE" ? 78 : 52;
       }
 
       const qrImage = document.createElement("img");
@@ -363,7 +665,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   }
 
   return (
-    <main className="module-shell">
+      <main className={`module-shell${initialTripId ? " module-shell-wide" : ""}`}>
       <header className="module-intro">
         <p className="module-eyebrow">TRAVEL · RESERVATIONS</p>
         <h1>{initialTripId ? initialTrip ? `${initialTrip.route} trip details` : "Trip not found" : "Choose a trip and reserve your seats"}</h1>
@@ -490,13 +792,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       )}
 
       {(selectedTrip || initialTripId) && (
-      <section className="module-section" aria-labelledby="reservation-heading">
-        <div className="module-section-heading">
-          <div>
-            <p className="module-eyebrow">RESERVE YOUR SEAT</p>
-            <h2 id="reservation-heading" tabIndex={-1}>Trip and passenger details</h2>
-          </div>
-        </div>
+        <section className="module-section booking-section" aria-label="Reserve your seat">
         {!selectedTrip ? (
           ticket ? null : <p className="module-empty">This sample trip could not be found. Return to the available trips and choose another departure.</p>
         ) : paymentPending ? (
@@ -522,6 +818,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
             </div>
           </div>
         ) : (
+<<<<<<< HEAD
           <div className="reservation-layout">
             <div className="reservation-map-panel">
               <div className="module-section-heading compact-heading">
@@ -661,6 +958,150 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               </div>
             </form>
           </div>
+=======
+          <form className="booking-layout" onSubmit={submitBooking} noValidate>
+            {/* LEFT CARD: seats + passenger details */}
+            <section className="booking-card" aria-labelledby="reservation-heading">
+              <p className="module-eyebrow">RESERVE YOUR SEAT</p>
+              <h2 id="reservation-heading" tabIndex={-1}>Select your seats</h2>
+              <p className="booking-help">Click on the seats you want. Selected seats will be highlighted in dark blue.</p>
+
+              <div className="booking-card-body">
+                {/* Bus diagram */}
+                <div className="bus-diagram" aria-label="Bus seat layout">
+                  <div className="bus-body">
+                    <span className="bus-chip bus-chip-top">Driver</span>
+                    <fieldset className="bus-seats" disabled={saving} style={{ "--cols": SEATS_PER_ROW } as CSSProperties}>
+                      <legend className="sr-only">Choose your seats</legend>
+                      {seatNumbers.map((seatNumber) => (
+                        <SeatButton
+                          key={seatNumber}
+                          seatNumber={seatNumber}
+                          isBooked={bookedSeatNumbers.includes(seatNumber)}
+                          isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
+                          saving={saving}
+                          onToggle={toggleSeat}
+                        />
+                      ))}
+                    </fieldset>
+                    <span className="bus-chip bus-chip-bottom">Back</span>
+                  </div>
+                </div>
+
+                {/* Legend + form fields */}
+                <div className="booking-fields">
+                  <ul className="seat-legend" aria-label="Seat legend">
+                    <li><i className="dot dot-available" /> Available</li>
+                    <li><i className="dot dot-selected" /> Selected</li>
+                    <li><i className="dot dot-booked" /> Booked</li>
+                  </ul>
+
+                  <div className="selected-seats-box" aria-live="polite">
+                    <span className="info-dot" aria-hidden="true">i</span>
+                    <span>Selected Seats: {selectedCount > 0 ? activeSelectedSeatNumbers.join(", ") : "none yet"}</span>
+                    {selectedCount > 0 && (
+                      <button type="button" className="link-button" onClick={clearSeats}>Clear</button>
+                    )}
+                  </div>
+
+                  <h3 className="booking-subheading">Passenger Details</h3>
+                  <label>
+                    Passenger 1{activeSelectedSeatNumbers[0] ? ` (Seat ${activeSelectedSeatNumbers[0]})` : ""}
+                    <input
+                      autoComplete="name"
+                      maxLength={100}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Full Name (e.g. Alex Banda)"
+                      required
+                    />
+                  </label>
+
+                  <h3 className="booking-subheading">Boarding Points</h3>
+                  <div className="booking-two-col">
+                    <label>
+                      Pickup point
+                      <select value={pickup} onChange={(event) => setPickup(event.target.value)} required>
+                        {selectedTrip.pickup.map((point) => <option key={point} value={point}>{point}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      Drop-off point
+                      <select value={dropoff} onChange={(event) => setDropoff(event.target.value)} required>
+                        {selectedTrip.dropoff.map((point) => <option key={point} value={point}>{point}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  <h3 className="booking-subheading">Contact Information</h3>
+                  <label>
+                    Email address (optional)
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="Email Address (optional)"
+                    />
+                  </label>
+
+                  <button className="primary-button booking-continue" type="submit" disabled={saving || available === 0}>
+                    Continue to Payment →
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* RIGHT CARD: trip summary + route map */}
+            <aside className="booking-summary" aria-label="Trip summary">
+              <h2 className="summary-title">
+                <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+                  <path fill="currentColor" d="M4 16c0 .9.4 1.7 1 2.2V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.8c.6-.5 1-1.3 1-2.2V6c0-3.5-3.6-4-8-4S4 2.5 4 6v10Zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM6 11V6h12v5H6Z" />
+                </svg>
+                Trip Summary
+              </h2>
+
+              <dl className="summary-rows">
+                <div><dt>Route</dt><dd>{selectedTrip.route}</dd></div>
+                <div><dt>Date</dt><dd>{fmtDate(travelDate || selectedTrip.date)}</dd></div>
+                <div><dt>Time</dt><dd>{to12Hour(selectedTrip.departure)}</dd></div>
+                <div><dt>Seats</dt><dd>{seatSummary}</dd></div>
+                <div><dt>Fare</dt><dd className="summary-fare">MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</dd></div>
+              </dl>
+
+              <h3 className="summary-map-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
+                </svg>
+                Route Map
+              </h3>
+
+              {currentRouteLookup.status === "error" && (
+                <div className="booking-route-error" role="alert">
+                  <span>Driving directions could not be loaded.</span>
+                  <button className="secondary-button" type="button" onClick={() => setRouteRetryKey((key) => key + 1)}>
+                    Retry directions
+                  </button>
+                </div>
+              )}
+
+              {pickupPosition && dropoffPosition ? (
+                <TripRouteMap
+                  from={routeOrigin ?? ""}
+                  to={routeDestination ?? ""}
+                  start={pickupPosition}
+                  end={dropoffPosition}
+                  route={currentRouteLookup.route}
+                  loading={currentRouteLookup.status === "loading"}
+                />
+              ) : (
+                <p className="booking-route-error" role="alert">Map directions are unavailable for this trip.</p>
+              )}
+              <p className="booking-route-attribution">Road route via OSRM using OpenStreetMap data.</p>
+            </aside>
+          </form>
+>>>>>>> origin/feature/integration
         )}
         {ticket && ticketQr && (
           <article className="ticket-card" aria-labelledby="ticket-heading">
@@ -669,6 +1110,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               <h3 id="ticket-heading">Your bus ticket</h3>
               <p className="ticket-route">{ticket.route}</p>
               <p>{fmtDate(ticket.travelDate)} · {ticket.pickup} to {ticket.dropoff}</p>
+              <p>Seat{ticket.seatNumbers?.length === 1 ? "" : "s"}: {ticket.seatNumbers?.join(", ") ?? "Not recorded"}</p>
               <p>{ticket.passengers} passenger{ticket.passengers === 1 ? "" : "s"} · {ticket.name}</p>
               {ticket.seatNumbers?.length ? <p>Seat{ticket.seatNumbers.length === 1 ? "" : "s"}: {ticket.seatNumbers.join(", ")}</p> : null}
               <p className="ticket-reference">Reference: <strong>{ticket.reference}</strong></p>

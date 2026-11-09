@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import RequireAdmin from "@/components/RequireAdmin";
-import { TRIPS, fmtDate, type Booking } from "@/app/transport-booking/booking-data";
-import { getAvailableSeats } from "@/app/transport-booking/seat-inventory.mjs";
+import { TRIPS, fmtDate } from "@/lib/booking-data";
+import type { Booking } from "@/lib/types";
+import { getAvailableSeats } from "@/lib/seat-inventory.mjs";
 import { KEYS } from "@/lib/seed";
 import { loadList, saveList, useStoredList } from "@/lib/storage";
 

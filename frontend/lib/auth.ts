@@ -124,6 +124,38 @@ export function logout() {
   listeners.forEach((fn) => fn());
 }
 
+export function clearDemoAuthState() {
+  const keysToRemove = new Set<string>([KEYS.session, "sbus_admin_accounts_v1", "routewise-profile-v1"]);
+
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key) continue;
+      if (key.startsWith("sb-") || key.includes("supabase") || keysToRemove.has(key)) {
+        keysToRemove.add(key);
+      }
+    }
+  } catch {
+    // Ignore browser storage access errors when the environment is restricted.
+  }
+
+  for (const key of keysToRemove) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore storage access failures when clearing demo login data.
+    }
+  }
+
+  try {
+    sessionStorage.removeItem(KEYS.session);
+  } catch {
+    // Ignore storage access failures when clearing demo login data.
+  }
+
+  listeners.forEach((fn) => fn());
+}
+
 export function useSession(): Session {
   const raw = useSyncExternalStore(
     (cb) => {

@@ -2,6 +2,9 @@
 
 import dynamic from "next/dynamic";
 
+export const RouteLocationMarker = dynamic(() => import("./RouteLocationMarker"), {
+  ssr: false,
+});
 export const CircleMarker = dynamic(
   () => import("react-leaflet").then((module) => module.CircleMarker),
   { ssr: false },
