@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-import { getAvailableSeats, getUnavailableSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
-=======
 import { getAvailableSeats, getBookedSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
->>>>>>> origin/feature/integration
+import { getUnavailableSeatNumbers } from "./seat-inventory.mjs";
 import { KEYS } from "./seed";
 import { loadList, saveList } from "./storage";
 import type { Booking, Trip } from "./types";
@@ -10,7 +7,7 @@ import type { Booking, Trip } from "./types";
 export type { Booking, Trip } from "./types";
 export { getBookedSeatNumbers };
 
-const STANDARD_BUS_CAPACITY = 60;
+const STANDARD_BUS_CAPACITY = 41;
 
 export const TRIPS: Trip[] = [
   {
@@ -18,7 +15,7 @@ export const TRIPS: Trip[] = [
     route: "Blantyre → Limbe",
     pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"],
     dropoff: ["Limbe Bus Station", "Limbe Market"],
-    date: "2026-11-03",
+    date: "2026-11-12",
     departure: "08:00",
     arrival: "08:45",
     capacity: STANDARD_BUS_CAPACITY,
@@ -29,7 +26,7 @@ export const TRIPS: Trip[] = [
     route: "Blantyre → Limbe",
     pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"],
     dropoff: ["Limbe Bus Station", "Limbe Market"],
-    date: "2026-11-03",
+    date: "2026-11-12",
     departure: "10:30",
     arrival: "11:15",
     capacity: STANDARD_BUS_CAPACITY,
@@ -40,7 +37,7 @@ export const TRIPS: Trip[] = [
     route: "Blantyre → Zomba",
     pickup: ["Blantyre Bus Depot", "Limbe Bus Station"],
     dropoff: ["Zomba Bus Depot", "Zomba Market"],
-    date: "2026-11-04",
+    date: "2026-11-12",
     departure: "09:00",
     arrival: "10:30",
     capacity: STANDARD_BUS_CAPACITY,
@@ -51,7 +48,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Mzuzu",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Mzuzu Bus Terminal", "Mzuzu Drop-off"],
-    date: "2026-11-03",
+    date: "2026-11-13",
     departure: "06:00",
     arrival: "14:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -62,7 +59,7 @@ export const TRIPS: Trip[] = [
     route: "Mzuzu → Lilongwe",
     pickup: ["Mzuzu Bus Terminal", "Mzuzu Drop-off"],
     dropoff: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
-    date: "2026-11-04",
+    date: "2026-11-13",
     departure: "06:30",
     arrival: "14:30",
     capacity: STANDARD_BUS_CAPACITY,
@@ -73,7 +70,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Salima",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Salima Bus Stage", "Salima Drop-off"],
-    date: "2026-11-03",
+    date: "2026-11-13",
     departure: "09:00",
     arrival: "11:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -84,7 +81,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Mchinji",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Mchinji Bus Station"],
-    date: "2026-11-04",
+    date: "2026-11-13",
     departure: "08:00",
     arrival: "12:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -95,7 +92,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Kasungu",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Kasungu Bus Depot", "Kasungu Market Drop-off"],
-    date: "2026-11-05",
+    date: "2026-11-14",
     departure: "07:00",
     arrival: "10:30",
     capacity: STANDARD_BUS_CAPACITY,
@@ -106,7 +103,7 @@ export const TRIPS: Trip[] = [
     route: "Blantyre → Mangochi",
     pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"],
     dropoff: ["Mangochi Bus Depot", "Mangochi Market Drop-off"],
-    date: "2026-11-05",
+    date: "2026-11-14",
     departure: "06:00",
     arrival: "12:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -117,7 +114,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Dedza",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Dedza Bus Depot"],
-    date: "2026-11-03",
+    date: "2026-11-14",
     departure: "10:30",
     arrival: "12:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -128,7 +125,7 @@ export const TRIPS: Trip[] = [
     route: "Blantyre → Lilongwe",
     pickup: ["Blantyre Bus Depot", "Chichiri Shopping Centre"],
     dropoff: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
-    date: "2026-11-03",
+    date: "2026-11-14",
     departure: "06:00",
     arrival: "14:30",
     capacity: STANDARD_BUS_CAPACITY,
@@ -139,7 +136,7 @@ export const TRIPS: Trip[] = [
     route: "Lilongwe → Blantyre",
     pickup: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
     dropoff: ["Blantyre Bus Depot", "Chichiri Shopping Centre"],
-    date: "2026-11-04",
+    date: "2026-11-14",
     departure: "06:15",
     arrival: "14:45",
     capacity: STANDARD_BUS_CAPACITY,
@@ -150,7 +147,7 @@ export const TRIPS: Trip[] = [
     route: "Mzuzu → Karonga",
     pickup: ["Mzuzu Bus Terminal", "Mzuzu Drop-off"],
     dropoff: ["Karonga Bus Station"],
-    date: "2026-11-04",
+    date: "2026-11-15",
     departure: "07:30",
     arrival: "12:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -161,7 +158,7 @@ export const TRIPS: Trip[] = [
     route: "Zomba → Blantyre",
     pickup: ["Zomba Bus Depot", "Zomba Town Stage"],
     dropoff: ["Blantyre Bus Depot", "Limbe Bus Station"],
-    date: "2026-11-05",
+    date: "2026-11-15",
     departure: "09:00",
     arrival: "10:30",
     capacity: STANDARD_BUS_CAPACITY,
@@ -172,7 +169,7 @@ export const TRIPS: Trip[] = [
     route: "Salima → Lilongwe",
     pickup: ["Salima Bus Stage", "Salima Drop-off"],
     dropoff: ["Lilongwe Bus Terminal", "Lilongwe City Centre Stage"],
-    date: "2026-11-05",
+    date: "2026-11-15",
     departure: "08:00",
     arrival: "10:00",
     capacity: STANDARD_BUS_CAPACITY,
@@ -208,11 +205,7 @@ export async function createBooking(
   return reserveBooking<Booking>({
     trip,
     passengers: input.passengers,
-<<<<<<< HEAD
-    selectedSeats: input.seatNumbers,
-=======
     seatNumbers: input.seatNumbers,
->>>>>>> origin/feature/integration
     locks: typeof navigator === "undefined" ? undefined : navigator.locks,
     readBookings,
     writeBookings: saveBookings,
@@ -222,6 +215,8 @@ export async function createBooking(
       reference: `TR-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
       status: "confirmed",
       createdAt: new Date().toISOString(),
+      total: trip.fare * input.passengers,
+      paymentStatus: "paid",
     }),
   });
 }

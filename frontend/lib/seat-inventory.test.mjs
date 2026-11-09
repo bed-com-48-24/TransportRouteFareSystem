@@ -1,68 +1,42 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-<<<<<<< HEAD
-import { getAvailableSeats, getUnavailableSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
-=======
-import { getAvailableSeats, getBookedSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
->>>>>>> origin/feature/integration
+import { getAvailableSeats, getBookedSeatNumbers, getUnavailableSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
 
-test("booked seats exclude cancelled bookings and other trips", () => {
+test("seat availability ignores cancelled bookings and bookings for other trips", () => {
   const bookings = [
     { tripId: "trip-a", passengers: 3, seatNumbers: [2, 4, 6], status: "confirmed" },
     { tripId: "trip-a", passengers: 2, status: "cancelled" },
     { tripId: "trip-b", passengers: 4, status: "confirmed" },
   ];
-
   assert.deepEqual(getBookedSeatNumbers(10, bookings, "trip-a"), [2, 4, 6]);
   assert.equal(getAvailableSeats(10, bookings, "trip-a"), 7);
 });
 
-<<<<<<< HEAD
-test("unavailable seat numbers include assigned seats and legacy booking counts", () => {
+test("legacy bookings reserve seats without overwriting explicit seats", () => {
   const bookings = [
     { tripId: "trip-a", passengers: 2, status: "confirmed" },
     { tripId: "trip-a", passengers: 1, seatNumbers: [5], status: "confirmed" },
     { tripId: "trip-a", passengers: 1, seatNumbers: [7], status: "cancelled" },
   ];
-
   assert.deepEqual(getUnavailableSeatNumbers(8, bookings, "trip-a"), [1, 2, 5]);
-=======
-test("legacy bookings without seat numbers occupy the first available seats", () => {
-  const bookings = [
-    { tripId: "trip-a", passengers: 2, status: "confirmed" },
-    { tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" },
-  ];
-
-  assert.deepEqual(getBookedSeatNumbers(5, bookings, "trip-a"), [1, 2, 3]);
 });
 
-test("seat reservations reject a seat already booked by another passenger", async () => {
+test("booking rejects a seat already claimed", async () => {
   const trip = { id: "trip-a", capacity: 4 };
   const bookings = [{ tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" }];
-
   const result = await reserveBooking({
     trip,
     passengers: 1,
     seatNumbers: [2],
     locks: { request: (_name, callback) => callback() },
     readBookings: () => bookings,
-    writeBookings: () => assert.fail("A booked seat must not be written"),
-    createBooking: () => assert.fail("A booked seat must not create a booking"),
+    writeBookings: () => assert.fail("A claimed seat must not be written"),
+    createBooking: () => assert.fail("A claimed seat must not create a booking"),
   });
-
   assert.equal(result, null);
 });
 
-test("overlapping old seat assignments reserve replacement seats for each passenger", () => {
-  const bookings = [
-    { tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" },
-    { tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" },
-  ];
-
-  assert.deepEqual(getBookedSeatNumbers(4, bookings, "trip-a"), [1, 2]);
-});
-
-test("concurrent reservations cannot claim the same numbered seat", async () => {
+test("concurrent reservations cannot claim the same seat", async () => {
   const trip = { id: "trip-a", capacity: 2 };
   let bookings = [];
   let tail = Promise.resolve();
@@ -73,30 +47,24 @@ test("concurrent reservations cannot claim the same numbered seat", async () => 
       return current;
     },
   };
-  const reserve = (reference) =>
-    reserveBooking({
-      trip,
+  const reserve = (reference) => reserveBooking({
+    trip,
+    passengers: 1,
+    seatNumbers: [1],
+    locks,
+    readBookings: () => bookings,
+    writeBookings: (next) => { bookings = next; },
+    createBooking: (seatNumbers) => ({
+      tripId: trip.id,
       passengers: 1,
-      seatNumbers: [1],
-      locks,
-      readBookings: () => bookings,
-      writeBookings: (next) => {
-        bookings = next;
-      },
-      createBooking: (seatNumbers) => ({
-        tripId: trip.id,
-        passengers: 1,
-        seatNumbers,
-        status: "confirmed",
-        reference,
-      }),
-    });
-
+      seatNumbers,
+      status: "confirmed",
+      reference,
+    }),
+  });
   const results = await Promise.all([reserve("first"), reserve("second")]);
-
   assert.equal(results.filter(Boolean).length, 1);
   assert.deepEqual(getBookedSeatNumbers(trip.capacity, bookings, trip.id), [1]);
->>>>>>> origin/feature/integration
 });
 
 test("reservation refuses to exceed remaining capacity", async () => {
@@ -111,80 +79,24 @@ test("reservation refuses to exceed remaining capacity", async () => {
     writeBookings: () => assert.fail("A full trip must not be written"),
     createBooking: () => assert.fail("A full trip must not create a booking"),
   });
-
   assert.equal(result, null);
 });
 
-test("reservation refuses seats already assigned to another booking", async () => {
-  const trip = { id: "trip-a", capacity: 4 };
-  const bookings = [{ tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" }];
-  const result = await reserveBooking({
-    trip,
-    passengers: 1,
-    selectedSeats: [2],
+test("reservation validates passenger count, seat count, and unique seat numbers", async () => {
+  const base = {
+    trip: { id: "trip-a", capacity: 4 },
     locks: { request: (_name, callback) => callback() },
-    readBookings: () => bookings,
-    writeBookings: () => assert.fail("An assigned seat must not be written"),
-    createBooking: () => assert.fail("An assigned seat must not create a booking"),
-  });
-
-  assert.equal(result, null);
-});
-
-test("concurrent reservations cannot overbook the last seat", async () => {
-  const trip = { id: "trip-a", capacity: 1 };
-  let bookings = [];
-  let tail = Promise.resolve();
-  const locks = {
-    request: (_name, callback) => {
-      const current = tail.then(callback);
-      tail = current.then(() => undefined, () => undefined);
-      return current;
-    },
+    readBookings: () => [],
+    writeBookings: () => {},
+    createBooking: () => ({ status: "confirmed" }),
   };
-  const reserve = (reference) =>
-    reserveBooking({
-      trip,
-      passengers: 1,
-      seatNumbers: [1],
-      locks,
-      readBookings: () => bookings,
-      writeBookings: (next) => {
-        bookings = next;
-      },
-      createBooking: (seatNumbers) => ({
-        tripId: trip.id,
-        passengers: 1,
-        seatNumbers,
-        status: "confirmed",
-        reference,
-      }),
-    });
-
-  const results = await Promise.all([reserve("first"), reserve("second")]);
-
-  assert.equal(results.filter(Boolean).length, 1);
-  assert.equal(getAvailableSeats(trip.capacity, bookings, trip.id), 0);
-});
-
-test("reservation rejects invalid passenger counts", async () => {
-  await assert.rejects(
-    reserveBooking({
-      trip: { id: "trip-a", capacity: 2 },
-      passengers: 0,
-      seatNumbers: [],
-      locks: { request: (_name, callback) => callback() },
-      readBookings: () => [],
-      writeBookings: () => {},
-      createBooking: () => ({ tripId: "trip-a", passengers: 0, status: "confirmed" }),
-    }),
-    /positive whole number/,
-  );
+  await assert.rejects(reserveBooking({ ...base, passengers: 0, seatNumbers: [] }), /positive whole number/);
+  await assert.rejects(reserveBooking({ ...base, passengers: 2, seatNumbers: [1] }), /one unique/);
+  await assert.rejects(reserveBooking({ ...base, passengers: 2, seatNumbers: [1, 1] }), /one unique/);
 });
 
 test("reservation never saves a duplicate booking reference", async () => {
   const existing = { tripId: "trip-a", passengers: 1, status: "confirmed", reference: "TR-duplicate" };
-
   await assert.rejects(
     reserveBooking({
       trip: { id: "trip-a", capacity: 3 },

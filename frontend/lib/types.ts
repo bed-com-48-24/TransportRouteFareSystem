@@ -5,6 +5,18 @@ export type RouteItem = {
   origin: string;
   destination: string;
   service: string; 
+  companyName?: string;
+  name?: string;
+  pickupLocation?: string;
+  stops?: string[];
+  duration?: number | null;
+  mapDistance?: number | null;
+  transfers?: number;
+  departureTimes?: string[];
+  fareIsEstimate?: boolean;
+  active?: boolean;
+  featured?: boolean;
+  updatedAt?: string;
 };
 
 export type FareItem = {
@@ -47,9 +59,20 @@ export type Trip = {
   arrival: string;
   capacity: number;
   fare: number;
+  routeId?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  mapDistanceMeters?: number | null;
+  fareIsEstimate?: boolean;
+  transportMode?: string;
+  operatorName?: string;
+  routeName?: string;
 };
 
+export type BookingStatus = "draft" | "reviewed" | "paid" | "confirmed" | "cancelled";
+
 export type Booking = {
+  id?: string;
   reference: string;
   tripId: string;
   route: string;
@@ -60,6 +83,24 @@ export type Booking = {
   seatNumbers?: number[];
   name: string;
   email: string;
-  status: "confirmed" | "cancelled";
+  phoneNumber?: string;
+  identificationNumber?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paymentStatus?: "pending" | "paid" | "failed" | "refunded";
+  total?: number;
+  holdExpiresAt?: string;
+  status: BookingStatus;
   createdAt: string;
+  updatedAt?: string;
+};
+
+export type NotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  category: "booking" | "payment" | "route" | "system";
+  createdAt: string;
+  readAt: string | null;
+  bookingReference?: string;
 };

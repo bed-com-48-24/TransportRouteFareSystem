@@ -4,9 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout, useSession } from "@/lib/auth";
+import { KEYS } from "@/lib/seed";
+import { useStoredList } from "@/lib/storage";
+import type { NotificationItem } from "@/lib/types";
 
 export default function MainNavigation() {
   const session = useSession();
+  const notifications = useStoredList<NotificationItem>(KEYS.notifications, []);
+  const unreadCount = notifications.filter((item) => !item.readAt).length;
   const pathname = usePathname();
   const [error, setError] = useState("");
 
@@ -14,6 +19,9 @@ export default function MainNavigation() {
     { href: "/", label: "Home" },
     { href: "/routes-fares", label: "Routes & fares" },
     { href: "/transport-booking", label: "Bookings" },
+    { href: "/transport-booking/my-bookings", label: "My bookings" },
+    { href: "/accounts-reports/notifications", label: `Notifications${unreadCount ? ` (${unreadCount})` : ""}` },
+    { href: "/accounts-reports/profile", label: "Profile" },
     { href: "/help", label: "Help" },
   ];
 

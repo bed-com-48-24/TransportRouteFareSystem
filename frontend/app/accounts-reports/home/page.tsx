@@ -5,6 +5,8 @@ const links = [
   ["Nearby stops", "Find pickup and drop-off points on the map.", "/maps-admin-integration"],
   ["Book a trip", "Reserve seats for your trip.", "/transport-booking"],
   ["My bookings", "View or cancel a booking.", "/transport-booking/my-bookings"],
+  ["Passenger profile", "Save your name, phone, and identification details for this device.", "/accounts-reports/profile"],
+  ["Notifications", "Review booking and payment updates.", "/accounts-reports/notifications"],
   ["Account and support", "Manage your profile or report travel information.", "/accounts-reports"],
 ];
 

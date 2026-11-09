@@ -1,4 +1,6 @@
 import Link from "next/link";
+import FeaturedRoutes from "@/components/FeaturedRoutes";
+import HomeJourneySearch from "@/components/HomeJourneySearch";
 
 export default function Home() {
   return (
@@ -13,6 +15,7 @@ export default function Home() {
             <Link className="home-secondary-link" href="/transport-booking">Browse available trips</Link>
           </div>
           <p className="home-guest-note">No account needed to search or browse as a guest.</p>
+          <HomeJourneySearch />
         </div>
         <div className="home-journey-card" aria-label="Example journey">
           <span className="module-eyebrow">YOUR NEXT JOURNEY</span>
@@ -27,6 +30,8 @@ export default function Home() {
           <p>Direct and connected route information, all in one place.</p>
         </div>
       </section>
+
+      <FeaturedRoutes />
 
       <section className="home-section">
         <div className="home-section-heading">

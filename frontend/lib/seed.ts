@@ -6,6 +6,9 @@ export const KEYS = {
   stops: "routewise-stops-v1",
   reports: "routewise-reports-v1",
   bookings: "routewise-bookings-v1", 
+  notifications: "routewise-notifications-v1",
+  schedules: "routewise-schedules-v1",
+  profile: "routewise-passenger-profile-v1",
   session: "routewise-session-v1",
 } as const;
 
@@ -27,7 +30,20 @@ const ROUTE_ROWS: [string, string, string, string, number][] = [
   ["salima-lilongwe-minibus", "Salima", "Lilongwe", "Minibus", 7000],
 ];
 
-export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination, service]) => ({ id, origin, destination, service }));
+export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination, service]) => ({
+  id,
+  origin,
+  destination,
+  service,
+  name: `${origin} - ${destination}`,
+  companyName: "MOVA",
+  stops: [origin, destination],
+  transfers: 0,
+  departureTimes: ["07:00", "12:00"],
+  fareIsEstimate: true,
+  active: true,
+  featured: ["blantyre-lilongwe-coach", "lilongwe-mzuzu-coach", "blantyre-zomba-minibus"].includes(id),
+}));
 
 export const SEED_FARES: FareItem[] = ROUTE_ROWS.map(([id, , , , amount]) => ({ id: `f-${id}`, routeId: id, amount }));
 

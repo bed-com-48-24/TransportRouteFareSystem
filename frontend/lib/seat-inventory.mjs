@@ -86,11 +86,7 @@ export function getUnavailableSeatNumbers(capacity, bookings, tripId) {
 export async function reserveBooking({
   trip,
   passengers,
-<<<<<<< HEAD
-  selectedSeats,
-=======
   seatNumbers,
->>>>>>> origin/feature/integration
   locks,
   readBookings,
   writeBookings,
@@ -101,22 +97,12 @@ export async function reserveBooking({
   }
 
   if (
-<<<<<<< HEAD
-    selectedSeats !== undefined &&
-    (!Array.isArray(selectedSeats) ||
-      selectedSeats.length !== passengers ||
-      selectedSeats.some((seatNumber) => !Number.isSafeInteger(seatNumber) || seatNumber < 1 || seatNumber > trip.capacity) ||
-      new Set(selectedSeats).size !== selectedSeats.length)
-  ) {
-    throw new RangeError("Choose one unique valid seat for each passenger.");
-=======
     !Array.isArray(seatNumbers) ||
     seatNumbers.length !== passengers ||
     seatNumbers.some((seatNumber) => !Number.isSafeInteger(seatNumber) || seatNumber < 1 || seatNumber > trip.capacity) ||
     new Set(seatNumbers).size !== seatNumbers.length
   ) {
     throw new RangeError("Select one unique, available seat for each passenger.");
->>>>>>> origin/feature/integration
   }
 
   if (typeof locks?.request !== "function") {
@@ -133,16 +119,7 @@ export async function reserveBooking({
       return null;
     }
 
-<<<<<<< HEAD
-    const unavailableSeats = new Set(getUnavailableSeatNumbers(trip.capacity, bookings, trip.id));
-    if (selectedSeats?.some((seatNumber) => unavailableSeats.has(seatNumber))) {
-      return null;
-    }
-
-    const booking = createBooking();
-=======
     const booking = createBooking(seatNumbers);
->>>>>>> origin/feature/integration
     if (
       typeof booking.reference === "string" &&
       bookings.some((existing) => existing.reference === booking.reference)

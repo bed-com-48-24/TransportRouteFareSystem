@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
 import RequireAdmin from "@/components/RequireAdmin";
-import { fmtDate } from "@/lib/booking-data";
+import { availableSeats, fmtDate, TRIPS } from "@/lib/booking-data";
 import { distanceKm, hasCoords } from "@/lib/geo";
 import { DISTRICT_COORDINATES, MALAWI_LOCATIONS, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
-import type { Booking, FareItem, ReportItem, ReportStatus, RouteItem, StopItem, StopKind } from "@/lib/types";
+import type { Booking, FareItem, ReportItem, ReportStatus, RouteItem, StopItem, StopKind, Trip } from "@/lib/types";
 
 type MainPanel = "map" | "admin";
-type AdminPanel = "routes" | "stops" | "reports" | "bookings";
+type AdminPanel = "routes" | "stops" | "schedules" | "reports" | "bookings";
 
 const CITY_COORDINATES: Record<string, Coordinates> = {
   ...DISTRICT_COORDINATES,
@@ -22,6 +22,7 @@ const CITY_COORDINATES: Record<string, Coordinates> = {
 const ADMIN_SECTIONS: { id: AdminPanel; label: string }[] = [
   { id: "routes", label: "Routes & fares" },
   { id: "stops", label: "Pickup & drop-off points" },
+  { id: "schedules", label: "Schedules" },
   { id: "reports", label: "Passenger reports" },
   { id: "bookings", label: "Bookings" },
 ];
@@ -109,7 +110,8 @@ function MapAdminIntegrationPage() {
     };
   }, [origin, stops]);
 
-  const visibleRoutes = selectedRouteId === "all" ? routes : routes.filter((route) => route.id === selectedRouteId);
+  const publicRoutes = routes.filter((route) => route.active !== false);
+  const visibleRoutes = selectedRouteId === "all" ? publicRoutes : publicRoutes.filter((route) => route.id === selectedRouteId);
   const mapCenter = useMemo(() => [-13.5, 34.2] as [number, number], []);
 
   function useMyLocation() {
@@ -162,11 +164,11 @@ function MapAdminIntegrationPage() {
               <label className="map-route-filter">Show
                 <select value={selectedRouteId} onChange={(event) => setSelectedRouteId(event.target.value)}>
                   <option value="all">All routes</option>
-                  {routes.map((route) => <option key={route.id} value={route.id}>{route.origin} to {route.destination}</option>)}
+                  {publicRoutes.map((route) => <option key={route.id} value={route.id}>{route.origin} to {route.destination}</option>)}
                 </select>
               </label>
             </div>
-            {routes.length === 0 ? (
+            {publicRoutes.length === 0 ? (
               <p className="module-empty">There are no routes to show yet.</p>
             ) : (
               <div className="network-map">
@@ -176,7 +178,7 @@ function MapAdminIntegrationPage() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
 
-                  {routes.map((route) => {
+                  {publicRoutes.map((route) => {
                     const origin = coordinatesForCity(route.origin);
                     const destination = coordinatesForCity(route.destination);
                     if (!origin || !destination) return null;
@@ -243,6 +245,7 @@ function MapAdminIntegrationPage() {
                     <strong>{route.origin} <span aria-hidden="true">→</span> {route.destination}</strong>
                     <span>{route.service}</span>
                     <span>{fare ? `Estimated fare: MWK ${fare.amount.toLocaleString("en-MW")}` : "Fare estimate unavailable"}</span>
+                    <a href={`/routes-fares/${encodeURIComponent(route.id)}`}>Route details</a>
                   </article>
                 );
               })}
@@ -306,6 +309,7 @@ function AdminDashboard() {
       </nav>
       {section === "routes" && <RouteFareManagement />}
       {section === "stops" && <StopManagement />}
+      {section === "schedules" && <ScheduleManagement />}
       {section === "reports" && <ReportManagement />}
       {section === "bookings" && <BookingManagement />}
     </section>
@@ -315,10 +319,15 @@ function AdminDashboard() {
 function RouteFareManagement() {
   const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
   const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
+  const schedules = useStoredList<Trip>(KEYS.schedules, TRIPS);
+  const bookings = useStoredList<Booking>(KEYS.bookings, []);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [service, setService] = useState("Minibus");
   const [fare, setFare] = useState("");
+  const [intermediateStops, setIntermediateStops] = useState("");
+  const [featured, setFeatured] = useState(false);
+  const [active, setActive] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
 
@@ -335,12 +344,40 @@ function RouteFareManagement() {
       setFeedback("Enter an estimated fare as a positive whole number of MWK.");
       return;
     }
+    if (routes.some((route) =>
+      route.id !== editingId &&
+      route.active !== false &&
+      route.origin.trim().toLowerCase() === normalizedOrigin.toLowerCase() &&
+      route.destination.trim().toLowerCase() === normalizedDestination.toLowerCase(),
+    )) {
+      setFeedback("An active route already exists for these towns. Edit it or deactivate it first.");
+      return;
+    }
 
     try {
       const currentRoutes = loadList<RouteItem>(KEYS.routes, SEED_ROUTES);
       const currentFares = loadList<FareItem>(KEYS.fares, SEED_FARES);
       const routeId = editingId ?? newId("route");
-      const nextRoute = { id: routeId, origin: normalizedOrigin, destination: normalizedDestination, service: service.trim() };
+      const previous = currentRoutes.find((route) => route.id === routeId);
+      const stops = [normalizedOrigin, ...intermediateStops.split(",").map((stop) => stop.trim()).filter(Boolean), normalizedDestination];
+      if (new Set(stops.map((stop) => stop.toLowerCase())).size !== stops.length) {
+        setFeedback("Route stops must be unique.");
+        return;
+      }
+      const nextRoute: RouteItem = {
+        ...previous,
+        id: routeId,
+        origin: normalizedOrigin,
+        destination: normalizedDestination,
+        service: service.trim(),
+        name: `${normalizedOrigin} - ${normalizedDestination}`,
+        companyName: previous?.companyName ?? "MOVA",
+        stops,
+        featured,
+        active,
+        fareIsEstimate: true,
+        updatedAt: new Date().toISOString(),
+      };
       saveList(KEYS.routes, editingId
         ? currentRoutes.map((route) => route.id === routeId ? nextRoute : route)
         : [...currentRoutes, nextRoute]);
@@ -351,7 +388,10 @@ function RouteFareManagement() {
       setOrigin("");
       setDestination("");
       setFare("");
+      setIntermediateStops("");
       setService("Minibus");
+      setFeatured(false);
+      setActive(true);
       setEditingId(null);
       setFeedback(editingId ? "Route and fare updated." : "Route and fare added.");
     } catch {
@@ -365,10 +405,24 @@ function RouteFareManagement() {
     setDestination(route.destination);
     setService(route.service);
     setFare(String(fares.find((item) => item.routeId === route.id)?.amount ?? ""));
+    setIntermediateStops((route.stops ?? [route.origin, route.destination]).slice(1, -1).join(", "));
+    setFeatured(route.featured ?? false);
+    setActive(route.active !== false);
     setFeedback("");
   }
 
   function deleteRoute(routeId: string) {
+    const route = routes.find((item) => item.id === routeId);
+    const routeName = route ? `${route.origin} → ${route.destination}` : "";
+    const dependentSchedules = schedules.filter((trip) => trip.routeId === routeId || trip.route === routeName);
+    if (dependentSchedules.some((trip) => bookings.some((booking) => booking.tripId === trip.id))) {
+      setFeedback("This route has booking history and cannot be removed. Deactivate it instead.");
+      return;
+    }
+    if (dependentSchedules.length > 0) {
+      setFeedback("This route has schedules. Deactivate it instead of removing its history.");
+      return;
+    }
     try {
       saveList(KEYS.routes, loadList<RouteItem>(KEYS.routes, SEED_ROUTES).filter((route) => route.id !== routeId));
       saveList(KEYS.fares, loadList<FareItem>(KEYS.fares, SEED_FARES).filter((item) => item.routeId !== routeId));
@@ -387,6 +441,9 @@ function RouteFareManagement() {
         <datalist id="malawi-route-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
         <label>Service type<input value={service} onChange={(event) => setService(event.target.value)} maxLength={60} required /></label>
         <label>Estimated fare (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
+        <label>Intermediate stops <span className="optional-label">Comma separated</span><input value={intermediateStops} onChange={(event) => setIntermediateStops(event.target.value)} placeholder="e.g. Ntcheu, Balaka" /></label>
+        <label className="checkbox-field"><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /> Feature this route</label>
+        <label className="checkbox-field"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Route is active</label>
         <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add route"}</button>
         {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setOrigin(""); setDestination(""); setFare(""); setFeedback(""); }}>Stop editing</button>}
       </form>
@@ -394,10 +451,152 @@ function RouteFareManagement() {
       <div className="admin-record-list">
         {routes.map((route) => (
           <article key={route.id}>
-            <div><strong>{route.origin} → {route.destination}</strong><small>{route.service} · {fares.find((item) => item.routeId === route.id) ? `MWK ${fares.find((item) => item.routeId === route.id)?.amount.toLocaleString("en-MW")}` : "Fare not set"}</small></div>
+            <div><strong>{route.origin} → {route.destination}{route.featured ? " · Featured" : ""}</strong><small>{route.service} · {route.active === false ? "Inactive" : "Active"} · {(route.stops ?? [route.origin, route.destination]).join(" → ")} · {fares.find((item) => item.routeId === route.id) ? `MWK ${fares.find((item) => item.routeId === route.id)?.amount.toLocaleString("en-MW")}` : "Fare not set"}</small></div>
             <div className="admin-record-actions">
               <button type="button" className="text-action" onClick={() => editRoute(route)}>Edit</button>
               <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${route.origin} to ${route.destination}?`)) deleteRoute(route.id); }}>Remove</button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleManagement() {
+  const schedules = useStoredList<Trip>(KEYS.schedules, TRIPS);
+  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
+  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
+  const bookings = useStoredList<Booking>(KEYS.bookings, []);
+  const [routeId, setRouteId] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [date, setDate] = useState("");
+  const [departure, setDeparture] = useState("");
+  const [arrival, setArrival] = useState("");
+  const [fare, setFare] = useState("");
+  const [service, setService] = useState("Coach");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  function chooseRoute(id: string) {
+    setRouteId(id);
+    const route = routes.find((item) => item.id === id);
+    if (!route) return;
+    setOrigin(route.origin);
+    setDestination(route.destination);
+    setFare(String(fares.find((item) => item.routeId === id)?.amount ?? ""));
+    setService(route.service);
+  }
+
+  function submitSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amount = Number(fare);
+    const departureAt = new Date(`${date}T${departure}:00`);
+    const arrivalAt = new Date(`${date}T${arrival}:00`);
+    if (origin.trim().toLowerCase() === destination.trim().toLowerCase()) {
+      setFeedback("Schedule origin and destination must differ.");
+      return;
+    }
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setFeedback("Enter a positive whole-number MWK fare.");
+      return;
+    }
+    if (date < tomorrow || !departure || !arrival || arrivalAt <= departureAt) {
+      setFeedback("Choose a future date and an arrival time later than departure.");
+      return;
+    }
+
+    const trip: Trip = {
+      id: editingId ?? newId("schedule"),
+      route: `${origin.trim()} → ${destination.trim()}`,
+      pickup: [origin.trim()],
+      dropoff: [destination.trim()],
+      date,
+      departure,
+      arrival,
+      capacity: 41,
+      fare: amount,
+      routeId: routeId || undefined,
+      departureTime: departure,
+      arrivalTime: arrival,
+      fareIsEstimate: false,
+      transportMode: service.trim(),
+      operatorName: "MOVA",
+      routeName: `${origin.trim()} - ${destination.trim()}`,
+    };
+    const current = loadList<Trip>(KEYS.schedules, TRIPS);
+    saveList(KEYS.schedules, editingId
+      ? current.map((item) => item.id === editingId ? { ...trip, capacity: item.capacity } : item)
+      : [...current, trip]);
+    resetForm();
+    setFeedback(editingId ? "Sample schedule updated on this device." : "Sample schedule added on this device.");
+  }
+
+  function editSchedule(trip: Trip) {
+    setEditingId(trip.id);
+    setRouteId(trip.routeId ?? "");
+    setOrigin(trip.route.split(" → ")[0] ?? "");
+    setDestination(trip.route.split(" → ")[1] ?? "");
+    setDate(trip.date);
+    setDeparture(trip.departure);
+    setArrival(trip.arrival);
+    setFare(String(trip.fare));
+    setService(trip.transportMode ?? "Coach");
+    setFeedback("");
+  }
+
+  function deleteSchedule(trip: Trip) {
+    if (bookings.some((booking) => booking.tripId === trip.id)) {
+      setFeedback("This schedule has booking history and cannot be removed in the demo.");
+      return;
+    }
+    saveList(KEYS.schedules, loadList<Trip>(KEYS.schedules, TRIPS).filter((item) => item.id !== trip.id));
+    setFeedback("Sample schedule removed.");
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setRouteId("");
+    setOrigin("");
+    setDestination("");
+    setDate("");
+    setDeparture("");
+    setArrival("");
+    setFare("");
+    setService("Coach");
+  }
+
+  return (
+    <div className="admin-section-content">
+      <h3>{editingId ? "Edit sample schedule" : "Add a sample schedule"}</h3>
+      <p className="module-footnote">Capacity is fixed at 41 in this mockup; booked-seat counts come from local demo bookings.</p>
+      <form className="module-form admin-data-form" onSubmit={submitSchedule}>
+        <label>Configured route <span className="optional-label">Optional</span>
+          <select value={routeId} onChange={(event) => chooseRoute(event.target.value)}>
+            <option value="">Custom route</option>
+            {routes.filter((route) => route.active !== false).map((route) => <option key={route.id} value={route.id}>{route.origin} → {route.destination}</option>)}
+          </select>
+        </label>
+        <label>Origin<input value={origin} onChange={(event) => setOrigin(event.target.value)} required /></label>
+        <label>Destination<input value={destination} onChange={(event) => setDestination(event.target.value)} required /></label>
+        <label>Date<input type="date" min={tomorrow} value={date} onChange={(event) => setDate(event.target.value)} required /></label>
+        <label>Departure<input type="time" value={departure} onChange={(event) => setDeparture(event.target.value)} required /></label>
+        <label>Arrival<input type="time" value={arrival} onChange={(event) => setArrival(event.target.value)} required /></label>
+        <label>Fare (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
+        <label>Transport mode<input value={service} onChange={(event) => setService(event.target.value)} required /></label>
+        <button className="primary-button" type="submit">{editingId ? "Save schedule" : "Add schedule"}</button>
+        {editingId && <button className="secondary-button" type="button" onClick={resetForm}>Stop editing</button>}
+      </form>
+      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
+      <div className="admin-record-list">
+        {schedules.map((trip) => (
+          <article key={trip.id}>
+            <div><strong>{trip.route}</strong><small>{fmtDate(trip.date)} · {trip.departure}–{trip.arrival} · MWK {trip.fare.toLocaleString("en-MW")} · Capacity {trip.capacity} · {availableSeats(trip, bookings)} available</small></div>
+            <div className="admin-record-actions">
+              <button type="button" className="text-action" onClick={() => editSchedule(trip)}>Edit</button>
+              <button type="button" className="text-action danger-action" onClick={() => deleteSchedule(trip)}>Remove</button>
             </div>
           </article>
         ))}

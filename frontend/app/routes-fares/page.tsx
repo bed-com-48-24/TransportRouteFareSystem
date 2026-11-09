@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { useStoredList } from "@/lib/storage";
 import type { Booking, FareItem, RouteItem, StopItem, Trip } from "@/lib/types";
 import { availableSeats, TRIPS } from "@/lib/booking-data";
 
-const popularDestinations = ["Blantyre", "Lilongwe", "Mzuzu", "Zomba", "Salima"];
-const ROUTE_STOPOVERS: Record<string, string[]> = {
-  "blantyre-lilongwe-coach": ["Zomba", "Balaka", "Dedza"],
-};
+function normalizeLocation(value: string) {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
 
 type RouteOption = {
   id: string;
@@ -21,6 +20,7 @@ type RouteOption = {
   dropOffPoint: string;
   estimatedFare: number | null;
   stopovers: string[];
+  featured?: boolean;
 };
 
 type JourneyOption = {
@@ -43,14 +43,14 @@ function findJourneyOptions(origin: string, destination: string, sampleRoutes: R
 
     for (const route of sampleRoutes) {
       if (
-        route.origin.toLocaleLowerCase() !== currentCity.toLocaleLowerCase() ||
-        visitedCities.has(route.destination.toLocaleLowerCase())
+        normalizeLocation(route.origin) !== normalizeLocation(currentCity) ||
+        visitedCities.has(normalizeLocation(route.destination))
       ) {
         continue;
       }
 
       const nextLegs = [...legs, route];
-      if (route.destination.toLocaleLowerCase() === destination.toLocaleLowerCase()) {
+      if (normalizeLocation(route.destination) === normalizeLocation(destination)) {
         journeys.push({
           legs: nextLegs,
           totalFare: nextLegs.some((leg) => leg.estimatedFare === null)
@@ -61,12 +61,12 @@ function findJourneyOptions(origin: string, destination: string, sampleRoutes: R
       }
 
       const nextVisitedCities = new Set(visitedCities);
-      nextVisitedCities.add(route.destination.toLocaleLowerCase());
+      nextVisitedCities.add(normalizeLocation(route.destination));
       findPaths(route.destination, nextVisitedCities, nextLegs);
     }
   }
 
-  findPaths(origin, new Set([origin.toLocaleLowerCase()]), []);
+  findPaths(origin, new Set([normalizeLocation(origin)]), []);
   return journeys.sort(
       (first, second) =>
       first.legs.length - second.legs.length || (first.totalFare ?? Infinity) - (second.totalFare ?? Infinity),
@@ -74,8 +74,8 @@ function findJourneyOptions(origin: string, destination: string, sampleRoutes: R
 }
 
 function findTripForRoute(route: RouteOption, trips: Trip[] = TRIPS) {
-  const routeName = `${route.origin} → ${route.destination}`.toLocaleLowerCase();
-  return trips.find((trip) => trip.route.toLocaleLowerCase() === routeName);
+  const routeName = normalizeLocation(`${route.origin} → ${route.destination}`);
+  return trips.find((trip) => normalizeLocation(trip.route) === routeName);
 }
 
 export default function RoutesFaresPage() {
@@ -83,21 +83,24 @@ export default function RoutesFaresPage() {
   const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
   const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
   const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  const availableTrips = TRIPS.filter((trip) => availableSeats(trip, bookings) > 0);
-  const availableRouteNames = new Set(availableTrips.map((trip) => trip.route.toLocaleLowerCase()));
+  const trips = useStoredList<Trip>(KEYS.schedules, TRIPS);
+  const availableTrips = trips.filter((trip) => availableSeats(trip, bookings) > 0);
+  const availableRouteNames = new Set(availableTrips.map((trip) => normalizeLocation(trip.route)));
   const sampleRoutes: RouteOption[] = routes.filter((route) =>
-    availableRouteNames.has(`${route.origin} → ${route.destination}`.toLocaleLowerCase()),
+    route.active !== false &&
+    availableRouteNames.has(normalizeLocation(`${route.origin} → ${route.destination}`)),
   ).map((route) => {
-    const pickup = stops.find((stop) => stop.city.toLowerCase() === route.origin.toLowerCase() && (stop.kind === "pickup" || stop.kind === "both"));
-    const dropoff = stops.find((stop) => stop.city.toLowerCase() === route.destination.toLowerCase() && (stop.kind === "dropoff" || stop.kind === "both"));
+    const pickup = stops.find((stop) => normalizeLocation(stop.city) === normalizeLocation(route.origin) && (stop.kind === "pickup" || stop.kind === "both"));
+    const dropoff = stops.find((stop) => normalizeLocation(stop.city) === normalizeLocation(route.destination) && (stop.kind === "dropoff" || stop.kind === "both"));
     return {
       ...route,
       pickupPoint: pickup?.name ?? `Pickup point in ${route.origin}`,
       dropOffPoint: dropoff?.name ?? `Drop-off point in ${route.destination}`,
       estimatedFare: fares.find((fare) => fare.routeId === route.id)?.amount ?? null,
-      stopovers: ROUTE_STOPOVERS[route.id] ?? [],
+      stopovers: (route.stops ?? [route.origin, route.destination]).slice(1, -1),
     };
   });
+  const popularDestinations = [...new Set(sampleRoutes.filter((route) => route.featured).map((route) => route.destination))];
   const cities = [...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination]))].sort();
   function reachableDestinations(from: string) {
     return cities.filter((city) => city !== from && findJourneyOptions(from, city, sampleRoutes).length > 0);
@@ -110,6 +113,7 @@ export default function RoutesFaresPage() {
   );
   const [selectedJourneyIndex, setSelectedJourneyIndex] = useState(0);
   const [error, setError] = useState("");
+  const initialSearchProcessed = useRef(false);
   const destinationOptions = origin ? reachableDestinations(origin) : cities;
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -173,12 +177,9 @@ export default function RoutesFaresPage() {
       return;
     }
 
-    const knownOrigin = cities.find(
-      (city) => city.toLocaleLowerCase() === normalizedOrigin.toLocaleLowerCase(),
-    );
+    const knownOrigin = cities.find((city) => normalizeLocation(city) === normalizeLocation(normalizedOrigin));
     const knownDestination = knownOrigin && reachableDestinations(knownOrigin).find(
-      (city) =>
-        city.toLocaleLowerCase() === normalizedDestination.toLocaleLowerCase(),
+      (city) => normalizeLocation(city) === normalizeLocation(normalizedDestination),
     );
 
     if (!knownOrigin || !knownDestination) {
@@ -205,6 +206,15 @@ export default function RoutesFaresPage() {
       searchJourney(origin, place);
     }
   }
+
+  useEffect(() => {
+    if (initialSearchProcessed.current) return;
+    initialSearchProcessed.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const requestedOrigin = params.get("origin");
+    const requestedDestination = params.get("destination");
+    if (requestedOrigin && requestedDestination) searchJourney(requestedOrigin, requestedDestination);
+  }, [searchJourney]);
 
   const matchingJourneys =
     searchedOrigin === null || searchedDestination === null
@@ -607,6 +617,7 @@ export default function RoutesFaresPage() {
                             <p className="mt-2 text-sm font-semibold text-[#26364d]">
                               {leg.estimatedFare === null ? "Fare unavailable" : `MWK ${leg.estimatedFare.toLocaleString("en-MW")}`}
                             </p>
+                            <Link className="mt-2 inline-block text-sm font-semibold text-[#29466D] underline" href={`/routes-fares/${encodeURIComponent(leg.id)}`}>View route details</Link>
                           </li>
                         ))}
                       </ol>
