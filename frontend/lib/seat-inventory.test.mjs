@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAvailableSeats, reserveBooking } from "./seat-inventory.mjs";
+import { getAvailableSeats, getUnavailableSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
 
 test("available seats exclude cancelled bookings and other trips", () => {
   const bookings = [
@@ -10,6 +10,16 @@ test("available seats exclude cancelled bookings and other trips", () => {
   ];
 
   assert.equal(getAvailableSeats(10, bookings, "trip-a"), 7);
+});
+
+test("unavailable seat numbers include assigned seats and legacy booking counts", () => {
+  const bookings = [
+    { tripId: "trip-a", passengers: 2, status: "confirmed" },
+    { tripId: "trip-a", passengers: 1, seatNumbers: [5], status: "confirmed" },
+    { tripId: "trip-a", passengers: 1, seatNumbers: [7], status: "cancelled" },
+  ];
+
+  assert.deepEqual(getUnavailableSeatNumbers(8, bookings, "trip-a"), [1, 2, 5]);
 });
 
 test("reservation refuses to exceed remaining capacity", async () => {
@@ -22,6 +32,22 @@ test("reservation refuses to exceed remaining capacity", async () => {
     readBookings: () => bookings,
     writeBookings: () => assert.fail("A full trip must not be written"),
     createBooking: () => assert.fail("A full trip must not create a booking"),
+  });
+
+  assert.equal(result, null);
+});
+
+test("reservation refuses seats already assigned to another booking", async () => {
+  const trip = { id: "trip-a", capacity: 4 };
+  const bookings = [{ tripId: "trip-a", passengers: 1, seatNumbers: [2], status: "confirmed" }];
+  const result = await reserveBooking({
+    trip,
+    passengers: 1,
+    selectedSeats: [2],
+    locks: { request: (_name, callback) => callback() },
+    readBookings: () => bookings,
+    writeBookings: () => assert.fail("An assigned seat must not be written"),
+    createBooking: () => assert.fail("An assigned seat must not create a booking"),
   });
 
   assert.equal(result, null);

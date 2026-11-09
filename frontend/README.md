@@ -29,6 +29,10 @@ npm run dev
 
 Stops can be pickup points, drop-off points, or both. Route and stop information is shared between search, booking, map, and administration views.
 
+## Backend API handoff
+
+See [docs/API-ENDPOINTS.md](./docs/API-ENDPOINTS.md) for the proposed REST API endpoint list, request/response shapes, access rules, and current prototype limitations.
+
 ## Validation
 
 ```bash

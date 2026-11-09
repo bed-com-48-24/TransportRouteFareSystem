@@ -1,4 +1,4 @@
-import { getAvailableSeats, reserveBooking } from "./seat-inventory.mjs";
+import { getAvailableSeats, getUnavailableSeatNumbers, reserveBooking } from "./seat-inventory.mjs";
 import { KEYS } from "./seed";
 import { loadList, saveList } from "./storage";
 import type { Booking, Trip } from "./types";
@@ -190,6 +190,10 @@ export function availableSeats(trip: Trip, bookings = readBookings()) {
   return getAvailableSeats(trip.capacity, bookings, trip.id);
 }
 
+export function unavailableSeatNumbers(trip: Trip, bookings = readBookings()) {
+  return getUnavailableSeatNumbers(trip.capacity, bookings, trip.id);
+}
+
 export async function createBooking(
   input: Omit<Booking, "reference" | "status" | "createdAt">,
   trip: Trip,
@@ -197,6 +201,7 @@ export async function createBooking(
   return reserveBooking<Booking>({
     trip,
     passengers: input.passengers,
+    selectedSeats: input.seatNumbers,
     locks: typeof navigator === "undefined" ? undefined : navigator.locks,
     readBookings,
     writeBookings: saveBookings,
