@@ -24,6 +24,10 @@ export const Popup = dynamic(
   () => import("react-leaflet").then((module) => module.Popup),
   { ssr: false },
 );
+export const ZoomControl = dynamic(
+  () => import("react-leaflet").then((module) => module.ZoomControl),
+  { ssr: false },
+);
 export const TileLayer = dynamic(
   () => import("react-leaflet").then((module) => module.TileLayer),
   { ssr: false },

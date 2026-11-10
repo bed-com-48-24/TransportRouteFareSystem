@@ -933,19 +933,20 @@ body { background: var(--background); color: var(--foreground); }
 
 .network-map { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: #f5f8fb; }
 .route-map { width: 100%; height: 470px; min-height: 320px; background: #edf4fb; }
-.booking-form-map-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; gap: 20px; }
+.booking-form-map-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: stretch; gap: 20px; }
 .booking-form-fields { display: grid; min-width: 0; gap: 15px; }
-.booking-route-preview { position: sticky; top: 20px; overflow: hidden; min-width: 0; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
-.booking-route-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px 10px; }
-.booking-route-heading h3 { margin: 0; color: var(--navy); font-size: 14px; }
-.booking-route-heading p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
-.booking-route-heading .booking-route-status { flex: 0 0 auto; margin: 0; color: var(--navy-light); font-size: 11px; font-weight: 700; }
-.booking-route-map { height: 420px; min-height: 320px; }
+.booking-route-preview { position: sticky; top: 20px; display: flex; overflow: hidden; min-width: 0; flex-direction: column; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.booking-route-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 14px 9px; }
+.booking-route-heading h3 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--navy); font-size: 14px; }
+.booking-route-heading h3 svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.booking-route-heading p { margin: 3px 0 0 21px; color: var(--muted); font-size: 11px; }
+.booking-route-map-wrap { position: relative; min-height: 250px; flex: 1; }
+.booking-route-map { height: 100%; min-height: 250px; }
 .booking-location-icon { border: 0; background: transparent; }
 .booking-location-symbol { display: block; width: 32px; height: 42px; filter: drop-shadow(0 2px 2px #12304a55); }
-.booking-route-legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; border-top: 1px solid var(--line); padding: 10px 14px; color: var(--navy-light); list-style: none; font-size: 11px; }
-.booking-route-legend li { display: flex; align-items: center; gap: 7px; }
-.booking-route-legend-pin { display: inline-grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; color: #fff; background: #173b57; font-size: 10px; font-weight: 800; }
+.booking-location-label { position: absolute; top: 7px; left: 31px; display: block; max-width: 142px; overflow: hidden; border-radius: 5px; padding: 4px 8px; color: #263648; background: #fff; box-shadow: 0 1px 5px #172b3b33; font-size: 11px; font-weight: 750; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.booking-route-estimate { position: absolute; z-index: 650; top: 50%; left: 50%; display: flex; max-width: calc(100% - 24px); align-items: center; gap: 7px; transform: translate(-50%, -50%); border-radius: 20px; padding: 7px 11px; color: #fff; background: #1263d8; box-shadow: 0 2px 8px #153d7655; font-size: 11px; font-weight: 750; line-height: 16px; white-space: nowrap; }
+.booking-route-estimate svg { flex: 0 0 13px; width: 13px; height: 13px; fill: currentColor; }
 .booking-route-error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 0; border-top: 1px solid var(--line); padding: 11px 16px; color: #8c423b; background: #fff7f5; font-size: 11px; }
 .booking-route-error .secondary-button { min-height: 32px; padding: 0 10px; font-size: 10px; }
 .booking-route-attribution { margin: 0; border-top: 1px solid var(--line); padding: 8px 13px; color: var(--muted); font-size: 10px; }
@@ -1026,7 +1027,8 @@ body { background: var(--background); color: var(--foreground); }
 @media (max-width: 760px) {
   .booking-form-map-layout { grid-template-columns: 1fr; }
   .booking-route-preview { position: static; }
-  .booking-route-map { height: 350px; min-height: 280px; }
+  .booking-route-map-wrap { min-height: 0; flex: 0 0 auto; }
+  .booking-route-map { height: 260px; min-height: 260px; }
 }
 @media (max-width: 620px) {
   .site-header { align-items: center; flex-direction: row; padding: 12px 16px; }
@@ -1111,6 +1113,96 @@ body { background: var(--background); color: var(--foreground); }
 .account-create-button { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; border: 0; border-radius: 8px; color: #fff; background: #2a624f; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
 .account-create-button:hover { background: #214f40; }
 .account-create-button:focus-visible { outline: 3px solid #9eb6cc; outline-offset: 3px; }
+.account-required-panel { display: grid; max-width: 620px; gap: 10px; border: 1px solid #dce5ec; border-radius: 12px; padding: 22px; background: #f7fafc; }
+.account-required-panel h3 { margin: 0; color: var(--navy); font-size: 19px; }
+.account-required-panel > p:not(.module-eyebrow) { margin: 0; color: #526b80; font-size: 13px; line-height: 1.6; }
+.account-required-panel .mock-payment-actions { margin-top: 5px; }
+.passenger-login-shell {
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 400px);
+  gap: clamp(40px, 8vw, 100px);
+  width: 100%;
+  min-height: calc(100vh - 145px);
+  margin: 0;
+  padding: 54px max(24px, calc((100% - 1000px) / 2));
+  background: #f0f2f5;
+}
+.passenger-login-intro { max-width: 550px; }
+.passenger-login-wordmark {
+  display: block;
+  margin-bottom: 12px;
+  color: #12304a;
+  font-size: clamp(54px, 7vw, 68px);
+  font-weight: 800;
+  letter-spacing: -4px;
+  line-height: 1;
+}
+.passenger-login-intro h1 {
+  max-width: 520px;
+  margin: 0 0 12px;
+  color: #1c1e21;
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 400;
+  letter-spacing: -.5px;
+  line-height: 1.3;
+}
+.passenger-login-intro > p:not(.module-eyebrow) {
+  max-width: 480px;
+  margin: 0;
+  color: #1c1e21;
+  font-size: 18px;
+  line-height: 1.5;
+}
+.passenger-login-intro .account-auth-browse-link { color: #1877f2; }
+.passenger-login-controls { width: 100%; max-width: 400px; justify-self: center; }
+.passenger-login-card {
+  border: 0;
+  border-radius: 9px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 2px 12px #1c1e211a;
+}
+.passenger-login-card .module-section-heading { margin-bottom: 16px; }
+.passenger-login-card .module-section-heading h2 { color: #1c1e21; font-size: 20px; }
+.passenger-login-card .module-form { gap: 12px; }
+.passenger-login-card .module-form label { gap: 6px; color: #4b4f56; font-size: 11px; }
+.passenger-login-card .module-form input {
+  min-height: 50px;
+  border-color: #ccd0d5;
+  border-radius: 6px;
+  color: #1c1e21;
+  font-size: 15px;
+}
+.passenger-login-card .module-form input:focus {
+  border-color: #12304a;
+  outline: 2px solid #12304a33;
+}
+.passenger-login-card .form-submit {
+  width: 100%;
+  min-height: 48px;
+  justify-self: stretch;
+  border-color: #12304a;
+  border-radius: 6px;
+  background: #12304a;
+  font-size: 16px;
+}
+.passenger-login-card .form-submit:hover:not(:disabled) { background: #234866; }
+.passenger-login-forgot {
+  margin: 13px auto 0;
+  color: #1877f2;
+  font-size: 13px;
+  text-align: center;
+}
+.passenger-login-forgot:hover { color: #166fe5; }
+.passenger-login-divider { height: 1px; margin: 18px 0; background: #dadde1; }
+.passenger-login-card .account-create-button {
+  width: auto;
+  min-height: 46px;
+  margin: 0 auto;
+  padding: 0 18px;
+  border-radius: 6px;
+  background: #12304a;
+}
+.passenger-login-card .account-create-button:hover { background: #234866; }
 
 @media (max-width: 760px) {
   .account-auth-shell { grid-template-columns: minmax(0, 1fr); gap: 26px; align-content: start; width: calc(100% - 28px); min-height: 0; padding-top: 30px; }
@@ -1119,6 +1211,10 @@ body { background: var(--background); color: var(--foreground); }
   .account-auth-benefits { gap: 9px; margin-top: 20px; }
   .account-auth-browse-link { margin-top: 18px; }
   .account-auth-shell > .account-auth-controls { width: 100%; max-width: 480px; justify-self: center; }
+  .passenger-login-shell { width: 100%; gap: 26px; padding: 38px 18px; }
+  .passenger-login-intro { max-width: 480px; text-align: center; }
+  .passenger-login-intro > p:not(.module-eyebrow) { margin: 0 auto; font-size: 16px; }
+  .passenger-login-controls { max-width: 400px; }
 }
 
 @media (max-width: 420px) {

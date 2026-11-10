@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
+import { MapContainer, Polyline, RouteLocationMarker, TileLayer } from "@/components/ClientLeaflet";
 import RequireAdmin from "@/components/RequireAdmin";
 import { fmtDate } from "@/lib/booking-data";
 import { distanceKm, hasCoords } from "@/lib/geo";
@@ -12,8 +12,9 @@ import type { Booking, FareItem, ReportItem, ReportStatus, RouteItem, StopItem, 
 
 type MainPanel = "map" | "admin";
 type AdminPanel = "routes" | "stops" | "reports" | "bookings";
+type RoutePoint = [number, number];
 
-const CITY_COORDINATES: Record<string, Coordinates> = {
+const ROUTE_TOWN_COORDINATES: Record<string, Coordinates> = {
   ...DISTRICT_COORDINATES,
   Limbe: { lat: -15.8103, lng: 35.0586 },
   Mzuzu: { lat: -11.4656, lng: 34.0207 },
@@ -68,54 +69,135 @@ const MOCK_ADMIN_BOOKINGS: Booking[] = [
   },
 ];
 
-function coordinatesForCity(city: string): Coordinates | null {
-  return CITY_COORDINATES[city] ?? null;
+function stopKindLabel(kind: StopKind) {
+  if (kind === "dropoff") return "Drop-off";
+  return "Pickup & drop-off";
 }
 
-function stopKindLabel(kind: StopKind) {
-  if (kind === "both") return "Pickup & drop-off";
-  return kind === "pickup" ? "Pickup" : "Drop-off";
+function getRoadRoute(value: unknown): RoutePoint[] | null {
+  if (typeof value !== "object" || value === null || !("routes" in value) || !Array.isArray(value.routes)) {
+    return null;
+  }
+
+  const route = value.routes[0];
+  if (typeof route !== "object" || route === null || !("geometry" in route)) return null;
+  const geometry = route.geometry;
+  if (typeof geometry !== "object" || geometry === null || !("coordinates" in geometry) || !Array.isArray(geometry.coordinates)) {
+    return null;
+  }
+
+  const positions: RoutePoint[] = [];
+  for (const point of geometry.coordinates) {
+    if (
+      !Array.isArray(point) ||
+      typeof point[0] !== "number" ||
+      !Number.isFinite(point[0]) ||
+      point[0] < -180 ||
+      point[0] > 180 ||
+      typeof point[1] !== "number" ||
+      !Number.isFinite(point[1]) ||
+      point[1] < -90 ||
+      point[1] > 90
+    ) {
+      return null;
+    }
+    positions.push([point[1], point[0]]);
+  }
+
+  return positions.length >= 2 ? positions : null;
 }
 
 function MapAdminIntegrationPage() {
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
   const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
   const [mainPanel, setMainPanel] = useState<MainPanel>("map");
   const [panelReady, setPanelReady] = useState(false);
-  const [selectedRouteId, setSelectedRouteId] = useState("all");
-  const [city, setCity] = useState("Blantyre");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [locationMessage, setLocationMessage] = useState("");
   const [locating, setLocating] = useState(false);
+  const [routeTowns, setRouteTowns] = useState<string[]>([]);
+  const [routeResult, setRouteResult] = useState<{
+    key: string;
+    positions: RoutePoint[];
+    status: "ready" | "fallback";
+  } | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setMainPanel(new URLSearchParams(window.location.search).get("panel") === "admin" ? "admin" : "map");
+      const params = new URLSearchParams(window.location.search);
+      setMainPanel(params.get("panel") === "admin" ? "admin" : "map");
+      const requestedTowns = params.get("route")?.split("|").map((town) => town.trim()) ?? [];
+      if (requestedTowns.length >= 2 && requestedTowns.every((town) => town in ROUTE_TOWN_COORDINATES)) {
+        setRouteTowns(requestedTowns);
+      }
       setPanelReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
-  const origin = userLocation ?? CITY_COORDINATES[city];
-  const { nearbyStops, unlocatedStops } = useMemo(() => {
-    const located = stops
-      .filter(hasCoords)
-      .map((stop) => ({ ...stop, distance: distanceKm(origin.lat, origin.lng, stop.lat, stop.lng) }))
-      .sort((first, second) => first.distance - second.distance);
-    return {
-      nearbyStops: located.filter((stop) => stop.distance <= 30),
-      unlocatedStops: stops.filter((stop) => !hasCoords(stop)),
-    };
-  }, [origin, stops]);
+  const routePositions = useMemo<RoutePoint[]>(
+    () => routeTowns.map((town) => {
+      const coordinates = ROUTE_TOWN_COORDINATES[town];
+      return [coordinates.lat, coordinates.lng];
+    }),
+    [routeTowns],
+  );
+  const routeKey = routeTowns.join("|");
+  const currentRouteResult = routeResult?.key === routeKey ? routeResult : null;
+  const routeGeometry = currentRouteResult?.positions ?? routePositions;
+  const routeStatus = currentRouteResult?.status ?? "loading";
+  const routeCities = useMemo(
+    () => new Set(routeTowns.map((town) => town.toLocaleLowerCase())),
+    [routeTowns],
+  );
+  const routeStops = useMemo(
+    () => stops
+      .filter((stop) => routeCities.has(stop.city.trim().toLocaleLowerCase()))
+      .sort((first, second) =>
+        routeTowns.findIndex((town) => town.toLocaleLowerCase() === first.city.trim().toLocaleLowerCase()) -
+          routeTowns.findIndex((town) => town.toLocaleLowerCase() === second.city.trim().toLocaleLowerCase()) ||
+        first.name.localeCompare(second.name),
+      ),
+    [routeCities, routeTowns, stops],
+  );
 
-  const visibleRoutes = selectedRouteId === "all" ? routes : routes.filter((route) => route.id === selectedRouteId);
-  const mapCenter = useMemo(() => [-13.5, 34.2] as [number, number], []);
+  useEffect(() => {
+    if (routePositions.length < 2) return;
+
+    const controller = new AbortController();
+    const coordinates = routePositions.map(([lat, lng]) => `${lng},${lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`;
+
+    async function loadRoadRoute() {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Routing service returned ${response.status}`);
+        const result: unknown = await response.json();
+        const roadRoute = getRoadRoute(result);
+        if (!roadRoute) throw new Error("Routing service returned an invalid route");
+        setRouteResult({ key: routeKey, positions: roadRoute, status: "ready" });
+      } catch {
+        if (controller.signal.aborted) return;
+        setRouteResult({ key: routeKey, positions: routePositions, status: "fallback" });
+      }
+    }
+
+    void loadRoadRoute();
+    return () => controller.abort();
+  }, [routeKey, routePositions]);
+
+  const nearbyStops = useMemo(() => {
+    if (!userLocation) return [];
+    return stops
+      .filter(hasCoords)
+      .map((stop) => ({ ...stop, distance: distanceKm(userLocation.lat, userLocation.lng, stop.lat, stop.lng) }))
+      .filter((stop) => stop.distance <= 30)
+      .sort((first, second) => first.distance - second.distance);
+  }, [userLocation, stops]);
 
   function useMyLocation() {
     setLocationMessage("");
     if (!navigator.geolocation) {
-      setLocationMessage("Location is not available in this browser. Choose a town instead.");
+      setLocationMessage("Location is unavailable in this browser. Enable location services to find nearby stops.");
       return;
     }
 
@@ -130,8 +212,8 @@ function MapAdminIntegrationPage() {
         setUserLocation(null);
         setLocationMessage(
           error.code === error.PERMISSION_DENIED
-            ? "Location permission was denied. Choose a town to find nearby stops."
-            : "Your location could not be found. Choose a town to find nearby stops.",
+            ? "Location permission was denied. Allow location access in your browser and try again."
+            : "Your location could not be found. Check your device settings and try again.",
         );
         setLocating(false);
       },
@@ -146,142 +228,110 @@ function MapAdminIntegrationPage() {
       {mainPanel === "map" ? (
         <>
           <header className="module-intro">
-            <p className="module-eyebrow">TRANSPORT MAP</p>
-            <h1>Routes, stops, and service information</h1>
-            <p>Explore route locations across Malawi and find nearby pickup or drop-off points.</p>
+            <p className="module-eyebrow">NEARBY TRANSPORT STOPS</p>
+            <h1>{routeTowns.length > 0 ? `Stops along ${routeTowns[0]} to ${routeTowns[routeTowns.length - 1]}` : "Find stops near you"}</h1>
+            <p>{routeTowns.length > 0 ? "View the selected route and pickup and drop-off stops along the way." : "Share your location to see pickup and drop-off stops within 30 km."}</p>
           </header>
-
-          <nav className="module-tabs" aria-label="Map and administration">
-            <button type="button" className="is-active" aria-pressed="true">Explore map &amp; nearby stops</button>
-            <button type="button" aria-pressed="false" onClick={() => setMainPanel("admin")}>Staff sign in</button>
-          </nav>
-
-          <section className="module-section" aria-labelledby="map-heading">
-            <div className="module-section-heading">
-              <div><p className="module-eyebrow">ROUTE NETWORK</p><h2 id="map-heading">Explore routes across Malawi</h2></div>
-              <label className="map-route-filter">Show
-                <select value={selectedRouteId} onChange={(event) => setSelectedRouteId(event.target.value)}>
-                  <option value="all">All routes</option>
-                  {routes.map((route) => <option key={route.id} value={route.id}>{route.origin} to {route.destination}</option>)}
-                </select>
-              </label>
-            </div>
-            {routes.length === 0 ? (
-              <p className="module-empty">There are no routes to show yet.</p>
-            ) : (
-              <div className="network-map">
-                <MapContainer center={mapCenter} zoom={7} scrollWheelZoom className="route-map" worldCopyJump>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-
-                  {routes.map((route) => {
-                    const origin = coordinatesForCity(route.origin);
-                    const destination = coordinatesForCity(route.destination);
-                    if (!origin || !destination) return null;
-
-                    const isSelected = selectedRouteId === "all" || selectedRouteId === route.id;
-
-                    return (
-                      <Polyline
-                        key={route.id}
-                        positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
-                        pathOptions={{
-                          color: isSelected ? "#12304A" : "#8CA6BF",
-                          weight: isSelected ? 5 : 2.5,
-                          opacity: isSelected ? 1 : 0.7,
-                        }}
-                      >
-                        <Popup>
-                          <strong>{route.origin} → {route.destination}</strong><br />
-                          {route.service}
-                        </Popup>
-                      </Polyline>
-                    );
-                  })}
-
-                  {Object.entries(CITY_COORDINATES).map(([name, coordinates]) => (
-                    <CircleMarker key={name} center={[coordinates.lat, coordinates.lng]} radius={7} pathOptions={{ color: "#12304A", fillColor: "#12304A", fillOpacity: 1 }}>
-                      <Popup>{name}</Popup>
-                    </CircleMarker>
-                  ))}
-
-                  {stops.filter(hasCoords).map((stop) => (
-                    <CircleMarker
-                      key={stop.id}
-                      center={[stop.lat, stop.lng]}
-                      radius={stop.kind === "both" ? 6 : 5}
-                      pathOptions={{
-                        color: stop.kind === "pickup" ? "#2F80ED" : stop.kind === "dropoff" ? "#E67E22" : "#7E57C2",
-                        fillColor: stop.kind === "pickup" ? "#2F80ED" : stop.kind === "dropoff" ? "#E67E22" : "#7E57C2",
-                        fillOpacity: 0.9,
-                      }}
-                    >
-                      <Popup>
-                        <strong>{stop.name}</strong><br />
-                        {stop.city}<br />
-                        {stopKindLabel(stop.kind)}
-                      </Popup>
-                    </CircleMarker>
-                  ))}
-                </MapContainer>
-
-                <div className="map-legend" aria-label="Map legend">
-                  <span><i className="legend-route" /> Route connection</span>
-                  <span><i className="legend-pickup" /> Pickup point</span>
-                  <span><i className="legend-dropoff" /> Drop-off point</span>
-                  <span><i className="legend-both" /> Pickup and drop-off</span>
-                </div>
-              </div>
-            )}
-            <div className="map-route-list">
-              {visibleRoutes.map((route) => {
-                const fare = fares.find((item) => item.routeId === route.id);
-                return (
-                  <article key={route.id}>
-                    <strong>{route.origin} <span aria-hidden="true">→</span> {route.destination}</strong>
-                    <span>{route.service}</span>
-                    <span>{fare ? `Estimated fare: MWK ${fare.amount.toLocaleString("en-MW")}` : "Fare estimate unavailable"}</span>
-                  </article>
-                );
-              })}
-            </div>
-            <p className="module-footnote">District markers use approximate center coordinates; transport stop markers use recorded stop coordinates. Stops without recorded coordinates are listed below.</p>
-          </section>
 
           <section className="module-section" aria-labelledby="nearby-heading">
             <div className="module-section-heading">
-              <div><p className="module-eyebrow">PICKUP &amp; DROP-OFF</p><h2 id="nearby-heading">Find nearby transport points</h2></div>
-            </div>
-            <div className="nearby-toolbar">
-              <label>Choose a town
-                <select value={city} onChange={(event) => { setCity(event.target.value); setUserLocation(null); setLocationMessage(""); }}>
-                  {MALAWI_LOCATIONS.map((town) => <option key={town} value={town}>{town}</option>)}
-                </select>
-              </label>
-              <button className="secondary-button" type="button" onClick={useMyLocation} disabled={locating}>{locating ? "Finding location…" : "Use my location"}</button>
-              <span className="nearby-radius">Within 30 km of {userLocation ? "your location" : city}</span>
+              <div><p className="module-eyebrow">{routeTowns.length > 0 ? "SELECTED ROUTE" : "YOUR LOCATION"}</p><h2 id="nearby-heading">{routeTowns.length > 0 ? "Stops along this route" : "Nearby stops"}</h2></div>
+              {routeTowns.length === 0 && (
+                <button className="secondary-button" type="button" onClick={useMyLocation} disabled={locating}>
+                  {locating ? "Finding location…" : userLocation ? "Refresh my location" : "Use my location"}
+                </button>
+              )}
             </div>
             {locationMessage && <p className="module-feedback" role="status">{locationMessage}</p>}
-            {nearbyStops.length === 0 ? (
-              <p className="module-empty">No recorded stops are within 30 km. Choose another town to search.</p>
+            {routeTowns.length > 0 ? (
+              <>
+                <p className="nearby-radius">Route: {routeTowns.join(" → ")}. Pickup and drop-off stops are shown for towns along this route.</p>
+                {routeStatus === "fallback" && <p className="module-feedback" role="status">The road route could not be loaded, so the map shows connections between the route towns.</p>}
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
+                  <div className="network-map">
+                    <MapContainer
+                      key={`${routeKey}:${routeStatus}`}
+                      bounds={routeGeometry.length > 1 ? routeGeometry : routePositions}
+                      boundsOptions={{ paddingTopLeft: [24, 24], paddingBottomRight: [24, 24] }}
+                      scrollWheelZoom
+                      className="route-map"
+                      style={{ height: "clamp(360px, 65vh, 560px)", minHeight: "360px" }}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      {routeGeometry.length > 1 && <Polyline positions={routeGeometry} pathOptions={{ color: "#12304A", weight: 5, opacity: 0.85 }} />}
+                      {routeStops.filter(hasCoords).map((stop) => (
+                        <RouteLocationMarker
+                          key={stop.id}
+                          position={[stop.lat, stop.lng]}
+                          label={stop.kind === "dropoff" ? "Drop-off" : "Pickup & drop-off"}
+                          town={stop.name}
+                          details={stop.city}
+                        />
+                      ))}
+                    </MapContainer>
+                  </div>
+                  <div className="max-h-[470px] overflow-y-auto max-[760px]:max-h-[360px]">
+                    {routeStops.length === 0 ? (
+                      <p className="module-empty">No pickup or drop-off stops are recorded along this route yet.</p>
+                    ) : (
+                      <ul className="nearby-stop-list">
+                        {routeStops.map((stop) => (
+                          <li key={stop.id}>
+                            <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
+                            <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
+                            <span className="stop-distance">{hasCoords(stop) ? "On route" : "No map location"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : !userLocation ? (
+              <p className="module-empty">Use your location to see nearby pickup and drop-off stops on the map.</p>
             ) : (
-              <ul className="nearby-stop-list">
-                {nearbyStops.map((stop) => (
-                  <li key={stop.id}>
-                    <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
-                    <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
-                    <span className="stop-distance">{stop.distance.toFixed(1)} km</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {unlocatedStops.length > 0 && (
-              <div className="unlocated-stops">
-                <h3>Location not recorded yet</h3>
-                <ul>{unlocatedStops.map((stop) => <li key={stop.id}>{stop.name} · {stopKindLabel(stop.kind)} · {stop.city}</li>)}</ul>
-              </div>
+              <>
+                <p className="nearby-radius">Showing stops within 30 km of your location.</p>
+                <div className="network-map">
+                  <MapContainer
+                    key={`${userLocation.lat}:${userLocation.lng}:${nearbyStops.map((stop) => stop.id).join(",")}`}
+                    center={[userLocation.lat, userLocation.lng]}
+                    zoom={9}
+                    scrollWheelZoom
+                    className="route-map"
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {nearbyStops.map((stop) => (
+                      <RouteLocationMarker
+                        key={stop.id}
+                        position={[stop.lat, stop.lng]}
+                        label={stop.kind === "dropoff" ? "Drop-off" : "Pickup & drop-off"}
+                        town={stop.name}
+                        details={stop.city}
+                      />
+                    ))}
+                  </MapContainer>
+                </div>
+                {nearbyStops.length === 0 ? (
+                  <p className="module-empty">No recorded stops are within 30 km of your location.</p>
+                ) : (
+                  <ul className="nearby-stop-list">
+                    {nearbyStops.map((stop) => (
+                      <li key={stop.id}>
+                        <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
+                        <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
+                        <span className="stop-distance">{stop.distance.toFixed(1)} km</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </section>
         </>
@@ -477,7 +527,7 @@ function StopManagement() {
         <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
         <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
         <datalist id="malawi-stop-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
-        <label>Point type<select value={kind} onChange={(event) => setKind(event.target.value as StopKind)}><option value="pickup">Pickup only</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
+        <label>Point type<select value={kind} onChange={(event) => setKind(event.target.value as StopKind)}><option value="pickup">Pickup (also drop-off)</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
         <label>Latitude <span className="optional-label">Optional</span><input type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} /></label>
         <label>Longitude <span className="optional-label">Optional</span><input type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} /></label>
         <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add stop"}</button>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { readPassengerSession } from "@/lib/passenger-auth";
+import { useState, type FormEvent } from "react";
+import { usePassengerAuth } from "@/components/PassengerAuthProvider";
 import { KEYS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
 import type { ReportItem, ReportStatus } from "@/lib/types";
@@ -23,6 +23,7 @@ const REPORT_STATUS_MESSAGES: Record<ReportStatus, string> = {
 };
 
 export default function PassengerReportForm() {
+  const { passenger, error: authError } = usePassengerAuth();
   const reports = useStoredList<ReportItem>(KEYS.reports, EMPTY_REPORTS);
   const [reporterName, setReporterName] = useState("");
   const [reporterEmail, setReporterEmail] = useState("");
@@ -31,41 +32,24 @@ export default function PassengerReportForm() {
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const currentReporterName = passenger?.fullName ?? reporterName;
+  const currentReporterEmail = passenger?.email ?? reporterEmail;
   const matchingReports = reports
-    .filter((report) => report.reporterEmail?.trim().toLowerCase() === reporterEmail.trim().toLowerCase())
+    .filter((report) => report.reporterEmail?.trim().toLowerCase() === currentReporterEmail.trim().toLowerCase())
     .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-
-  useEffect(() => {
-    let active = true;
-    void readPassengerSession().then((session) => {
-      if (active && session) {
-        setReporterName(session.fullName);
-        setReporterEmail(session.email);
-      }
-    }).catch((reason: unknown) => {
-      if (!active) return;
-      setFeedback({
-        kind: "error",
-        message: reason instanceof Error ? reason.message : "Your passenger details could not be loaded.",
-      });
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   function submitReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
-    if (reporterName.trim().length < 2 || itemName.trim().length < 2 || description.trim().length < 10) {
+    if (currentReporterName.trim().length < 2 || itemName.trim().length < 2 || description.trim().length < 10) {
       setFeedback({ kind: "error", message: "Enter your name, the route or stop name, and at least 10 characters describing the issue." });
       return;
     }
 
     const report: ReportItem = {
       id: newId("report"),
-      reporterName: reporterName.trim(),
-      reporterEmail: reporterEmail.trim(),
+      reporterName: currentReporterName.trim(),
+      reporterEmail: currentReporterEmail.trim(),
       type: reportType,
       itemName: itemName.trim(),
       description: description.trim(),
@@ -91,9 +75,10 @@ export default function PassengerReportForm() {
 
   return (
     <>
+      {authError && <p className="module-feedback error" role="alert">{authError}</p>}
       <form className="module-form narrow-form" onSubmit={submitReport}>
-        <label>Your name<input autoComplete="name" minLength={2} maxLength={100} value={reporterName} onChange={(event) => setReporterName(event.target.value)} required /></label>
-        <label>Email address<input type="email" autoComplete="email" maxLength={254} value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} required /></label>
+        <label>Your name<input autoComplete="name" minLength={2} maxLength={100} value={currentReporterName} onChange={(event) => setReporterName(event.target.value)} disabled={Boolean(passenger)} required /></label>
+        <label>Email address<input type="email" autoComplete="email" maxLength={254} value={currentReporterEmail} onChange={(event) => setReporterEmail(event.target.value)} disabled={Boolean(passenger)} required /></label>
         <label>What needs attention?
           <select value={reportType} onChange={(event) => setReportType(event.target.value as ReportItem["type"])}>
             <option value="Route">Route</option><option value="Fare">Fare</option><option value="Stop">Pickup or drop-off point</option><option value="Other">Other</option>
@@ -118,7 +103,7 @@ export default function PassengerReportForm() {
             Updates are saved in this browser. These are on-page demo notifications only; no email is sent.
           </p>
         </div>
-        {!reporterEmail.trim() ? (
+        {!currentReporterEmail.trim() ? (
           <p className="module-empty">Enter your email address above to check for report updates.</p>
         ) : matchingReports.length === 0 ? (
           <p className="module-empty">No reports were found for this email address in this browser.</p>

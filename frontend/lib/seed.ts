@@ -5,6 +5,7 @@ export const KEYS = {
   fares: "routewise-fares-v1",
   stops: "routewise-stops-v1",
   reports: "routewise-reports-v1",
+  savedJourneys: "routewise-saved-journeys-v1",
   bookings: "routewise-bookings-v1", 
   session: "routewise-session-v1",
 } as const;
@@ -36,7 +37,7 @@ export const SEED_STOPS: StopItem[] = [
   { id: "s-2", name: "Chichiri Shopping Centre", kind: "pickup", city: "Blantyre", lat: -15.7945, lng: 35.0233 },
   { id: "s-3", name: "Limbe Bus Station", kind: "both", city: "Limbe", lat: -15.8103, lng: 35.0586 },
   { id: "s-4", name: "Limbe Market", kind: "dropoff", city: "Limbe", lat: -15.8076, lng: 35.0527 },
-  { id: "s-5", name: "Zomba Bus Depot", kind: "dropoff", city: "Zomba", lat: -15.3833, lng: 35.3188 },
+  { id: "s-5", name: "Zomba Bus Depot", kind: "both", city: "Zomba", lat: -15.3833, lng: 35.3188 },
   { id: "s-6", name: "Zomba Market", kind: "dropoff", city: "Zomba", lat: -15.3869, lng: 35.3262 },
   { id: "s-7", name: "Lilongwe Bus Terminal", kind: "dropoff", city: "Lilongwe", lat: -13.9626, lng: 33.7741 },
   { id: "s-8", name: "Mzuzu Bus Terminal (location pending)", kind: "pickup", city: "Mzuzu", lat: null, lng: null },

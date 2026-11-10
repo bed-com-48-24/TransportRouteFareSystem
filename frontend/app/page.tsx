@@ -36,8 +36,8 @@ export default function Home() {
         </div>
         <div className="home-services" aria-label="SBUS services">
           <Link href="/routes-fares"><strong>Routes &amp; fares</strong><span>Compare routes, estimated fares, pickup points, and transfers →</span></Link>
-          <Link href="/maps-admin-integration"><strong>Map &amp; nearby stops</strong><span>Explore the expanded route network and recorded pickup or drop-off locations →</span></Link>
-          <Link href="/transport-booking"><strong>Trips, bookings &amp; map</strong><span>Browse departures as cards or on a map, then reserve seats →</span></Link>
+          <Link href="/maps-admin-integration"><strong>Nearby stops</strong><span>Use your location to find pickup and drop-off stops within 30 km →</span></Link>
+          <Link href="/transport-booking"><strong>Trips &amp; bookings</strong><span>Browse scheduled departures and reserve seats →</span></Link>
           <Link href="/accounts-reports"><strong>Account &amp; support</strong><span>Sign in, create an account, update your profile, or report an issue →</span></Link>
         </div>
       </section>

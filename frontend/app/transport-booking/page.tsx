@@ -4,8 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { CircleMarker, MapContainer, Polyline, Popup, RouteLocationMarker, TileLayer } from "@/components/ClientLeaflet";
+import { MapContainer, Polyline, RouteLocationMarker, TileLayer, ZoomControl } from "@/components/ClientLeaflet";
 import QRCode from "qrcode";
+import { usePassengerAuth } from "@/components/PassengerAuthProvider";
 import { availableSeats, createBooking, fmtDate, getBookedSeatNumbers, TRIPS } from "@/lib/booking-data";
 import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS } from "@/lib/seed";
@@ -126,7 +127,7 @@ function isRoutingResponse(value: unknown): value is RoutingResponse {
 function formatRouteDuration(seconds: number) {
   const minutes = Math.round(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  return hours > 0 ? `${hours} hr ${minutes % 60} min` : `${minutes} min`;
+  return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
 }
 
 function SeatButton({
@@ -165,6 +166,7 @@ function SeatButton({
 
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
   const router = useRouter();
+  const passengerAuth = usePassengerAuth();
   const initialTrip = TRIPS.find((trip) => trip.id === initialTripId);
   const bookings = useStoredList<Booking>(KEYS.bookings, []);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
@@ -176,6 +178,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [showSeatSelector, setShowSeatSelector] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const passengerSession = passengerAuth.passenger;
+  const authChecked = passengerAuth.ready;
+  const bookingName = passengerSession?.fullName ?? name;
+  const bookingEmail = passengerSession?.email ?? email;
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -183,7 +189,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [paymentMethod, setPaymentMethod] = useState("mobile-money");
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
-  const [tripView, setTripView] = useState<"cards" | "map">("cards");
   const [destinationFilter, setDestinationFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
   const [routeRetryKey, setRouteRetryKey] = useState(0);
@@ -218,7 +223,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     const dateMatches = dateFilter === "all" || trip.date === dateFilter;
     return destinationMatches && dateMatches;
   }).sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
-  const visibleTowns = [...new Set(visibleTrips.flatMap((trip) => trip.route.split(" → ")))];
   const seatsByTrip = useMemo(
     () => new Map(TRIPS.map((trip) => [trip.id, availableSeats(trip, bookings)])),
     [bookings],
@@ -333,15 +337,20 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setError("");
     setNotice("");
 
+    if (!passengerSession) {
+      router.push(loginPath);
+      return;
+    }
+
     if (!selectedTrip) {
       setError("Choose a trip before continuing.");
       return;
     }
 
     if (
-      name.trim().length < 2 ||
-      name.trim().length > 100 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      bookingName.trim().length < 2 ||
+      bookingName.trim().length > 100 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail.trim()) ||
       travelDate < selectedTrip.date ||
       !selectedTrip.pickup.includes(pickup) ||
       !selectedTrip.dropoff.includes(dropoff) ||
@@ -361,6 +370,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   }
 
   async function completeMockPayment() {
+    if (!passengerSession) {
+      router.push(loginPath);
+      return;
+    }
     if (!selectedTrip) return;
 
     setSaving(true);
@@ -375,8 +388,8 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           dropoff,
           passengers,
           seatNumbers: activeSelectedSeatNumbers,
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
+          name: bookingName.trim(),
+          email: bookingEmail.trim().toLowerCase(),
         },
         selectedTrip,
       );
@@ -474,6 +487,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     }
   }
 
+  const bookingReturnPath = initialTripId
+    ? `/transport-booking/details/${encodeURIComponent(initialTripId)}`
+    : "/transport-booking";
+  const loginPath = `/login?next=${encodeURIComponent(bookingReturnPath)}`;
+
   return (
     <main className="module-shell">
       <header className="module-intro">
@@ -523,14 +541,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           </div>
         </div>
 
-        <nav className="module-tabs" aria-label="Available trips view">
-          <button type="button" className={tripView === "cards" ? "is-active" : ""} aria-pressed={tripView === "cards"} onClick={() => setTripView("cards")}>Cards</button>
-          <button type="button" className={tripView === "map" ? "is-active" : ""} aria-pressed={tripView === "map"} onClick={() => setTripView("map")}>Map</button>
-        </nav>
-
         {visibleTrips.length === 0 ? (
           <p className="module-empty">No sample departures match these filters. Choose another destination or date.</p>
-        ) : tripView === "cards" ? (
+        ) : (
           <div className="module-card-grid">
             {visibleTrips.map((trip) => {
               const seats = seatsByTrip.get(trip.id) ?? 0;
@@ -561,41 +574,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               );
             })}
           </div>
-        ) : (
-          <div className="network-map">
-            <MapContainer center={[-13.4, 34.2]} zoom={6} scrollWheelZoom className="route-map">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {visibleTrips.map((trip) => {
-                const [origin, destination] = trip.route.split(" → ");
-                const originCoordinates = TRIP_CITY_COORDINATES[origin];
-                const destinationCoordinates = TRIP_CITY_COORDINATES[destination];
-                if (!originCoordinates || !destinationCoordinates) return null;
-                return (
-                  <Polyline key={trip.id} positions={[[originCoordinates.lat, originCoordinates.lng], [destinationCoordinates.lat, destinationCoordinates.lng]]} pathOptions={{ color: "#12304A", weight: 4, opacity: 0.8 }}>
-                    <Popup>
-                      <strong>{trip.route}</strong><br />
-                      {fmtDate(trip.date)} · {trip.departure}<br />
-                      Estimated fare: MWK {trip.fare.toLocaleString("en-MW")}
-                      <br />
-                      <Link className="map-trip-select" href={`/transport-booking/details/${trip.id}`}>Choose this trip</Link>
-                    </Popup>
-                  </Polyline>
-                );
-              })}
-              {visibleTowns.map((town) => {
-                const coordinates = TRIP_CITY_COORDINATES[town];
-                if (!coordinates) return null;
-                return (
-                <CircleMarker key={town} center={[coordinates.lat, coordinates.lng]} radius={7} pathOptions={{ color: "#12304A", fillColor: "#fff", fillOpacity: 1 }}>
-                  <Popup>{town}</Popup>
-                </CircleMarker>
-                );
-              })}
-            </MapContainer>
-          </div>
         )}
         <p className="module-footnote">Fares and schedules are estimates for this project demonstration. No payment is collected.</p>
       </section>
@@ -611,6 +589,18 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         </div>
         {!selectedTrip ? (
           ticket ? null : <p className="module-empty">This sample trip could not be found. Return to the available trips and choose another departure.</p>
+        ) : !authChecked ? (
+          <p className="module-empty" role="status">Checking your passenger account…</p>
+        ) : !passengerSession ? (
+          <div className="account-required-panel" role="status">
+            <p className="module-eyebrow">PASSENGER ACCOUNT REQUIRED</p>
+            <h3>Sign in before booking</h3>
+            <p>Sign in or create a passenger account to reserve this trip. Your selected trip will be ready when you return.</p>
+            <div className="mock-payment-actions">
+              <Link className="primary-button" href={loginPath}>Sign in to continue</Link>
+              <Link className="secondary-button" href={`/login?mode=register&next=${encodeURIComponent(bookingReturnPath)}`}>Create account</Link>
+            </div>
+          </div>
         ) : paymentPending ? (
           <div className="mock-payment-panel">
             <div>
@@ -639,16 +629,12 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               <section className="booking-route-preview" aria-labelledby="booking-route-heading">
                 <div className="booking-route-heading">
                   <div>
-                    <h3 id="booking-route-heading">Route preview</h3>
+                    <h3 id="booking-route-heading">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-7.2 8-13a8 8 0 1 0-16 0c0 5.8 8 13 8 13Z" /><circle cx="12" cy="9" r="2.5" /></svg>
+                      Route Map
+                    </h3>
                     <p>{pickup} to {dropoff}</p>
                   </div>
-                  <p className="booking-route-status" aria-live="polite">
-                    {currentRouteLookup.status === "loading"
-                      ? "Loading road route…"
-                      : currentRouteLookup.status === "ready" && currentRouteLookup.route
-                        ? `${(currentRouteLookup.route.distance / 1000).toFixed(0)} km · ${formatRouteDuration(currentRouteLookup.route.duration)}`
-                        : "Road route unavailable"}
-                  </p>
                 </div>
                 {currentRouteLookup.status === "error" && (
                   <div className="booking-route-error" role="alert">
@@ -659,33 +645,41 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
                   </div>
                 )}
                 {pickupPosition && dropoffPosition ? (
-                  <MapContainer
-                    key={`${routeKey}:${currentRouteLookup.status}`}
-                    bounds={currentRouteLookup.route?.positions ?? [pickupPosition, dropoffPosition]}
-                    scrollWheelZoom
-                    className="route-map booking-route-map"
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {currentRouteLookup.route && (
-                      <Polyline
-                        positions={currentRouteLookup.route.positions}
-                        pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.88 }}
+                  <div className="booking-route-map-wrap">
+                    <MapContainer
+                      key={`${routeKey}:${currentRouteLookup.status}`}
+                      bounds={currentRouteLookup.route?.positions ?? [pickupPosition, dropoffPosition]}
+                      boundsOptions={{ paddingTopLeft: [22, 24], paddingBottomRight: [184, 24] }}
+                      scrollWheelZoom
+                      zoomControl={false}
+                      className="route-map booking-route-map"
+                    >
+                      <ZoomControl position="topright" />
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                    )}
-                    <RouteLocationMarker position={pickupPosition} label="Pickup" town={pickup} />
-                    <RouteLocationMarker position={dropoffPosition} label="Drop-off" town={dropoff} />
-                  </MapContainer>
+                      {currentRouteLookup.route && (
+                        <Polyline
+                          positions={currentRouteLookup.route.positions}
+                          pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.88 }}
+                        />
+                      )}
+                      <RouteLocationMarker position={pickupPosition} label="Pickup" town={pickup} />
+                      <RouteLocationMarker position={dropoffPosition} label="Drop-off" town={dropoff} />
+                    </MapContainer>
+                    <div className="booking-route-estimate" role="status" aria-live="polite">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v13H3V5a2 2 0 0 1 2-2Zm0 2v7h14V5H5Zm-2 9h18v2H3v-2Zm3 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm12 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" /></svg>
+                      {currentRouteLookup.status === "ready" && currentRouteLookup.route
+                        ? `${formatRouteDuration(currentRouteLookup.route.duration)} (≈${Math.round(currentRouteLookup.route.distance / 1000)} km)`
+                        : currentRouteLookup.status === "loading"
+                          ? "Finding road route…"
+                          : "Travel estimate unavailable"}
+                    </div>
+                  </div>
                 ) : (
                   <p className="booking-route-error" role="alert">Map directions are unavailable for this trip.</p>
                 )}
-                <ul className="booking-route-legend" aria-label="Map location markers">
-                  <li><span className="booking-route-legend-pin" aria-hidden="true">P</span> Pickup point</li>
-                  <li><span className="booking-route-legend-pin" aria-hidden="true">D</span> Drop-off point</li>
-                </ul>
-                <p className="booking-route-attribution">Road route via OSRM using OpenStreetMap data. Stops are shown at town locations.</p>
               </section>
 
               <div className="booking-form-fields">
@@ -800,11 +794,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
                   </label>
                   <label>
                     Passenger full name
-                    <input autoComplete="name" maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alex Banda" required />
+                    <input autoComplete="name" maxLength={100} value={bookingName} onChange={(event) => setName(event.target.value)} disabled={Boolean(passengerSession)} placeholder="e.g. Alex Banda" required />
                   </label>
                   <label>
                     Email address
-                    <input type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
+                    <input type="email" autoComplete="email" maxLength={254} value={bookingEmail} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(passengerSession)} placeholder="you@example.com" required />
                   </label>
                 </div>
 

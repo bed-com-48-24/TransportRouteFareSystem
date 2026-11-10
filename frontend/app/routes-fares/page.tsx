@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
+import { saveList, useStoredList } from "@/lib/storage";
 import type { Booking, FareItem, RouteItem, StopItem, Trip } from "@/lib/types";
 import { availableSeats, TRIPS } from "@/lib/booking-data";
 
@@ -27,6 +27,22 @@ type JourneyOption = {
   legs: RouteOption[];
   totalFare: number | null;
 };
+
+type SavedJourney = {
+  origin: string;
+  destination: string;
+};
+
+function isSavedJourney(value: unknown): value is SavedJourney {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "origin" in value &&
+    typeof value.origin === "string" &&
+    "destination" in value &&
+    typeof value.destination === "string"
+  );
+}
 
 function findJourneyOptions(origin: string, destination: string, sampleRoutes: RouteOption[]): JourneyOption[] {
   const cities = [...new Set(sampleRoutes.flatMap((route) => [route.origin, route.destination]))];
@@ -83,13 +99,14 @@ export default function RoutesFaresPage() {
   const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
   const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
   const bookings = useStoredList<Booking>(KEYS.bookings, []);
+  const savedJourneys = useStoredList<SavedJourney>(KEYS.savedJourneys, []).filter(isSavedJourney);
   const availableTrips = TRIPS.filter((trip) => availableSeats(trip, bookings) > 0);
   const availableRouteNames = new Set(availableTrips.map((trip) => trip.route.toLocaleLowerCase()));
   const sampleRoutes: RouteOption[] = routes.filter((route) =>
     availableRouteNames.has(`${route.origin} → ${route.destination}`.toLocaleLowerCase()),
   ).map((route) => {
     const pickup = stops.find((stop) => stop.city.toLowerCase() === route.origin.toLowerCase() && (stop.kind === "pickup" || stop.kind === "both"));
-    const dropoff = stops.find((stop) => stop.city.toLowerCase() === route.destination.toLowerCase() && (stop.kind === "dropoff" || stop.kind === "both"));
+    const dropoff = stops.find((stop) => stop.city.toLowerCase() === route.destination.toLowerCase() && (stop.kind === "dropoff" || stop.kind === "both" || stop.kind === "pickup"));
     return {
       ...route,
       pickupPoint: pickup?.name ?? `Pickup point in ${route.origin}`,
@@ -110,6 +127,7 @@ export default function RoutesFaresPage() {
   );
   const [selectedJourneyIndex, setSelectedJourneyIndex] = useState(0);
   const [error, setError] = useState("");
+  const [savedJourneyNotice, setSavedJourneyNotice] = useState("");
   const destinationOptions = origin ? reachableDestinations(origin) : cities;
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -196,6 +214,32 @@ export default function RoutesFaresPage() {
     setSearchedDestination(knownDestination);
   }
 
+  function toggleCurrentSavedJourney() {
+    if (searchedOrigin === null || searchedDestination === null) return;
+
+    const isSaved = savedJourneys.some(
+      (journey) => journey.origin === searchedOrigin && journey.destination === searchedDestination,
+    );
+    const nextJourneys = isSaved
+      ? savedJourneys.filter(
+          (journey) => journey.origin !== searchedOrigin || journey.destination !== searchedDestination,
+        )
+      : [...savedJourneys, { origin: searchedOrigin, destination: searchedDestination }];
+
+    saveList(KEYS.savedJourneys, nextJourneys);
+    setSavedJourneyNotice(isSaved ? "Route removed from saved routes." : "Route saved on this browser.");
+  }
+
+  function removeSavedJourney(journeyToRemove: SavedJourney) {
+    saveList(
+      KEYS.savedJourneys,
+      savedJourneys.filter(
+        (journey) => journey.origin !== journeyToRemove.origin || journey.destination !== journeyToRemove.destination,
+      ),
+    );
+    setSavedJourneyNotice(`${journeyToRemove.origin} to ${journeyToRemove.destination} removed from saved routes.`);
+  }
+
   function selectPopularDestination(place: string) {
     setDestination(place);
     setError("");
@@ -215,10 +259,6 @@ export default function RoutesFaresPage() {
   const selectedJourneyStops = selectedJourney && searchedOrigin
     ? [searchedOrigin, ...selectedJourney.legs.flatMap((leg) => [...leg.stopovers, leg.destination])]
     : [];
-  const selectedJourneyTrip = selectedJourney?.legs.length === 1
-    ? findTripForRoute(selectedJourney.legs[0], availableTrips)
-    : undefined;
-
   useEffect(() => {
     if (searchedOrigin === null || searchedDestination === null) {
       return;
@@ -423,6 +463,39 @@ export default function RoutesFaresPage() {
       </section>
 
       <div className="mx-auto max-w-6xl px-5 pb-16 pt-8 sm:px-8 sm:pt-10">
+        {savedJourneys.length > 0 && (
+          <section aria-labelledby="saved-routes-heading" className="mx-auto mb-8 max-w-4xl">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="saved-routes-heading" className="text-lg font-bold text-[#0D2438]">Saved routes</h2>
+                <p className="mt-1 text-sm text-slate-600">Saved on this browser only.</p>
+              </div>
+              <p className="sr-only" role="status" aria-live="polite">{savedJourneyNotice}</p>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {savedJourneys.map((journey) => (
+                <li key={`${journey.origin}-${journey.destination}`} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-[#D7E2EF] bg-white p-3">
+                  <button
+                    type="button"
+                    onClick={() => searchJourney(journey.origin, journey.destination)}
+                    className="min-w-0 flex-1 text-left text-sm font-semibold text-[#12304A] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                  >
+                    <span className="block break-words">{journey.origin} → {journey.destination}</span>
+                    <span className="mt-1 block text-xs font-medium text-[#526D87]">Search this route</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSavedJourney(journey)}
+                    aria-label={`Remove ${journey.origin} to ${journey.destination} from saved routes`}
+                    className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-[#526D87] hover:bg-[#EEF4FB] hover:text-[#12304A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <div aria-live="polite" aria-atomic="true" className="mb-8">
           {searchedOrigin === null || searchedDestination === null ? (
             <section
@@ -469,18 +542,34 @@ export default function RoutesFaresPage() {
               tabIndex={-1}
               className="mx-auto max-w-4xl scroll-mt-6 focus:outline-none"
             >
-              <div className="mb-5">
-                <h2
-                  id="travel-information-heading"
-                  className="break-words text-xl font-bold text-[#0D2438] sm:text-2xl"
-                >
-                  Journey from {searchedOrigin} to {searchedDestination}
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {matchingJourneys.length
-                    ? `${matchingJourneys.length} sample ${matchingJourneys.length === 1 ? "journey" : "journeys"} found, ordered by fewest changes.`
-                    : `No sample route connects ${searchedOrigin} to ${searchedDestination} yet.`}
-                </p>
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2
+                    id="travel-information-heading"
+                    className="break-words text-xl font-bold text-[#0D2438] sm:text-2xl"
+                  >
+                    Journey from {searchedOrigin} to {searchedDestination}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {matchingJourneys.length
+                      ? `${matchingJourneys.length} sample ${matchingJourneys.length === 1 ? "journey" : "journeys"} found, ordered by fewest changes.`
+                      : `No sample route connects ${searchedOrigin} to ${searchedDestination} yet.`}
+                  </p>
+                </div>
+                {matchingJourneys.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleCurrentSavedJourney}
+                    aria-pressed={savedJourneys.some(
+                      (journey) => journey.origin === searchedOrigin && journey.destination === searchedDestination,
+                    )}
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#AABBD0] px-3 text-sm font-semibold text-[#12304A] transition hover:bg-[#EAF2FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
+                  >
+                    {savedJourneys.some(
+                      (journey) => journey.origin === searchedOrigin && journey.destination === searchedDestination,
+                    ) ? "Remove saved route" : "Save route"}
+                  </button>
+                )}
               </div>
               {matchingJourneys.length ? (
                 <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -611,24 +700,9 @@ export default function RoutesFaresPage() {
                         ))}
                       </ol>
 
-                      <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                        {selectedJourneyTrip ? (
-                          <Link
-                            href={`/transport-booking/details/${encodeURIComponent(selectedJourneyTrip.id)}`}
-                            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#12304A] px-4 text-sm font-bold text-white transition hover:bg-[#29466D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
-                          >
-                            Reserve trip
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/transport-booking"
-                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#AABBD0] px-4 text-sm font-bold text-[#12304A] transition hover:bg-[#EAF2FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
-                          >
-                            Browse available trip legs
-                          </Link>
-                        )}
+                      <div className="mt-5">
                         <Link
-                          href="/maps-admin-integration"
+                          href={`/maps-admin-integration?route=${encodeURIComponent(selectedJourneyStops.join("|"))}`}
                           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#AABBD0] px-4 text-sm font-bold text-[#12304A] transition hover:bg-[#EAF2FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466D]"
                         >
                           Nearby stops
