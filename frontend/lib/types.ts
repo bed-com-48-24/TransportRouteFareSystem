@@ -1,4 +1,4 @@
-export type StopKind = "pickup" | "dropoff";
+export type StopKind = "pickup" | "dropoff" | "both";
 
 export type RouteItem = {
   id: string;
@@ -26,6 +26,8 @@ export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
 
 export type ReportItem = {
   id: string;
+  reporterName?: string;
+  reporterEmail?: string;
   type: "Route" | "Fare" | "Stop" | "Other";
   itemName: string;
   description: string;
@@ -55,6 +57,7 @@ export type Booking = {
   pickup: string;
   dropoff: string;
   passengers: number;
+  seatNumbers?: number[];
   name: string;
   email: string;
   status: "confirmed" | "cancelled";
