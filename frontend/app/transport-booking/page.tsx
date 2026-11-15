@@ -1,408 +1,492 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-<<<<<<< HEAD
+import { useRoadRoutes } from "@/components/road-routing";
+import { travelEstimate } from "@/lib/geo";
 import QRCode from "qrcode";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from "@/components/ClientLeaflet";
-import { availableSeats, createBooking, fmtDate, TRIPS, unavailableSeatNumbers } from "@/lib/booking-data";
-=======
-import { MapContainer, Polyline, RouteLocationMarker, TileLayer, ZoomControl } from "@/components/ClientLeaflet";
-import QRCode from "qrcode";
-import { usePassengerAuth } from "@/components/PassengerAuthProvider";
-import { availableSeats, createBooking, fmtDate, getBookedSeatNumbers, TRIPS } from "@/lib/booking-data";
->>>>>>> origin/feature/integration
-import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
-import { addMockNotification } from "@/lib/mock-notifications";
-import { KEYS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
-import type { Booking, Trip } from "@/lib/types";
+import { adminReservedSeatNumbers, availableSeatNumbers, availableSeats, createBooking, fmtDate } from "@/lib/booking-data";
+import { useDemoSeed } from "@/lib/demo-data";
+import { nearestTransportTown, TRANSPORT_TOWN_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
+import { notifyBookingStatus } from "@/lib/notifications";
+import { readSavedRoutes, savedRouteId, toggleSavedRoute } from "@/lib/saved-routes";
+import { KEYS, SEED_ROUTES } from "@/lib/seed";
+import { loadList, useStoredList } from "@/lib/storage";
+import type { Booking, RouteItem, Trip } from "@/lib/types";
+
+const TripMap = dynamic(() => import("@/components/TripMap"), {
+  ssr: false,
+  loading: () => <p className="module-empty">Loading map…</p>,
+});
 
 const MAX_PASSENGERS = 5;
-const CITY_COORDINATES: Record<string, Coordinates> = {
-  ...DISTRICT_COORDINATES,
-  Limbe: { lat: -15.8103, lng: 35.0586 },
-  Mzuzu: { lat: -11.4656, lng: 34.0207 },
-};
+const SEAT_COLUMNS = [1, 2, 4, 5];
 
-<<<<<<< HEAD
+function maskPhone(phone?: string) {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 5) return "••••";
+  return `${digits.slice(0, 4)} ••• ${digits.slice(-2)}`;
+}
+
+function paymentMethodLabel(method?: Booking["paymentMethod"]) {
+  switch (method) {
+    case "tnm": return "TNM Mpamba";
+    case "airtel": return "Airtel Money";
+    case "bank": return "Bank transfer";
+    case "card": return "Card";
+    default: return "Not recorded";
+  }
+}
+
+const MALAWI_BANKS = [
+  "National Bank of Malawi",
+  "Standard Bank Malawi",
+  "NBS Bank",
+  "FDH Bank",
+  "Ecobank Malawi",
+  "First Capital Bank",
+  "CDH Investment Bank",
+  "Nedbank Malawi",
+  "Opportunity Bank Malawi",
+  "Centenary Bank Malawi",
+];
+
+/** Read a booking search value passed from the home page on the client only. */
+function readQueryParam(name: string): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(name)?.trim() ?? "";
+}
+
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
-  const trips = useStoredList<Trip>(KEYS.schedules, TRIPS);
+  const trips = useStoredList<Trip>(KEYS.trips, []);
+  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
+  const bookings = useStoredList<Booking>(KEYS.bookings, []);
+  useDemoSeed();
   const initialTrip = trips.find((trip) => trip.id === initialTripId);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
-  const [destinationFilter, setDestinationFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
-  const [pickup, setPickup] = useState(initialTrip?.pickup[0] ?? "");
-  const [dropoff, setDropoff] = useState(initialTrip?.dropoff[0] ?? "");
-  const [passengerName, setPassengerName] = useState("");
-  const [passengerEmail, setPassengerEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [identificationNumber, setIdentificationNumber] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("mobile_money");
-  const [paymentPending, setPaymentPending] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-  const [ticket, setTicket] = useState<Booking | null>(null);
-  const [ticketQr, setTicketQr] = useState("");
-  const [view, setView] = useState<"cards" | "map">("cards");
-=======
-type RoutePoint = [number, number];
-type RoadRoute = {
-  positions: RoutePoint[];
-  distance: number;
-  duration: number;
-};
-type RoutingRoute = {
-  distance: number;
-  duration: number;
-  geometry: { coordinates: [number, number][] };
-};
-type RoutingResponse = {
-  code: string;
-  routes: RoutingRoute[];
-};
-type BookingDraft = {
-  tripId: string;
-  travelDate: string;
-  pickup: string;
-  dropoff: string;
-  passengers: number;
-  seatNumbers: number[];
-};
-
-function isBookingDraft(value: unknown): value is BookingDraft {
-  if (typeof value !== "object" || value === null) return false;
-  if (
-    !("tripId" in value) ||
-    typeof value.tripId !== "string" ||
-    !("travelDate" in value) ||
-    typeof value.travelDate !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(value.travelDate) ||
-    !("pickup" in value) ||
-    typeof value.pickup !== "string" ||
-    !("dropoff" in value) ||
-    typeof value.dropoff !== "string" ||
-    !("passengers" in value) ||
-    typeof value.passengers !== "number" ||
-    !Number.isInteger(value.passengers) ||
-    value.passengers < 1 ||
-    value.passengers > MAX_PASSENGERS ||
-    !("seatNumbers" in value) ||
-    !Array.isArray(value.seatNumbers) ||
-    !value.seatNumbers.every((seat): seat is number => typeof seat === "number" && Number.isInteger(seat))
-  ) {
-    return false;
-  }
-
-  const trip = TRIPS.find((item) => item.id === value.tripId);
-  return Boolean(
-    trip &&
-    trip.pickup.includes(value.pickup) &&
-    trip.dropoff.includes(value.dropoff) &&
-    value.seatNumbers.length <= value.passengers &&
-    new Set(value.seatNumbers).size === value.seatNumbers.length &&
-    value.seatNumbers.every((seat) => seat >= 1 && seat <= trip.capacity),
-  );
-}
-
-function isRoutingRoute(value: unknown): value is RoutingRoute {
-  if (typeof value !== "object" || value === null || !("distance" in value) || !("duration" in value) || !("geometry" in value)) {
-    return false;
-  }
-  if (
-    typeof value.distance !== "number" ||
-    !Number.isFinite(value.distance) ||
-    typeof value.duration !== "number" ||
-    !Number.isFinite(value.duration) ||
-    typeof value.geometry !== "object" ||
-    value.geometry === null ||
-    !("coordinates" in value.geometry) ||
-    !Array.isArray(value.geometry.coordinates) ||
-    value.geometry.coordinates.length < 2
-  ) {
-    return false;
-  }
-  return value.geometry.coordinates.every((point: unknown) =>
-    Array.isArray(point) &&
-    point.length >= 2 &&
-    typeof point[0] === "number" &&
-    Number.isFinite(point[0]) &&
-    point[0] >= -180 &&
-    point[0] <= 180 &&
-    typeof point[1] === "number" &&
-    Number.isFinite(point[1]) &&
-    point[1] >= -90 &&
-    point[1] <= 90,
-  );
-}
-
-function isRoutingResponse(value: unknown): value is RoutingResponse {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "code" in value &&
-    value.code === "Ok" &&
-    "routes" in value &&
-    Array.isArray(value.routes) &&
-    value.routes.length > 0 &&
-    isRoutingRoute(value.routes[0])
-  );
-}
-
-function formatRouteDuration(seconds: number) {
-  const minutes = Math.round(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  return hours > 0 ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
-}
-
-function SeatButton({
-  seatNumber,
-  isBooked,
-  isSelected,
-  saving,
-  onToggle,
-}: {
-  seatNumber: number;
-  isBooked: boolean;
-  isSelected: boolean;
-  saving: boolean;
-  onToggle: (seatNumber: number) => void;
-}) {
-  const state = isBooked ? "Booked" : isSelected ? "Selected" : "Available";
-
-  return (
-    <button
-      className={`booking-seat${isBooked ? " is-booked" : isSelected ? " is-selected" : ""}`}
-      type="button"
-      aria-label={`Seat ${seatNumber}, ${state}`}
-      aria-pressed={isSelected}
-      disabled={isBooked || saving}
-      onClick={() => onToggle(seatNumber)}
-    >
-      <svg className="booking-seat-icon" viewBox="0 0 28 28" aria-hidden="true">
-        <path d="M7 3.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1v6h3v2H5v-2h3v-6H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-      <span>{seatNumber}</span>
-      {isBooked && <small>Booked</small>}
-      {isSelected && <small>Selected</small>}
-    </button>
-  );
-}
-
-export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
-  const router = useRouter();
-  const passengerAuth = usePassengerAuth();
-  const initialTrip = TRIPS.find((trip) => trip.id === initialTripId);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
+  const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));
+  const [origin, setOrigin] = useState(initialTrip?.route.split(" → ")[0] ?? "");
+  const [destination, setDestination] = useState(initialTrip?.route.split(" → ")[1] ?? "");
   const [travelDate, setTravelDate] = useState(initialTrip?.date ?? "");
   const [pickup, setPickup] = useState(initialTrip?.pickup[0] ?? "");
   const [dropoff, setDropoff] = useState(initialTrip?.dropoff[0] ?? "");
-  const [passengers, setPassengers] = useState(1);
-  const [selectedSeatNumbers, setSelectedSeatNumbers] = useState<number[]>([]);
-  const [showSeatSelector, setShowSeatSelector] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+  const [bookingStage, setBookingStage] = useState<"seats" | "details">("seats");
+  const [seatError, setSeatError] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const passengerSession = passengerAuth.passenger;
-  const authChecked = passengerAuth.ready;
-  const bookingName = passengerSession?.fullName ?? name;
-  const bookingEmail = passengerSession?.email ?? email;
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [notificationError, setNotificationError] = useState("");
   const [saving, setSaving] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("mobile-money");
+  const [paymentMethod, setPaymentMethod] = useState<"mobile" | "bank">("mobile");
+  const [mobileProvider, setMobileProvider] = useState<"tnm" | "airtel">("tnm");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [pin, setPin] = useState("");
+  const [bankName, setBankName] = useState(MALAWI_BANKS[0]);
+  const [accountNumber, setAccountNumber] = useState("");
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
-  const [destinationFilter, setDestinationFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-  const [routeRetryKey, setRouteRetryKey] = useState(0);
-  const [routeLookup, setRouteLookup] = useState<{
-    key: string;
-    status: "loading" | "ready" | "error";
-    route?: RoadRoute;
-  }>({ key: "", status: "loading" });
-
-  const selectedTrip = TRIPS.find((trip) => trip.id === selectedTripId);
-  const [routeOrigin, routeDestination] = selectedTrip?.route.split(" → ") ?? [];
-  const routeOriginCoordinates = routeOrigin ? TRIP_CITY_COORDINATES[routeOrigin] : undefined;
-  const routeDestinationCoordinates = routeDestination ? TRIP_CITY_COORDINATES[routeDestination] : undefined;
-  const pickupPosition = useMemo<RoutePoint | null>(
-    () => routeOriginCoordinates ? [routeOriginCoordinates.lat, routeOriginCoordinates.lng] : null,
-    [routeOriginCoordinates],
-  );
-  const dropoffPosition = useMemo<RoutePoint | null>(
-    () => routeDestinationCoordinates ? [routeDestinationCoordinates.lat, routeDestinationCoordinates.lng] : null,
-    [routeDestinationCoordinates],
-  );
-  const routeKey = `${selectedTripId}:${pickup}:${dropoff}:${routeRetryKey}`;
-  const currentRouteLookup = !pickupPosition || !dropoffPosition
-    ? { key: routeKey, status: "error" as const }
-    : routeLookup.key === routeKey
-      ? routeLookup
-      : { key: routeKey, status: "loading" as const };
-  const destinations = [...new Set(TRIPS.map((trip) => trip.route.split(" → ")[1]))].sort();
-  const travelDates = [...new Set(TRIPS.map((trip) => trip.date))].sort();
-  const visibleTrips = TRIPS.filter((trip) => {
-    const destinationMatches = destinationFilter === "all" || trip.route.endsWith(`→ ${destinationFilter}`);
-    const dateMatches = dateFilter === "all" || trip.date === dateFilter;
-    return destinationMatches && dateMatches;
-  }).sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
-  const seatsByTrip = useMemo(
-    () => new Map(TRIPS.map((trip) => [trip.id, availableSeats(trip, bookings)])),
-    [bookings],
-  );
-  const available = selectedTrip ? (seatsByTrip.get(selectedTrip.id) ?? 0) : 0;
-  const bookedSeatNumbers = selectedTrip
-    ? getBookedSeatNumbers(selectedTrip.capacity, bookings, selectedTrip.id)
-    : [];
-  const activeSelectedSeatNumbers = selectedSeatNumbers.filter((seatNumber) => !bookedSeatNumbers.includes(seatNumber));
-  const seatRows = selectedTrip
-    ? Array.from({ length: Math.ceil(selectedTrip.capacity / 5) }, (_, row) =>
-        Array.from({ length: 5 }, (_, column) => row * 5 + column + 1).filter((seatNumber) => seatNumber <= selectedTrip.capacity),
-      )
-    : [];
->>>>>>> origin/feature/integration
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(KEYS.profile);
-      if (!saved) return;
-      const profile: unknown = JSON.parse(saved);
-      if (typeof profile !== "object" || profile === null) return;
-      if ("name" in profile && typeof profile.name === "string") setPassengerName(profile.name);
-      if ("email" in profile && typeof profile.email === "string") setPassengerEmail(profile.email);
-      if ("phone" in profile && typeof profile.phone === "string") setPhoneNumber(profile.phone);
-      if ("identificationNumber" in profile && typeof profile.identificationNumber === "string") setIdentificationNumber(profile.identificationNumber);
-    } catch {
-      setError("Saved profile details could not be loaded. You can enter them manually.");
-    }
-  }, []);
-
+  const [showTicket, setShowTicket] = useState(false);
+  const [tripView, setTripView] = useState<"cards" | "map">("cards");
+  const [searchError, setSearchError] = useState("");
+  const [savedRouteIds, setSavedRouteIds] = useState<string[]>([]);
+  const [saveRouteError, setSaveRouteError] = useState("");
+  const [locationStatus, setLocationStatus] = useState("Finding your current location…");
+  const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
-  const destinations = [...new Set(trips.map((trip) => trip.route.split(" → ")[1]))].sort();
-  const dates = [...new Set(trips.map((trip) => trip.date))].sort();
-  const filteredTrips = trips.filter((trip) =>
-    (destinationFilter === "all" || trip.route.endsWith(`→ ${destinationFilter}`)) &&
-    (dateFilter === "all" || trip.date === dateFilter),
-  ).sort((a, b) => a.date.localeCompare(b.date) || a.departure.localeCompare(b.departure));
-  const remainingSeats = selectedTrip ? availableSeats(selectedTrip, bookings) : 0;
-  const unavailable = useMemo(
-    () => new Set(selectedTrip ? unavailableSeatNumbers(selectedTrip, bookings) : []),
+  const towns = [...new Set([
+    ...routes.flatMap((route) => [route.origin, route.destination]),
+    ...trips.flatMap((trip) => trip.route.split(" → ")),
+  ])].sort();
+
+  const [minTravelDate, setMinTravelDate] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const today = new Date();
+      setMinTravelDate(
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const hasRouteSelection = Boolean(origin.trim() && destination.trim());
+  const hasDefinedRoute = useMemo(
+    () =>
+      hasRouteSelection &&
+      routes.some(
+        (route) =>
+          route.origin.trim().toLocaleLowerCase() === origin.trim().toLocaleLowerCase() &&
+          route.destination.trim().toLocaleLowerCase() === destination.trim().toLocaleLowerCase(),
+      ),
+    [routes, origin, destination, hasRouteSelection],
+  );
+
+  const routeTrips = useMemo(() => {
+    if (!hasRouteSelection) return [];
+    return trips
+      .filter((trip) => {
+        if (trip.date < minTravelDate) return false;
+        const [tripOrigin, tripDestination] = trip.route.split(" → ");
+        return (
+          tripOrigin?.trim().toLocaleLowerCase() === origin.trim().toLocaleLowerCase() &&
+          tripDestination?.trim().toLocaleLowerCase() === destination.trim().toLocaleLowerCase()
+        );
+      })
+      .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
+  }, [trips, origin, destination, hasRouteSelection, minTravelDate]);
+
+  const upcomingTrips = useMemo(
+    () =>
+      trips
+        .filter((trip) => trip.date >= minTravelDate)
+        .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure)),
+    [trips, minTravelDate],
+  );
+
+  const scheduledDates = useMemo(() => {
+    const source = hasRouteSelection ? routeTrips : upcomingTrips;
+    return [...new Set(source.map((trip) => trip.date))].sort();
+  }, [hasRouteSelection, routeTrips, upcomingTrips]);
+
+  const displayedTrips = useMemo(() => {
+    if (!hasRouteSelection) return upcomingTrips;
+    if (!travelDate) return routeTrips;
+    return routeTrips.filter((trip) => trip.date === travelDate);
+  }, [hasRouteSelection, routeTrips, travelDate, upcomingTrips]);
+
+  const detailTrip = selectedTrip;
+  const allMapTrips = useMemo(() => {
+    const list = tripView === "map" ? [...displayedTrips] : [];
+    if (detailTrip && !list.some((t) => t.id === detailTrip.id)) {
+      list.push(detailTrip);
+    }
+    return list;
+  }, [tripView, displayedTrips, detailTrip]);
+  const tripRoadRoutes = useRoadRoutes(allMapTrips.flatMap((trip) => {
+    const [origin, destination] = trip.route.split(" → ");
+    const originCoordinates = TRANSPORT_TOWN_COORDINATES[origin];
+    const destinationCoordinates = TRANSPORT_TOWN_COORDINATES[destination];
+    return originCoordinates && destinationCoordinates
+      ? [{ id: trip.id, origin: originCoordinates, destination: destinationCoordinates }]
+      : [];
+  }));
+  const visibleTripGeometry = (tripView === "map" ? displayedTrips : detailTrip ? [detailTrip] : [])
+    .filter((trip) => {
+      const [origin, destination] = trip.route.split(" → ");
+      return TRANSPORT_TOWN_COORDINATES[origin] && TRANSPORT_TOWN_COORDINATES[destination];
+    })
+    .map((trip) => tripRoadRoutes[trip.id]);
+  const isTripRouting = visibleTripGeometry.some((geometry) => !geometry || geometry.status === "loading");
+  const tripFallbackCount = visibleTripGeometry.filter((geometry) => geometry?.status === "fallback").length;
+  const seatsByTrip = useMemo(
+    () => new Map(trips.map((trip) => [trip.id, availableSeats(trip, bookings)])),
+    [trips, bookings],
+  );
+  const available = selectedTrip ? (seatsByTrip.get(selectedTrip.id) ?? availableSeats(selectedTrip, bookings)) : 0;
+  const availableSeatList = useMemo(
+    () => (selectedTrip ? availableSeatNumbers(selectedTrip, bookings) : []),
     [selectedTrip, bookings],
   );
+  const adminSeats = useMemo(
+    () => (selectedTrip ? adminReservedSeatNumbers(selectedTrip) : []),
+    [selectedTrip],
+  );
+  const passengers = selectedSeats.length;
+  const seatLimitReached = passengers >= MAX_PASSENGERS;
 
-  function chooseTrip(tripId: string) {
-    const trip = TRIPS.find((item) => item.id === tripId);
-    setSelectedTripId(tripId);
+  function toggleTripSaved(route: string, fare: number) {
+    setSaveRouteError("");
+    try {
+      setSavedRouteIds(toggleSavedRoute(route, fare).map((item) => item.id));
+    } catch {
+      setSaveRouteError("That route could not be saved in this browser. Please try again.");
+    }
+  }
+  const onboardSeats = selectedTrip ? selectedTrip.capacity - availableSeatList.length : 0;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        setSavedRouteIds(readSavedRoutes().map((route) => route.id));
+      } catch {
+        // Saved routes are optional; leave the bookmarks empty.
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      const timer = window.setTimeout(
+        () => setLocationStatus("Location is unavailable. Enter your starting town."),
+        0,
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coordinates = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setUserPosition(coordinates);
+        setLocationStatus("");
+        if (initialTripId) return;
+
+        const nearest = nearestTransportTown(coordinates);
+        if (nearest) {
+          setOrigin((current) => current || nearest.town);
+        } else {
+          setLocationStatus("Your location is outside supported towns. Enter your starting town.");
+        }
+      },
+      (reason) => {
+        setLocationStatus(
+          reason.code === reason.PERMISSION_DENIED
+            ? "Location permission was denied. Enter your starting town."
+            : "Your location could not be found. Enter your starting town.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  }, [initialTripId]);
+
+  useEffect(() => {
+    if (initialTripId) return;
+    const queryOrigin = readQueryParam("origin");
+    const queryDestination = readQueryParam("destination");
+    if (!queryOrigin && !queryDestination) return;
+
+    // Apply the search passed from the home page after hydration so the
+    // server-rendered form and the client form start from the same values.
+    const frame = window.requestAnimationFrame(() => {
+      if (queryOrigin) setOrigin(queryOrigin);
+      if (queryDestination) setDestination(queryDestination);
+      setShowDepartures(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialTripId]);
+
+  useEffect(() => {
+    if (!initialTrip || (selectedTripId && selectedTripId !== initialTrip.id)) return;
+    const timer = window.setTimeout(() => {
+      setSelectedTripId(initialTrip.id);
+      setTravelDate((curr) => curr || initialTrip.date);
+      setPickup((curr) => curr || initialTrip.pickup[0] || "");
+      setDropoff((curr) => curr || initialTrip.dropoff[0] || "");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialTrip, selectedTripId]);
+
+  function resetTripSelection() {
+    setSelectedTripId("");
     setSelectedSeats([]);
-    setPickup(trip?.pickup[0] ?? "");
-    setDropoff(trip?.dropoff[0] ?? "");
-    setPassengerName("");
-    setPassengerEmail("");
-    setPhoneNumber("");
-    setIdentificationNumber("");
-    if (trip) {
-      setError("");
-      setNotice("");
-      setPaymentPending(false);
-      setTicket(null);
+    setBookingStage("seats");
+    setSeatError("");
+    setPaymentPending(false);
+    setSearchError("");
+    setError("");
+    setNotice("");
+  }
+
+  function startBooking() {
+    setSearchError("");
+    setShowDepartures(true);
+    setTimeout(() => {
+      document.getElementById("trip-results")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
+  function searchTrips(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    resetTripSelection();
+    setShowDepartures(true);
+
+    if (!origin.trim() || !destination.trim()) {
+      setSearchError("Enter a departure location and destination.");
+      return;
+    }
+    if (origin.trim().toLocaleLowerCase() === destination.trim().toLocaleLowerCase()) {
+      setSearchError("Choose a destination different from your departure location.");
+      return;
+    }
+    if (!hasDefinedRoute) {
+      setSearchError(`A direct route from ${origin.trim()} to ${destination.trim()} has not been defined by the admin.`);
+      return;
+    }
+    if (travelDate && travelDate < minTravelDate) {
+      setSearchError("Choose a future travel date.");
+      return;
+    }
+    if (travelDate && !scheduledDates.includes(travelDate)) {
+      setSearchError("Choose a travel date that has an admin-scheduled trip for this route.");
+      return;
+    }
+
+    setTimeout(() => {
+      document.getElementById("trip-results")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
+  function toggleSeat(seat: number) {
+    if (adminSeats.includes(seat)) {
+      setSeatError("Seat 1 is reserved by the transport admin and sits next to the door.");
+      return;
+    }
+    if (!availableSeatList.includes(seat)) {
+      setSeatError(`Seat ${seat} is already taken. Choose an available seat.`);
+      return;
+    }
+
+    setSeatError("");
+    setSelectedSeats((current) => {
+      if (current.includes(seat)) {
+        return current.filter((selected) => selected !== seat);
+      }
+      if (current.length >= MAX_PASSENGERS) {
+        return current;
+      }
+      return [...current, seat].sort((first, second) => first - second);
+    });
+
+    if (!selectedSeats.includes(seat) && selectedSeats.length >= MAX_PASSENGERS) {
+      setSeatError(`You can book up to ${MAX_PASSENGERS} seats in one reservation.`);
     }
   }
 
-  function toggleSeat(number: number) {
-    if (unavailable.has(number)) return;
-    setSelectedSeats((current) =>
-      current.includes(number)
-        ? current.filter((seat) => seat !== number)
-        : current.length < MAX_PASSENGERS
-          ? [...current, number].sort((a, b) => a - b)
-          : current,
-    );
-    setError("");
+  function confirmSeats() {
+    if (!selectedTrip) return;
+    if (selectedSeats.length === 0) {
+      setSeatError("Choose at least one available seat to continue.");
+      return;
+    }
+    if (selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
+      setSeatError("One of your seats has just been taken. Choose another seat.");
+      return;
+    }
+    setSeatError("");
+    setBookingStage("details");
+    setTimeout(() => {
+      document.getElementById("reservation-heading")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
   }
 
-  function continueToPayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function selectTripForBooking(trip: Trip) {
+    const seatsLeft = seatsByTrip.get(trip.id) ?? availableSeats(trip, bookings);
+    if (seatsLeft === 0) return;
+
+    setSelectedTripId(trip.id);
+    setTravelDate(trip.date);
+    setPickup(trip.pickup[0] ?? "");
+    setDropoff(trip.dropoff[0] ?? "");
+    setSelectedSeats([]);
+    setBookingStage("seats");
+    setSeatError("");
+    setPaymentPending(false);
     setError("");
-<<<<<<< HEAD
-=======
     setNotice("");
 
-    if (!passengerSession) {
-      router.push(loginPath);
-      return;
-    }
+    setTimeout(() => {
+      document.getElementById("reservation-heading")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
 
->>>>>>> origin/feature/integration
+  function returnToTrips() {
+    document.getElementById("trips-heading")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
+
+  async function submitBooking(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
     if (!selectedTrip) {
-      setError("Choose a trip first.");
+      setError("Choose a trip before continuing.");
       return;
     }
-<<<<<<< HEAD
-    if (passengerName.trim().length < 2) {
-      setError("Enter the passenger's full name.");
-=======
 
     if (
-      bookingName.trim().length < 2 ||
-      bookingName.trim().length > 100 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail.trim()) ||
-      travelDate < selectedTrip.date ||
+      name.trim().length < 2 ||
+      name.trim().length > 100 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      travelDate !== selectedTrip.date ||
+      travelDate < minTravelDate ||
       !selectedTrip.pickup.includes(pickup) ||
       !selectedTrip.dropoff.includes(dropoff) ||
-      passengers < 1 ||
-      passengers > MAX_PASSENGERS
+      selectedSeats.length < 1 ||
+      selectedSeats.length > MAX_PASSENGERS
     ) {
-      setError("Check your name, email, travel date, boarding points, and passenger count.");
->>>>>>> origin/feature/integration
+      setError("Check your name, email, travel date, boarding points, and seat selection.");
       return;
     }
-    if (passengerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passengerEmail.trim())) {
-      setError("Enter a valid email address or leave it blank.");
+
+    if (selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
+      setError("One of your seats is no longer available. Go back and choose another seat.");
       return;
     }
-    if (phoneNumber && phoneNumber.replace(/\D/g, "").length < 7) {
-      setError("Phone number must contain at least seven digits.");
-      return;
-    }
-    if (selectedSeats.length < 1 || selectedSeats.length > MAX_PASSENGERS) {
-      setError(`Choose between 1 and ${MAX_PASSENGERS} seats.`);
-      return;
-    }
+
     setPaymentPending(true);
   }
 
   async function completeMockPayment() {
-    if (!passengerSession) {
-      router.push(loginPath);
+    if (!selectedTrip) return;
+
+    if (!/^\d{4,6}$/.test(pin.trim())) {
+      setError("Enter the 4–6 digit PIN for your simulated payment.");
       return;
     }
-    if (!selectedTrip) return;
+    if (paymentMethod === "mobile" && !/^(?:\+265|265|0)?[0-9]{9}$/.test(mobileNumber.replace(/[\s-]/g, ""))) {
+      setError("Enter a valid Malawi phone number for the simulated mobile-money payment.");
+      return;
+    }
+    if (paymentMethod === "bank" && !/^\d{6,20}$/.test(accountNumber.replace(/[\s-]/g, ""))) {
+      setError("Enter a valid bank account number (6–20 digits) for the simulated bank payment.");
+      return;
+    }
+
+    const paymentLabel = paymentMethod === "mobile"
+      ? mobileProvider === "tnm" ? "TNM Mpamba" : "Airtel Money"
+      : bankName;
+    const paymentReference = `PAY-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+    const paymentCode = crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
+
     setSaving(true);
     setError("");
+    setNotificationError("");
     try {
-<<<<<<< HEAD
-      const booking = await createBooking({
-        tripId: selectedTrip.id,
-        route: selectedTrip.route,
-        travelDate: selectedTrip.date,
-        pickup,
-        dropoff,
-        passengers: selectedSeats.length,
-        seatNumbers: selectedSeats,
-        name: passengerName.trim(),
-        email: passengerEmail.trim().toLowerCase(),
-        phoneNumber: phoneNumber.trim(),
-        identificationNumber: identificationNumber.trim(),
-        paymentMethod,
-        paymentReference: `MOCK-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      }, selectedTrip);
-=======
+      const activeTrip = loadList<Trip>(KEYS.trips, []).find((trip) => trip.id === selectedTrip.id);
+      if (
+        !activeTrip ||
+        activeTrip.date !== travelDate ||
+        !activeTrip.pickup.includes(pickup) ||
+        !activeTrip.dropoff.includes(dropoff)
+      ) {
+        setError("This scheduled trip is no longer available. Search again and choose an active departure.");
+        setPaymentPending(false);
+        return;
+      }
+
       const booking = await createBooking(
         {
           tripId: selectedTrip.id,
@@ -411,54 +495,77 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           pickup,
           dropoff,
           passengers,
-          seatNumbers: activeSelectedSeatNumbers,
-          name: bookingName.trim(),
-          email: bookingEmail.trim().toLowerCase(),
+          seats: [...selectedSeats].sort((first, second) => first - second),
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          paymentStatus: "paid",
+          paymentMethod: paymentMethod === "bank" ? "bank" : mobileProvider,
+          paymentProvider: paymentLabel,
+          paymentReference,
+          paymentCode,
+          amountPaid: activeTrip.fare * passengers,
+          payerPhone: paymentMethod === "mobile" ? mobileNumber.replace(/[\s-]/g, "") : undefined,
+          payerAccountLast4: paymentMethod === "bank" ? accountNumber.replace(/\D/g, "").slice(-4) : undefined,
+          paidAt: new Date().toISOString(),
         },
-        selectedTrip,
+        activeTrip,
       );
 
->>>>>>> origin/feature/integration
       if (!booking) {
-        setError("One or more selected seats are no longer available. Choose different seats.");
+        setError("Not enough seats remain for this trip. Choose fewer passengers or another departure.");
         return;
       }
 
       const qr = await QRCode.toDataURL(JSON.stringify({
         reference: booking.reference,
+        tripId: booking.tripId,
         route: booking.route,
         travelDate: booking.travelDate,
-        passenger: booking.name,
-        seats: booking.seatNumbers,
-        total: booking.total,
-        paymentStatus: "simulated",
-      }), { errorCorrectionLevel: "H", margin: 1, width: 240 });
+        pickup: booking.pickup,
+        dropoff: booking.dropoff,
+        passengers: booking.passengers,
+        seats: booking.seats,
+      }), { errorCorrectionLevel: "H", margin: 1, width: 280 });
 
-      addMockNotification({
-        title: "Booking confirmed",
-        message: `Your mock booking ${booking.reference} for ${booking.route} is confirmed.`,
-        category: "booking",
-        bookingReference: booking.reference,
-      });
-      addMockNotification({
-        title: "Mock payment complete",
-        message: `A simulated ${paymentMethod.replace("_", " ")} payment of MWK ${(booking.total ?? 0).toLocaleString("en-MW")} was recorded for ${booking.reference}.`,
-        category: "payment",
-        bookingReference: booking.reference,
-      });
       setTicket(booking);
       setTicketQr(qr);
+      setShowTicket(false);
       setPaymentPending(false);
-      setNotice("Simulated payment complete. This is a mock ticket; no money was charged.");
+      setNotice("Mock payment complete. Your bus ticket is ready.");
+      try {
+        notifyBookingStatus(
+          booking,
+          "payment-complete",
+          `Payment of MWK ${(activeTrip.fare * passengers).toLocaleString("en-MW")} via ${paymentLabel} (demo) was successful. Payment reference ${paymentReference} · Confirmation code ${paymentCode}. Your e-ticket for ${booking.route} is ready.`,
+        );
+      } catch {
+        setNotificationError("Your booking and ticket are ready, but the in-app notification could not be saved.");
+      }
+      setSelectedTripId("");
+      setSelectedSeats([]);
+      setBookingStage("seats");
+      setName("");
+      setEmail("");
+      setMobileNumber("");
+      setAccountNumber("");
+      setPin("");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The mock reservation could not be saved.");
+      setError(reason instanceof Error ? reason.message : "The reservation could not be saved. Please try again.");
     } finally {
       setSaving(false);
     }
   }
 
-<<<<<<< HEAD
-=======
+  function viewTicket() {
+    setShowTicket(true);
+    setTimeout(() => {
+      document.getElementById("ticket-heading")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
   async function downloadTicketImage() {
     if (!ticket || !ticketQr) return;
 
@@ -469,7 +576,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Canvas is not available in this browser.");
 
-      context.fillStyle = "#eef2f5";
+      context.fillStyle = "#f2f7fb";
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.fillStyle = "#ffffff";
       context.fillRect(32, 32, 1136, 656);
@@ -480,6 +587,17 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       context.fillText("SBUS BUS TICKET", 76, 92);
       context.font = "20px sans-serif";
       context.fillText("MOCK PAYMENT COMPLETE", 78, 130);
+      const receiptLine = [
+        ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod),
+        ticket.payerPhone ? maskPhone(ticket.payerPhone) : "",
+        ticket.payerAccountLast4 ? `•••• ${ticket.payerAccountLast4}` : "",
+        `MWK ${(ticket.amountPaid ?? 0).toLocaleString("en-MW")}`,
+        `Ref ${ticket.paymentReference ?? ticket.reference}`,
+        `Code ${ticket.paymentCode ?? "—"}`,
+      ].filter(Boolean).join(" · ");
+      context.fillStyle = "#526d87";
+      context.font = "600 17px sans-serif";
+      context.fillText(`Paid: ${receiptLine}`, 78, 190, 900);
 
       const ticketFields = [
         ["ROUTE", ticket.route],
@@ -488,18 +606,18 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         ["BOARDING", ticket.pickup],
         ["DESTINATION", ticket.dropoff],
         ["PASSENGERS", String(ticket.passengers)],
-        ["SEAT NUMBERS", ticket.seatNumbers?.join(", ") ?? "Not recorded"],
+        ["SEATS", ticket.seats?.length ? ticket.seats.join(", ") : "Not assigned"],
         ["REFERENCE", ticket.reference],
       ];
-      let fieldY = 205;
+      let fieldY = 230;
       for (const [label, value] of ticketFields) {
-        context.fillStyle = "#64788a";
+        context.fillStyle = "#526d87";
         context.font = "700 16px sans-serif";
         context.fillText(label, 78, fieldY);
         context.fillStyle = "#12304a";
         context.font = "600 24px sans-serif";
         context.fillText(value, 78, fieldY + 34, 680);
-        fieldY += label === "ROUTE" ? 78 : 52;
+        fieldY += label === "ROUTE" ? 90 : 68;
       }
 
       const qrImage = document.createElement("img");
@@ -508,7 +626,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       context.fillStyle = "#ffffff";
       context.fillRect(850, 300, 260, 260);
       context.drawImage(qrImage, 860, 310, 240, 240);
-      context.fillStyle = "#64788a";
+      context.fillStyle = "#526d87";
       context.font = "16px sans-serif";
       context.fillText("Scan to verify ticket", 880, 590);
 
@@ -521,235 +639,213 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     }
   }
 
-  const bookingReturnPath = initialTripId
-    ? `/transport-booking/details/${encodeURIComponent(initialTripId)}`
-    : "/transport-booking";
-  const loginPath = `/login?next=${encodeURIComponent(bookingReturnPath)}`;
-
->>>>>>> origin/feature/integration
   return (
-    <main className="module-shell module-shell-wide">
+    <main className="module-shell">
       <header className="module-intro">
-        <p className="module-eyebrow">MOVA · TRIPS &amp; BOOKINGS</p>
-        <h1>{initialTrip ? initialTrip.route : "Choose a trip and reserve your seats"}</h1>
-        <p>Browse sample schedules, select seats, enter passenger details, and preview the simulated checkout. No backend or real payment is connected.</p>
+        <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
+        <p>
+          Enter your departure location and destination, then choose one of the trips scheduled by the transport admin. After selecting a trip, pick your seats, add passenger details, and complete a mock payment to receive your QR ticket.
+        </p>
         <div className="module-shortcuts">
-          <Link href="/routes-fares">Search routes and fares</Link>
+          <a href="#trips-heading">Scheduled departures</a>
+          {selectedTrip && <a href="#reservation-heading">Pick your seats</a>}
           <Link href="/transport-booking/my-bookings">My bookings</Link>
+          <Link href="/help">How booking works</Link>
         </div>
       </header>
 
       {notice && <p className="module-notice" role="status">{notice}</p>}
       {error && <p className="module-error" role="alert">{error}</p>}
+      {notificationError && <p className="module-error" role="alert">{notificationError}</p>}
+      {((initialTripId && !initialTrip) || (selectedTripId && !selectedTrip)) && (
+        <p className="module-error" role="alert">
+          This scheduled trip is no longer available. Search again for an admin-scheduled departure.
+        </p>
+      )}
 
-      {!initialTripId && (
-        <section className="module-section" aria-labelledby="trips-heading">
-          <div className="module-section-heading">
-            <div><p className="module-eyebrow">SAMPLE SCHEDULES</p><h2 id="trips-heading">Choose a departure</h2></div>
-            <div className="trip-browser-controls">
-              <label className="map-route-filter">Destination
-                <select value={destinationFilter} onChange={(event) => setDestinationFilter(event.target.value)}>
-                  <option value="all">All destinations</option>
-                  {destinations.map((town) => <option key={town} value={town}>{town}</option>)}
-                </select>
-              </label>
-              <label className="map-route-filter">Date
-                <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
-                  <option value="all">All dates</option>
-                  {dates.map((date) => <option key={date} value={date}>{fmtDate(date)}</option>)}
-                </select>
-              </label>
-            </div>
+      <section id="trips-heading" className="module-section" aria-label="Scheduled departures">
+        {!showDepartures ? (
+          <div className="module-empty booking-start">
+            <p className="module-eyebrow">READY TO TRAVEL?</p>
+            <p>Choose one of the departures scheduled by the transport admin, then pick your seats.</p>
+            <button className="primary-button" type="button" onClick={startBooking}>Book a trip</button>
           </div>
-<<<<<<< HEAD
-          <nav className="module-tabs" aria-label="Schedule presentation">
-            <button type="button" className={view === "cards" ? "is-active" : ""} aria-pressed={view === "cards"} onClick={() => setView("cards")}>Trip cards</button>
-            <button type="button" className={view === "map" ? "is-active" : ""} aria-pressed={view === "map"} onClick={() => setView("map")}>Map view</button>
-          </nav>
-          {filteredTrips.length === 0 ? <p className="module-empty">No sample trips match these filters.</p> : (
+        ) : (
+          <>
+        <div className="module-section-heading">
+          <div>
+            <p className="module-eyebrow">SEARCH ADMIN SCHEDULES</p>
+            {hasRouteSelection && (
+              <h2>{origin.trim()} → {destination.trim()} scheduled trips</h2>
+            )}
+          </div>
+          <span className="module-count">{displayedTrips.length} departure{displayedTrips.length === 1 ? "" : "s"}</span>
+        </div>
+
+        <form className="module-form" onSubmit={searchTrips}>
+          <div className="module-form-grid">
+            <label>
+              Departure location
+              <input list="booking-towns" value={origin} onChange={(event) => { setOrigin(event.target.value); setTravelDate(""); resetTripSelection(); }} placeholder="e.g. Zomba" autoComplete="off" required />
+            </label>
+            <label>
+              Destination
+              <input list="booking-towns" value={destination} onChange={(event) => { setDestination(event.target.value); setTravelDate(""); resetTripSelection(); }} placeholder="e.g. Blantyre" autoComplete="off" required />
+            </label>
+            <label>
+              Travel date
+              <input
+                type="date"
+                min={scheduledDates[0] ?? minTravelDate}
+                max={scheduledDates[scheduledDates.length - 1]}
+                value={travelDate}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setTravelDate(value);
+                  resetTripSelection();
+                }}
+              />
+              {travelDate && !scheduledDates.includes(travelDate) ? (
+                <span className="module-field-hint">No admin-scheduled trip on this date. Choose a date the admin has scheduled.</span>
+              ) : !travelDate && scheduledDates.length > 0 ? (
+                <span className="module-field-hint">Pick an admin-scheduled date to filter the departures, or leave it blank to see every scheduled date.</span>
+              ) : null}
+            </label>
+          </div>
+          <datalist id="booking-towns">{towns.map((town) => <option key={town} value={town} />)}</datalist>
+          {locationStatus && <p className="home-location-status" role="status">{locationStatus}</p>}
+          <button className="primary-button" type="submit">Book a trip</button>
+        </form>
+        {searchError && <p className="module-error" role="alert">{searchError}</p>}
+
+        <div id="trip-results" className="trip-results">
+          {displayedTrips.length > 0 && (
+            <p className="trip-results-hint">
+              {hasRouteSelection
+                ? `Select one of the ${displayedTrips.length} admin-scheduled departure${displayedTrips.length === 1 ? "" : "s"} below to continue.`
+                : "Select an upcoming departure below to continue."}
+            </p>
+          )}
+          <p className="module-footnote">Check your selected journey and fare before booking.</p>
+          {saveRouteError && <p className="module-error" role="alert">{saveRouteError}</p>}
+          {displayedTrips.length === 0 ? (
+            !hasRouteSelection ? (
+              <div className="module-empty" role="status">
+                <p>There are no upcoming trips scheduled by the admin yet. Booking opens when an admin adds a future departure.</p>
+              </div>
+            ) : !hasDefinedRoute ? (
+              <div className="module-empty" role="status">
+                <p>
+                  <strong>This journey is not defined by the admin yet.</strong> A direct route from {origin.trim()} to {destination.trim()} has
+                  not been created. Booking opens once the admin adds this route.
+                </p>
+              </div>
+            ) : routeTrips.length > 0 ? (
+              <div className="module-empty" role="status">
+                <p>
+                  <strong>No departures on {fmtDate(travelDate)}.</strong> Choose another admin-scheduled date, or clear the date
+                  to see every scheduled departure for this journey.
+                </p>
+              </div>
+            ) : null
+          ) : null}
+          {displayedTrips.length > 0 && (
+            <nav className="module-tabs" aria-label="Available trips view">
+              <button type="button" className={tripView === "cards" ? "is-active" : ""} aria-pressed={tripView === "cards"} onClick={() => setTripView("cards")}>Cards</button>
+              <button type="button" className={tripView === "map" ? "is-active" : ""} aria-pressed={tripView === "map"} onClick={() => setTripView("map")}>Map</button>
+            </nav>
+          )}
+
+          {displayedTrips.length > 0 && tripView === "cards" ? (
             <div className="module-card-grid">
-              {filteredTrips.map((trip) => {
-                const seats = availableSeats(trip, bookings);
+              {displayedTrips.map((trip) => {
+                const seats = seatsByTrip.get(trip.id) ?? availableSeats(trip, bookings);
+                const isSelected = selectedTripId === trip.id;
+                const departureTown = trip.route.split(" → ")[0] ?? "";
+                const departureCoordinates = TRANSPORT_TOWN_COORDINATES[departureTown];
+                const travelInfo = userPosition && departureCoordinates
+                  ? travelEstimate(userPosition.lat, userPosition.lng, departureCoordinates.lat, departureCoordinates.lng)
+                  : null;
                 return (
-                  <article className={`trip-choice${selectedTripId === trip.id ? " is-selected" : ""}`} key={trip.id}>
-                    <div className="trip-choice-top"><span className="trip-service">{trip.transportMode ?? "SCHEDULED TRIP"}</span><span className={`seat-status${seats === 0 ? " is-full" : ""}`}>{seats} seats left</span></div>
+                  <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={trip.id}>
+                    <div className="trip-choice-top">
+                      <span className="trip-service">ADMIN SCHEDULED</span>
+                      <div className="trip-choice-tools">
+                        <span className={`seat-status${seats === 0 ? " is-full" : ""}`}>
+                          {seats === 0 ? "Full" : `${seats} seats left`}
+                        </span>
+                        {(() => {
+                          const isSaved = savedRouteIds.includes(savedRouteId(trip.route));
+                          return (
+                            <button
+                              type="button"
+                              className={`save-route-button${isSaved ? " is-saved" : ""}`}
+                              aria-pressed={isSaved}
+                              onClick={() => toggleTripSaved(trip.route, trip.fare)}
+                            >
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M6 4h12v17l-6-4-6 4V4Z" />
+                              </svg>
+                              {isSaved ? "Saved" : "Save route"}
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    </div>
                     <h3>{trip.route}</h3>
                     <dl className="trip-facts">
                       <div><dt>Date</dt><dd>{fmtDate(trip.date)}</dd></div>
+                      {travelInfo && <div><dt>From your position</dt><dd>{travelInfo.label}</dd></div>}
                       <div><dt>Departure</dt><dd>{trip.departure}</dd></div>
-                      <div><dt>Arrival</dt><dd>{trip.arrival}</dd></div>
-                      <div><dt>Operator</dt><dd>{trip.operatorName ?? "MOVA"}</dd></div>
-                      <div><dt>Fare</dt><dd>MWK {trip.fare.toLocaleString("en-MW")} per passenger</dd></div>
+                      <div><dt>Arrival estimate</dt><dd>{trip.arrival}</dd></div>
+                      <div><dt>Fare</dt><dd>MWK {trip.fare.toLocaleString("en-MW")} <small>per passenger</small></dd></div>
                     </dl>
-                    <button className="primary-button" type="button" disabled={seats === 0} onClick={() => chooseTrip(trip.id)}>Select trip</button>
+                    <div className="trip-stops">
+                      <p><strong>Board:</strong> {trip.pickup.join(" or ")}</p>
+                      <p><strong>Get off:</strong> {trip.dropoff.join(" or ")}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`primary-button${seats === 0 ? " is-disabled" : ""}`}
+                      aria-disabled={seats === 0}
+                      disabled={seats === 0}
+                      onClick={() => selectTripForBooking(trip)}
+                    >
+                      {seats === 0 ? "Full" : isSelected ? "Selected for booking ✓" : "Choose this trip"}
+                    </button>
                   </article>
                 );
               })}
             </div>
-          )}
-          {view === "map" && (
-            <div className="network-map">
-              <MapContainer center={[-13.5, 34.2]} zoom={6} scrollWheelZoom className="route-map">
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {filteredTrips.map((trip) => {
-                  const [from, to] = trip.route.split(" → ");
-                  const fromPoint = CITY_COORDINATES[from];
-                  const toPoint = CITY_COORDINATES[to];
-                  if (!fromPoint || !toPoint) return null;
-                  return (
-                    <Polyline key={trip.id} positions={[[fromPoint.lat, fromPoint.lng], [toPoint.lat, toPoint.lng]]} pathOptions={{ color: "#12304A", weight: 4 }}>
-                      <Popup><strong>{trip.route}</strong><br />{fmtDate(trip.date)} · {trip.departure}<br /><button type="button" onClick={() => chooseTrip(trip.id)}>Select trip</button></Popup>
-                    </Polyline>
-                  );
-                })}
-                {[...new Set(filteredTrips.flatMap((trip) => trip.route.split(" → ")))].map((town) => {
-                  const point = CITY_COORDINATES[town];
-                  return point ? <CircleMarker key={town} center={[point.lat, point.lng]} radius={7} pathOptions={{ color: "#12304A" }}><Popup>{town}</Popup></CircleMarker> : null;
-                })}
-              </MapContainer>
-            </div>
-          )}
-        </section>
-=======
-          <div className="trip-browser-controls">
-            <label className="map-route-filter">Destination
-              <select value={destinationFilter} onChange={(event) => setDestinationFilter(event.target.value)}>
-                <option value="all">All destinations</option>
-                {destinations.map((destination) => <option key={destination} value={destination}>{destination}</option>)}
-              </select>
-            </label>
-            <label className="map-route-filter">Travel date
-              <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
-                <option value="all">All dates</option>
-                {travelDates.map((date) => <option key={date} value={date}>{fmtDate(date)}</option>)}
-              </select>
-            </label>
-            <span className="module-count">{visibleTrips.length} of {TRIPS.length} sample trips</span>
-          </div>
+          ) : displayedTrips.length > 0 && tripView === "map" ? (
+            <TripMap
+              trips={displayedTrips}
+              userPosition={userPosition}
+              cityCoordinates={TRANSPORT_TOWN_COORDINATES}
+              tripRoadRoutes={tripRoadRoutes}
+              isTripRouting={isTripRouting}
+              tripFallbackCount={tripFallbackCount}
+            />
+          ) : null}
         </div>
+          </>
+        )}
+      </section>
 
-        {visibleTrips.length === 0 ? (
-          <p className="module-empty">No sample departures match these filters. Choose another destination or date.</p>
-        ) : (
-          <div className="module-card-grid">
-            {visibleTrips.map((trip) => {
-              const seats = seatsByTrip.get(trip.id) ?? 0;
-              const isSelected = trip.id === selectedTripId;
-              return (
-                <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={trip.id}>
-                  <div className="trip-choice-top">
-                    <span className="trip-service">SCHEDULED TRIP</span>
-                    <span className={`seat-status${seats === 0 ? " is-full" : ""}`}>
-                      {seats === 0 ? "Full" : `${seats} seats left`}
-                    </span>
-                  </div>
-                  <h3>{trip.route}</h3>
-                  <dl className="trip-facts">
-                    <div><dt>Date</dt><dd>{fmtDate(trip.date)}</dd></div>
-                    <div><dt>Departure</dt><dd>{trip.departure}</dd></div>
-                    <div><dt>Arrival estimate</dt><dd>{trip.arrival}</dd></div>
-                    <div><dt>Estimated fare</dt><dd>MWK {trip.fare.toLocaleString("en-MW")} <small>per passenger</small></dd></div>
-                  </dl>
-                  <div className="trip-stops">
-                    <p><strong>Board:</strong> {trip.pickup.join(" or ")}</p>
-                    <p><strong>Get off:</strong> {trip.dropoff.join(" or ")}</p>
-                  </div>
-                  <Link className={`primary-button${seats === 0 ? " is-disabled" : ""}`} aria-disabled={seats === 0} tabIndex={seats === 0 ? -1 : undefined} href={`/transport-booking/details/${trip.id}`} onClick={(event) => { if (seats === 0) event.preventDefault(); }}>
-                    {seats === 0 ? "Full" : "Choose this trip"}
-                  </Link>
-                </article>
-              );
-            })}
+      {(selectedTrip || ticket) && (
+      <section id="reservation-heading" className="module-section" aria-label={bookingStage === "seats" ? "Pick your seats" : "Passenger details"}>
+        {selectedTrip && (
+          <div className="module-section-heading">
+            <div>
+              <p className="module-eyebrow">{bookingStage === "seats" ? "STEP 1 · PICK YOUR SEATS" : "STEP 2 · PASSENGER DETAILS"}</p>
+              <h2>{selectedTrip.route}</h2>
+            </div>
+            <span className="module-count">{available} seats left</span>
           </div>
         )}
-        <p className="module-footnote">Fares and schedules are estimates for this project demonstration. No payment is collected.</p>
-      </section>
->>>>>>> origin/feature/integration
-      )}
-
-      {selectedTrip && !ticket && (
-        <section className="module-section booking-section" aria-labelledby="reservation-title">
-          {paymentPending ? (
-            <div className="mock-payment-panel">
-              <p className="module-eyebrow">SIMULATED CHECKOUT</p>
-              <h2>{selectedTrip.route}</h2>
-              <p>{fmtDate(selectedTrip.date)} · {selectedTrip.departure} · {selectedSeats.length} passenger(s)</p>
-              <strong>Mock total: MWK {(selectedTrip.fare * selectedSeats.length).toLocaleString("en-MW")}</strong>
-              <label className="map-route-filter">Payment method
-                <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
-                  <option value="mobile_money">Mobile money (mock)</option>
-                  <option value="bank_card">Bank card (mock)</option>
-                </select>
-              </label>
-              <p className="module-footnote">Demonstration only. Do not enter a PIN or card details; no real payment is taken.</p>
-              <button className="primary-button" type="button" disabled={saving} onClick={completeMockPayment}>{saving ? "Simulating payment…" : "Confirm mock payment"}</button>{" "}
-              <button className="secondary-button" type="button" disabled={saving} onClick={() => setPaymentPending(false)}>Back</button>
-            </div>
-          ) : (
-            <form className="module-form" onSubmit={continueToPayment}>
-              <h2 id="reservation-title">Passenger and seat details</h2>
-              <div className="reservation-summary">
-                <div><span>Selected trip</span><strong>{selectedTrip.route}</strong><small>{fmtDate(selectedTrip.date)} · {selectedTrip.departure}</small></div>
-                <div><span>Seats available</span><strong>{remainingSeats} / {selectedTrip.capacity}</strong></div>
-                <div><span>Estimated total</span><strong>MWK {(selectedTrip.fare * selectedSeats.length).toLocaleString("en-MW")}</strong></div>
-              </div>
-              <div className="module-form-grid">
-                <label>Passenger full name<input autoComplete="name" maxLength={100} value={passengerName} onChange={(event) => setPassengerName(event.target.value)} required /></label>
-                <label>Email <span className="optional-label">Optional</span><input type="email" autoComplete="email" maxLength={254} value={passengerEmail} onChange={(event) => setPassengerEmail(event.target.value)} /></label>
-                <label>Phone number <span className="optional-label">Optional</span><input type="tel" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} /></label>
-                <label>Identification number <span className="optional-label">Optional</span><input value={identificationNumber} onChange={(event) => setIdentificationNumber(event.target.value)} /></label>
-                <label>Pickup point<select value={pickup} onChange={(event) => setPickup(event.target.value)}>{selectedTrip.pickup.map((point) => <option key={point}>{point}</option>)}</select></label>
-                <label>Drop-off point<select value={dropoff} onChange={(event) => setDropoff(event.target.value)}>{selectedTrip.dropoff.map((point) => <option key={point}>{point}</option>)}</select></label>
-              </div>
-              <h3>Choose seats (up to {MAX_PASSENGERS})</h3>
-              <div className="bus-seat-grid" role="group" aria-label="Bus seat selection">
-                {Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1).map((seat) => (
-                  <button key={seat} type="button" className={`bus-seat${selectedSeats.includes(seat) ? " is-selected" : ""}${unavailable.has(seat) ? " is-unavailable" : ""}`} aria-pressed={selectedSeats.includes(seat)} aria-label={`Seat ${seat}${unavailable.has(seat) ? ", unavailable" : ""}`} disabled={unavailable.has(seat)} onClick={() => toggleSeat(seat)}>{seat}</button>
-                ))}
-              </div>
-              <p aria-live="polite">Selected seats: {selectedSeats.length ? selectedSeats.join(", ") : "none"}</p>
-              <div className="reservation-actions">
-                <button className="secondary-button" type="button" onClick={() => setSelectedTripId("")}>Back to trips</button>
-                <button className="primary-button" type="submit" disabled={!selectedSeats.length || selectedSeats.length > remainingSeats}>Continue to mock payment</button>
-              </div>
-            </form>
-          )}
-        </section>
-      )}
-
-      {ticket && ticketQr && (
-        <section className="module-section ticket-card" aria-labelledby="ticket-heading">
-          <div>
-            <p className="module-eyebrow">MOCK TICKET · PAYMENT SIMULATED</p>
-            <h2 id="ticket-heading">Booking {ticket.reference}</h2>
-            <p>{ticket.name} · {ticket.route} · {fmtDate(ticket.travelDate)}</p>
-            <p>{ticket.pickup} → {ticket.dropoff} · Seat(s): {ticket.seatNumbers?.join(", ")}</p>
-            <p>MWK {ticket.total?.toLocaleString("en-MW")} · {ticket.paymentMethod?.replace("_", " ")} · no real payment</p>
-            <Link className="primary-button" href="/transport-booking/my-bookings">View my bookings</Link>
-          </div>
-<<<<<<< HEAD
-          <div className="ticket-qr-wrap"><Image src={ticketQr} alt={`Mock ticket QR for ${ticket.reference}`} width={180} height={180} unoptimized /></div>
-        </section>
-=======
-        </div>
-        {!selectedTrip ? (
-          ticket ? null : <p className="module-empty">This sample trip could not be found. Return to the available trips and choose another departure.</p>
-        ) : !authChecked ? (
-          <p className="module-empty" role="status">Checking your passenger account…</p>
-        ) : !passengerSession ? (
-          <div className="account-required-panel" role="status">
-            <p className="module-eyebrow">PASSENGER ACCOUNT REQUIRED</p>
-            <h3>Sign in before booking</h3>
-            <p>Sign in or create a passenger account to reserve this trip. Your selected trip will be ready when you return.</p>
-            <div className="mock-payment-actions">
-              <Link className="primary-button" href={loginPath}>Sign in to continue</Link>
-              <Link className="secondary-button" href={`/login?mode=register&next=${encodeURIComponent(bookingReturnPath)}`}>Create account</Link>
-            </div>
-          </div>
-        ) : paymentPending ? (
+        <div className={detailTrip ? "detail-booking-layout" : undefined}>
+          <div className={detailTrip ? "detail-booking-main" : undefined}>
+        {!selectedTrip ? null : paymentPending ? (
           <div className="mock-payment-panel">
             <div>
               <p className="module-eyebrow">DEMO CHECKOUT</p>
@@ -758,218 +854,276 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               <strong>Amount due: MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
             </div>
             <label className="map-route-filter">Payment method
-              <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
-                <option value="mobile-money">Mobile money (mock)</option>
-                <option value="card">Bank card (mock)</option>
+              <select
+                value={paymentMethod}
+                onChange={(event) => {
+                  const method = event.target.value;
+                  if (method === "mobile" || method === "bank") setPaymentMethod(method);
+                  setError("");
+                }}
+              >
+                <option value="mobile">Mobile money (demo)</option>
+                <option value="bank">Bank (demo)</option>
               </select>
             </label>
-            <p className="module-footnote">Demo only: this simulates {paymentMethod === "mobile-money" ? "a mobile money" : "a card"} payment. No payment details are requested and no money is charged.</p>
+            {paymentMethod === "mobile" ? (
+              <>
+                <label className="map-route-filter">Mobile money provider
+                  <select
+                    value={mobileProvider}
+                    onChange={(event) => {
+                      const provider = event.target.value;
+                      if (provider === "tnm" || provider === "airtel") setMobileProvider(provider);
+                    }}
+                  >
+                    <option value="tnm">TNM Mpamba</option>
+                    <option value="airtel">Airtel Money</option>
+                  </select>
+                </label>
+                <label className="map-route-filter">Phone number
+                  <input type="tel" autoComplete="tel" value={mobileNumber} onChange={(event) => setMobileNumber(event.target.value)} placeholder="e.g. 0991234567" required />
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="map-route-filter">Bank
+                  <select value={bankName} onChange={(event) => setBankName(event.target.value)}>
+                    {MALAWI_BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
+                  </select>
+                </label>
+                <label className="map-route-filter">Account number
+                  <input type="text" inputMode="numeric" autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="e.g. 1001234567" required />
+                </label>
+              </>
+            )}
+            <label className="map-route-filter">Payment PIN
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={6}
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
+                placeholder="4–6 digit demo PIN"
+                required
+              />
+            </label>
+            <p className="module-footnote">Demo only: no money is charged and the PIN is never stored. Use a made-up PIN here, never your real one.</p>
+            <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
             <div className="mock-payment-actions">
               <button className="primary-button" type="button" onClick={completeMockPayment} disabled={saving}>
-                {saving ? "Processing demo payment…" : `Pay MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
+                {saving ? "Processing demo payment…" : `Pay now · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
             </div>
           </div>
+        ) : bookingStage === "seats" ? (
+          <div className="seat-step">
+            <div className="seat-step-intro">
+              <h3>Pick your seats</h3>
+              <p>
+                {fmtDate(selectedTrip.date)} · departs {selectedTrip.departure} · {selectedTrip.pickup.join(" or ")} to {selectedTrip.dropoff.join(" or ")}.
+                Seat 1 is reserved by the admin next to the door, and the driver seat cannot be booked.
+              </p>
+            </div>
+            <div className="seat-step-layout">
+              <div>
+                <div className="bus-seat-map">
+                  <div className="bus-front">
+                    <span className="bus-door">Door</span>
+                    <span className="bus-aisle-label">Aisle</span>
+                    <span className="driver-seat">Driver<small>Not bookable</small></span>
+                  </div>
+                  <div className="seat-grid bus-seat-grid" role="group" aria-label={`Seats for ${selectedTrip.route}`}>
+                    {Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1).map((seat, order) => {
+                      const isAdminSeat = adminSeats.includes(seat);
+                      const isAvailable = availableSeatList.includes(seat);
+                      const isSelected = selectedSeats.includes(seat);
+                      const isLockedByLimit = seatLimitReached && !isSelected;
+                      const seatState = isAdminSeat
+                        ? "reserved by the admin"
+                        : isSelected
+                          ? "selected"
+                          : isLockedByLimit
+                            ? `locked, you already picked the ${MAX_PASSENGERS}-seat limit`
+                            : isAvailable
+                              ? "available"
+                              : "taken";
+                      return (
+                        <button
+                          key={seat}
+                          type="button"
+                          style={{ gridColumn: SEAT_COLUMNS[order % SEAT_COLUMNS.length], gridRow: Math.floor(order / SEAT_COLUMNS.length) + 1 }}
+                          className={`seat-number${isSelected ? " is-selected" : ""}${isAvailable ? "" : " is-taken"}${isAdminSeat ? " is-admin" : ""}${isLockedByLimit ? " is-locked" : ""}`}
+                          aria-pressed={isSelected}
+                          aria-label={`Seat ${seat}, ${seatState}`}
+                          title={isAdminSeat ? "Seat 1 is reserved by the admin next to the door" : isSelected ? `Seat ${seat} selected` : isLockedByLimit ? `Deselect a seat to choose seat ${seat}` : isAvailable ? `Choose seat ${seat}` : `Seat ${seat} is taken`}
+                          disabled={!isAvailable || isLockedByLimit}
+                          onClick={() => toggleSeat(seat)}
+                        >
+                          <span>{seat}</span>
+                          {isAdminSeat ? <small>Admin</small> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <ul className="seat-legend" aria-label="Seat map key">
+                  <li><i className="legend-free" aria-hidden="true" />Available</li>
+                  <li><i className="legend-picked" aria-hidden="true" />Selected</li>
+                  <li><i className="legend-taken" aria-hidden="true" />Taken</li>
+                  <li><i className="legend-admin" aria-hidden="true" />Admin reserved (door side)</li>
+                  <li><i className="legend-driver" aria-hidden="true" />Driver</li>
+                </ul>
+                <p className="seat-picker-help">
+                  Select up to {MAX_PASSENGERS} seats. {availableSeatList.length} of {selectedTrip.capacity} seats are available on this trip.
+                  {selectedSeats.length >= MAX_PASSENGERS ? ` You have reached the ${MAX_PASSENGERS}-seat limit.` : ""}
+                </p>
+                {seatError && <p className="module-error" role="alert">{seatError}</p>}
+              </div>
+              <aside className="seat-summary" aria-label="Fare and seat calculation">
+                <p className="module-eyebrow">FARE CALCULATION</p>
+                <dl className="seat-summary-list">
+                  <div><dt>Fare per passenger</dt><dd>MWK {selectedTrip.fare.toLocaleString("en-MW")}</dd></div>
+                  <div><dt>Seats you picked</dt><dd>{selectedSeats.length > 0 ? selectedSeats.join(", ") : "None yet"}</dd></div>
+                  <div><dt>Passengers</dt><dd>{passengers} of {MAX_PASSENGERS}</dd></div>
+                  <div><dt>People on the bus</dt><dd>{onboardSeats} of {selectedTrip.capacity}</dd></div>
+                  <div><dt>After this booking</dt><dd>{Math.min(selectedTrip.capacity, onboardSeats + passengers)} of {selectedTrip.capacity}</dd></div>
+                  <div><dt>Seats still free</dt><dd>{Math.max(0, availableSeatList.length - passengers)} of {selectedTrip.capacity}</dd></div>
+                </dl>
+                <p className="seat-summary-total"><span>Total</span><strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong></p>
+                <p className="module-footnote">Seat {adminSeats[0] ?? 1} stays reserved for the admin. Payment is simulated after you enter passenger details.</p>
+                <button className="primary-button" type="button" onClick={confirmSeats} disabled={selectedSeats.length === 0}>
+                  Confirm {passengers === 0 ? "seats" : `${passengers} seat${passengers === 1 ? "" : "s"}`}
+                </button>
+                <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
+              </aside>
+            </div>
+          </div>
         ) : (
           <form className="module-form" onSubmit={submitBooking} noValidate>
-            <div className="booking-form-map-layout">
-              <section className="booking-route-preview" aria-labelledby="booking-route-heading">
-                <div className="booking-route-heading">
-                  <div>
-                    <h3 id="booking-route-heading">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-7.2 8-13a8 8 0 1 0-16 0c0 5.8 8 13 8 13Z" /><circle cx="12" cy="9" r="2.5" /></svg>
-                      Route Map
-                    </h3>
-                    <p>{pickup} to {dropoff}</p>
-                  </div>
-                </div>
-                {currentRouteLookup.status === "error" && (
-                  <div className="booking-route-error" role="alert">
-                    <span>Driving directions could not be loaded. The map still shows the selected towns.</span>
-                    <button className="secondary-button" type="button" onClick={() => setRouteRetryKey((key) => key + 1)}>
-                      Retry directions
-                    </button>
-                  </div>
-                )}
-                {pickupPosition && dropoffPosition ? (
-                  <div className="booking-route-map-wrap">
-                    <MapContainer
-                      key={`${routeKey}:${currentRouteLookup.status}`}
-                      bounds={currentRouteLookup.route?.positions ?? [pickupPosition, dropoffPosition]}
-                      boundsOptions={{ paddingTopLeft: [22, 24], paddingBottomRight: [184, 24] }}
-                      scrollWheelZoom
-                      zoomControl={false}
-                      className="route-map booking-route-map"
-                    >
-                      <ZoomControl position="topright" />
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      {currentRouteLookup.route && (
-                        <Polyline
-                          positions={currentRouteLookup.route.positions}
-                          pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.88 }}
-                        />
-                      )}
-                      <RouteLocationMarker position={pickupPosition} label="Pickup" town={pickup} />
-                      <RouteLocationMarker position={dropoffPosition} label="Drop-off" town={dropoff} />
-                    </MapContainer>
-                    <div className="booking-route-estimate" role="status" aria-live="polite">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v13H3V5a2 2 0 0 1 2-2Zm0 2v7h14V5H5Zm-2 9h18v2H3v-2Zm3 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm12 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" /></svg>
-                      {currentRouteLookup.status === "ready" && currentRouteLookup.route
-                        ? `${formatRouteDuration(currentRouteLookup.route.duration)} (≈${Math.round(currentRouteLookup.route.distance / 1000)} km)`
-                        : currentRouteLookup.status === "loading"
-                          ? "Finding road route…"
-                          : "Travel estimate unavailable"}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="booking-route-error" role="alert">Map directions are unavailable for this trip.</p>
-                )}
-              </section>
-
-              <div className="booking-form-fields">
-                <div className="reservation-summary">
-                  <div>
-                    <span>Your trip</span>
-                    <strong>{selectedTrip.route}</strong>
-                    <small>{fmtDate(selectedTrip.date)} · departs {selectedTrip.departure}</small>
-                  </div>
-                  <div>
-                    <span>Seats available</span>
-                    <strong>{available} of {selectedTrip.capacity}</strong>
-                    <small>Seat availability is checked again when you confirm.</small>
-                  </div>
-                  <div>
-                    <span>Estimated total</span>
-                    <strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
-                    <small>{passengers} passenger{passengers === 1 ? "" : "s"} · payment not taken</small>
-                  </div>
-                </div>
-
-                <div className="module-form-grid">
-                  <label>
-                    Travel date
-                    <input type="date" min={selectedTrip.date} value={travelDate} onChange={(event) => setTravelDate(event.target.value)} required />
-                  </label>
-                  <label>
-                    Number of passengers
-                    <select
-                      value={passengers}
-                      onChange={(event) => changePassengerCount(Number(event.target.value))}
-                      disabled={available === 0}
-                    >
-                      {Array.from({ length: Math.min(MAX_PASSENGERS, available) }, (_, index) => index + 1).map((count) => (
-                        <option key={count} value={count}>{count} passenger{count === 1 ? "" : "s"}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="booking-seat-picker-toggle">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setShowSeatSelector((value) => !value)}
-                    >
-                      {showSeatSelector ? "Hide seat selection" : `Choose seat${passengers === 1 ? "" : "s"}`}
-                    </button>
-                    <span className="booking-seat-count" aria-live="polite">
-                      {activeSelectedSeatNumbers.length} of {passengers} selected
-                      {activeSelectedSeatNumbers.length > 0 && ` · ${activeSelectedSeatNumbers.join(", ")}`}
-                    </span>
-                  </div>
-                  {showSeatSelector && (
-                    <fieldset className="booking-seat-picker" disabled={saving}>
-                      <legend>Choose your seat{passengers === 1 ? "" : "s"} <span>({passengers} required)</span></legend>
-                      <p className="booking-seat-instructions">Select {passengers} available seat{passengers === 1 ? "" : "s"}. Booked seats are unavailable.</p>
-                      <div className="booking-seat-layout" aria-label="Bus seat layout">
-                        <span className="booking-seat-front">FRONT OF BUS</span>
-                        <div className="booking-seat-rows">
-                          {seatRows.map((row, rowIndex) => (
-                            <div className="booking-seat-row" key={rowIndex} aria-label={`Seat row ${rowIndex + 1}`}>
-                              {row.slice(0, 2).map((seatNumber) => {
-                                return (
-                                  <SeatButton
-                                    key={seatNumber}
-                                    seatNumber={seatNumber}
-                                    isBooked={bookedSeatNumbers.includes(seatNumber)}
-                                    isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
-                                    saving={saving}
-                                    onToggle={toggleSeat}
-                                  />
-                                );
-                              })}
-                              <span className="booking-seat-aisle" aria-hidden="true" />
-                              {row.slice(2, 5).map((seatNumber) => {
-                                return (
-                                  <SeatButton
-                                    key={seatNumber}
-                                    seatNumber={seatNumber}
-                                    isBooked={bookedSeatNumbers.includes(seatNumber)}
-                                    isSelected={activeSelectedSeatNumbers.includes(seatNumber)}
-                                    saving={saving}
-                                    onToggle={toggleSeat}
-                                  />
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <ul className="booking-seat-legend" aria-label="Seat availability legend">
-                        <li><span className="booking-seat-legend-mark" /> Available</li>
-                        <li><span className="booking-seat-legend-mark is-selected" /> Selected</li>
-                        <li><span className="booking-seat-legend-mark is-booked" /> Booked</li>
-                      </ul>
-                      <p className="booking-seat-count" aria-live="polite">
-                        {activeSelectedSeatNumbers.length} of {passengers} selected
-                        {activeSelectedSeatNumbers.length > 0 && ` · Seat${activeSelectedSeatNumbers.length === 1 ? "" : "s"} ${activeSelectedSeatNumbers.join(", ")}`}
-                      </p>
-                    </fieldset>
-                  )}
-                  <label>
-                    Pickup point
-                    <select value={pickup} onChange={(event) => setPickup(event.target.value)} required>
-                      {selectedTrip.pickup.map((point) => <option key={point} value={point}>{point}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Drop-off point
-                    <select value={dropoff} onChange={(event) => setDropoff(event.target.value)} required>
-                      {selectedTrip.dropoff.map((point) => <option key={point} value={point}>{point}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Passenger full name
-                    <input autoComplete="name" maxLength={100} value={bookingName} onChange={(event) => setName(event.target.value)} disabled={Boolean(passengerSession)} placeholder="e.g. Alex Banda" required />
-                  </label>
-                  <label>
-                    Email address
-                    <input type="email" autoComplete="email" maxLength={254} value={bookingEmail} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(passengerSession)} placeholder="you@example.com" required />
-                  </label>
-                </div>
-
-                <div className="reservation-actions">
-                  <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-                  <button className="primary-button form-submit" type="submit" disabled={saving || available === 0 || passengers > available}>
-                    Continue to payment
-                  </button>
-                </div>
+            <div className="reservation-summary">
+              <div>
+                <span>Your trip</span>
+                <strong>{selectedTrip.route}</strong>
+                <small>{fmtDate(selectedTrip.date)} · departs {selectedTrip.departure}</small>
               </div>
+              <div>
+                <span>People on the bus</span>
+                <strong>{onboardSeats} of {selectedTrip.capacity}</strong>
+                <small>{available} seats available · availability is checked when you confirm.</small>
+              </div>
+              <div>
+                <span>Estimated total</span>
+                <strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
+                <small>{passengers} passenger{passengers === 1 ? "" : "s"} · payment not taken</small>
+              </div>
+            </div>
+
+            <div className="seat-selection-bar">
+              <div>
+                <span>Your seats</span>
+                <strong>{selectedSeats.join(", ")}</strong>
+                <small>
+                  {passengers} passenger{passengers === 1 ? "" : "s"} · MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")} total
+                </small>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => setBookingStage("seats")}>
+                Change seats
+              </button>
+            </div>
+
+            <div className="module-form-grid">
+              <label>
+                Travel date
+                <input type="date" min={selectedTrip.date} max={selectedTrip.date} value={travelDate} onChange={(event) => setTravelDate(event.target.value)} required />
+              </label>
+              <label>
+                Pickup point
+                <select value={pickup} onChange={(event) => setPickup(event.target.value)} required>
+                  {selectedTrip.pickup.map((point) => <option key={point} value={point}>{point}</option>)}
+                </select>
+              </label>
+              <label>
+                Drop-off point
+                <select value={dropoff} onChange={(event) => setDropoff(event.target.value)} required>
+                  {selectedTrip.dropoff.map((point) => <option key={point} value={point}>{point}</option>)}
+                </select>
+              </label>
+              <label>
+                Passenger full name
+                <input autoComplete="name" maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Alex Banda" required />
+              </label>
+              <label>
+                Email address
+                <input type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
+              </label>
+            </div>
+
+            <div className="reservation-actions">
+              <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
+              <button className="primary-button form-submit" type="submit" disabled={saving || available === 0 || passengers > available}>
+                Continue to payment
+              </button>
             </div>
           </form>
         )}
-        {ticket && ticketQr && (
+          </div>
+          {detailTrip && (
+            <aside className="detail-trip-map" aria-label="Trip route map">
+              <p className="module-eyebrow">TRIP MAP</p>
+              <h3>{detailTrip.route}</h3>
+              <TripMap
+                trips={[detailTrip]}
+                userPosition={userPosition}
+                cityCoordinates={TRANSPORT_TOWN_COORDINATES}
+                tripRoadRoutes={tripRoadRoutes}
+                isTripRouting={isTripRouting}
+                tripFallbackCount={tripFallbackCount}
+              />
+              <p className="module-footnote">
+                {fmtDate(detailTrip.date)} · departs {detailTrip.departure} · arrives about {detailTrip.arrival}
+              </p>
+            </aside>
+          )}
+        </div>
+        {ticket && ticketQr && !showTicket && (
+          <div className="payment-success-panel" role="status">
+            <p className="module-eyebrow">PAYMENT SUCCESSFUL</p>
+            <h3>Your payment has been received</h3>
+            <dl className="payment-success-list">
+              <div><dt>Payment reference</dt><dd>{ticket.paymentReference ?? ticket.reference}</dd></div>
+              {ticket.paymentCode && <div><dt>Confirmation code</dt><dd>{ticket.paymentCode}</dd></div>}
+              <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
+              <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
+              {ticket.payerPhone && <div><dt>Phone number</dt><dd>{maskPhone(ticket.payerPhone)}</dd></div>}
+              {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
+            </dl>
+            <button className="primary-button" type="button" onClick={viewTicket}>View e-ticket</button>
+          </div>
+        )}
+        {ticket && ticketQr && showTicket && (
           <article className="ticket-card" aria-labelledby="ticket-heading">
             <div className="ticket-details">
               <p className="module-eyebrow">MOCK PAYMENT COMPLETE</p>
               <h3 id="ticket-heading">Your bus ticket</h3>
               <p className="ticket-route">{ticket.route}</p>
               <p>{fmtDate(ticket.travelDate)} · {ticket.pickup} to {ticket.dropoff}</p>
-              <p>Seat{ticket.seatNumbers?.length === 1 ? "" : "s"}: {ticket.seatNumbers?.join(", ") ?? "Not recorded"}</p>
               <p>{ticket.passengers} passenger{ticket.passengers === 1 ? "" : "s"} · {ticket.name}</p>
+              {ticket.seats?.length ? (
+                <p>Seat{ticket.seats.length === 1 ? "" : "s"}: {ticket.seats.join(", ")}</p>
+              ) : null}
               <p className="ticket-reference">Reference: <strong>{ticket.reference}</strong></p>
+              <div className="ticket-receipt">
+                <p className="module-eyebrow">PAYMENT RECEIPT</p>
+                <dl>
+                  <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
+                  {ticket.payerPhone && <div><dt>Phone number</dt><dd>{maskPhone(ticket.payerPhone)}</dd></div>}
+                  {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
+                  <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
+                  {ticket.paidAt && <div><dt>Paid on</dt><dd>{new Date(ticket.paidAt).toLocaleString("en-MW", { dateStyle: "medium", timeStyle: "short" })}</dd></div>}
+                </dl>
+              </div>
               <div className="ticket-actions">
                 <button className="primary-button" type="button" onClick={downloadTicketImage}>Download ticket PNG</button>
                 <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
@@ -982,9 +1136,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           </article>
         )}
       </section>
->>>>>>> origin/feature/integration
       )}
-      <p className="module-footnote">This page uses local sample data only. Booking availability is not shared across browsers or devices.</p>
     </main>
   );
 }

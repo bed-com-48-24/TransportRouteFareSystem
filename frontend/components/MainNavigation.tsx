@@ -1,131 +1,138 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import BookingNotificationCenter from "@/components/BookingNotificationCenter";
 import { logout, useSession } from "@/lib/auth";
-<<<<<<< HEAD
-import { KEYS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
-import type { NotificationItem } from "@/lib/types";
-=======
-import { usePassengerAuth } from "@/components/PassengerAuthProvider";
-import { usePassengerNotificationPreferences } from "@/components/usePassengerNotificationPreferences";
-import usePassengerNotificationState from "@/components/usePassengerNotificationState";
-import { KEYS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
-import type { Booking } from "@/lib/types";
->>>>>>> origin/feature/integration
+
+type NavItem = { href: string; label: string };
 
 export default function MainNavigation() {
   const session = useSession();
-  const notifications = useStoredList<NotificationItem>(KEYS.notifications, []);
-  const unreadCount = notifications.filter((item) => !item.readAt).length;
   const pathname = usePathname();
-  const { passenger, error: authError, signOut } = usePassengerAuth();
-  const [logoutError, setLogoutError] = useState("");
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  const notificationState = usePassengerNotificationState(passenger?.email ?? "");
-  const { preferences: notificationPreferences, error: notificationPreferencesError } =
-    usePassengerNotificationPreferences(passenger?.email ?? "");
-  const notificationCount = passenger && notificationPreferences.inApp
-    ? bookings.filter((booking) =>
-        booking.email.trim().toLowerCase() === passenger.email.toLowerCase() &&
-        !notificationState.readReferences.has(booking.reference) &&
-        !notificationState.dismissedReferences.has(booking.reference),
-      ).length
-    : 0;
-  const accountHref = passenger || !pathname.startsWith("/transport-booking")
-    ? "/login"
-    : `/login?next=${encodeURIComponent(pathname)}`;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [error, setError] = useState("");
 
-  const navItems = [
-    { href: "/", label: "Home" },
-    { href: "/routes-fares", label: "Routes & fares" },
-    { href: "/transport-booking", label: "Bookings" },
-    { href: "/transport-booking/my-bookings", label: "My bookings" },
-    { href: "/accounts-reports/notifications", label: `Notifications${unreadCount ? ` (${unreadCount})` : ""}` },
-    { href: "/accounts-reports/profile", label: "Profile" },
+  const adminNavItems: NavItem[] = [
+    { href: "/home", label: "Home" },
+    { href: "/maps-admin-integration?panel=admin&section=overview", label: "Overview" },
+    { href: "/maps-admin-integration?panel=admin&section=routes", label: "Routes & fares" },
+    { href: "/maps-admin-integration?panel=admin&section=schedules", label: "Schedules" },
+    { href: "/maps-admin-integration?panel=admin&section=bookings", label: "Bookings" },
+    { href: "/maps-admin-integration?panel=admin&section=reports", label: "Reports" },
+    { href: "/maps-admin-integration?panel=admin&section=passengers", label: "Passengers" },
+    { href: "/maps-admin-integration?panel=admin&section=company", label: "Company" },
     { href: "/help", label: "Help" },
-    { href: accountHref, label: passenger ? passenger.fullName : "Sign in" },
   ];
 
+  const passengerNavItems: NavItem[] = [
+    { href: "/home", label: "Home" },
+    { href: "/transport-booking", label: "Book a trip" },
+    { href: "/help", label: "Help" },
+  ];
+
+  const navItems = session?.role === "admin" ? adminNavItems : passengerNavItems;
+
+  const profileHref = session?.role === "admin"
+    ? "/maps-admin-integration?panel=admin&section=company"
+    : "/profile";
+
   function isActive(href: string) {
-    return href.startsWith("/login")
-      ? pathname === "/login" || pathname.startsWith("/login/")
-      : pathname === href;
+    const [base, query = ""] = href.split("?");
+    if (pathname !== base) return false;
+
+    const expected = new URLSearchParams(query);
+    if ([...expected.keys()].length === 0) {
+      // A plain page link is not active while the administration panel is open.
+      return searchParams.get("panel") !== "admin";
+    }
+
+    for (const [key, value] of expected.entries()) {
+      if (searchParams.get(key) !== value) return false;
+    }
+    return true;
   }
 
-  async function handleLogout() {
-    setLogoutError("");
+  function renderNavLink(item: NavItem) {
+    const active = isActive(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={active ? "is-active" : ""}
+        aria-current={active ? "page" : undefined}
+      >
+        {item.label}
+      </Link>
+    );
+  }
+
+  function handleLogout() {
+    setError("");
+
     try {
-      if (session?.role === "admin") {
-        logout();
-      }
-      if (passenger) await signOut();
-    } catch (reason) {
-      setLogoutError(reason instanceof Error ? reason.message : "Could not log out. Please try again.");
+      logout();
+      router.push("/");
+    } catch {
+      setError("Could not log out. Please try again.");
     }
   }
 
   return (
     <>
-      <nav className="site-nav" aria-label="Main navigation">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={[
-              isActive(item.href) ? "is-active" : "",
-              item.href.startsWith("/login") ? "site-nav-login" : "",
-            ].filter(Boolean).join(" ")}
-            aria-current={isActive(item.href) ? "page" : undefined}
-            aria-label={passenger && item.label === passenger.fullName ? `View user information for ${passenger.fullName}` : undefined}
-            title={item.href === "/" ? "Home" : undefined}
-          >
-            {item.href === "/" ? (
-              <svg className="inline-block size-5 align-middle" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ) : passenger && item.href === accountHref ? (
-              <span className="inline-flex items-center gap-2">
-                <svg className="size-4 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M4.5 21a7.5 7.5 0 0 1 15 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      {session && (
+        <>
+          <nav className="site-nav" aria-label="Main navigation">
+            {navItems.map(renderNavLink)}
+            <div className="site-nav-actions" role="group" aria-label="Account">
+              <BookingNotificationCenter />
+              <Link
+                href={profileHref}
+                className="site-profile-badge"
+                title={session.role === "admin" ? "SBUS company profile" : "SBUS profile"}
+                aria-label={
+                  session.role === "admin"
+                    ? "Open the SBUS company profile"
+                    : "Open your SBUS profile"
+                }
+              >
+                <svg
+                  className="site-profile-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" />
                 </svg>
-                <span>{passenger.fullName}</span>
-              </span>
-            ) : item.label}
-            {item.href === "/" && <span className="sr-only">Home</span>}
-          </Link>
-        ))}
-        <Link
-          href="/notifications"
-          className={`relative inline-flex size-10 shrink-0 items-center justify-center rounded-lg p-2 text-[#42566c] transition hover:bg-[#eaf2fa] hover:text-[#12304a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29466d]${passenger && pathname === "/notifications" ? " bg-[#eaf2fa] text-[#12304a]" : ""}`}
-          aria-label={notificationCount > 0 ? `Notifications, ${notificationCount} unread` : "Notifications"}
-          title="Notifications"
-        >
-          <svg className="size-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {notificationCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-5 text-white" aria-hidden="true">
-              {notificationCount > 99 ? "99+" : notificationCount}
-            </span>
-          )}
-        </Link>
-        {session?.role === "admin" && (
-          <button type="button" className="site-nav-logout" onClick={handleLogout}>Admin sign out</button>
-        )}
-        {passenger && (
-          <button type="button" className="site-nav-logout" onClick={handleLogout}>Sign out</button>
-        )}
-      </nav>
-      {(logoutError || authError || (passenger && (notificationState.error || notificationPreferencesError))) && (
-        <span className="site-nav-error" role="alert">
-          {logoutError || authError || notificationState.error || notificationPreferencesError}
-        </span>
+              </Link>
+            </div>
+            <button type="button" className="site-nav-logout" onClick={handleLogout}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 17l5-5-5-5" />
+                <path d="M20 12H9" />
+                <path d="M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6" />
+              </svg>
+              Sign out
+            </button>
+          </nav>
+        </>
       )}
+      {error && <span className="site-nav-error" role="alert">{error}</span>}
     </>
   );
 }

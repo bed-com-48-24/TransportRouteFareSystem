@@ -1,15 +1,14 @@
-import type { FareItem, RouteItem, StopItem } from "./types";
+import type { FareItem, ReportItem, RouteItem, StopItem } from "./types";
 
 export const KEYS = {
   routes: "routewise-routes-v1",
   fares: "routewise-fares-v1",
   stops: "routewise-stops-v1",
   reports: "routewise-reports-v1",
-  savedJourneys: "routewise-saved-journeys-v1",
   bookings: "routewise-bookings-v1", 
+  trips: "routewise-trips-v1",
   notifications: "routewise-notifications-v1",
-  schedules: "routewise-schedules-v1",
-  profile: "routewise-passenger-profile-v1",
+  savedRoutes: "routewise-saved-routes-v1",
   session: "routewise-session-v1",
 } as const;
 
@@ -31,29 +30,49 @@ const ROUTE_ROWS: [string, string, string, string, number][] = [
   ["salima-lilongwe-minibus", "Salima", "Lilongwe", "Minibus", 7000],
 ];
 
-export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination, service]) => ({
-  id,
-  origin,
-  destination,
-  service,
-  name: `${origin} - ${destination}`,
-  companyName: "MOVA",
-  stops: [origin, destination],
-  transfers: 0,
-  departureTimes: ["07:00", "12:00"],
-  fareIsEstimate: true,
-  active: true,
-  featured: ["blantyre-lilongwe-coach", "lilongwe-mzuzu-coach", "blantyre-zomba-minibus"].includes(id),
-}));
+export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination, service]) => ({ id, origin, destination, service }));
 
 export const SEED_FARES: FareItem[] = ROUTE_ROWS.map(([id, , , , amount]) => ({ id: `f-${id}`, routeId: id, amount }));
+
+export const MOCK_REPORTS: ReportItem[] = [
+  {
+    id: "report-mock-1",
+    type: "Fare",
+    itemName: "Blantyre to Lilongwe",
+    description: "The fare shown on the site is lower than what the conductor charged at the depot this morning.",
+    location: "Blantyre Bus Depot",
+    status: "open",
+    adminNote: "",
+    createdAt: "2026-11-07T08:15:00.000Z",
+  },
+  {
+    id: "report-mock-2",
+    type: "Stop",
+    itemName: "Lilongwe City Centre Stage",
+    description: "The pickup point marker is on the wrong side of the road. Passengers are waiting at the opposite stage.",
+    location: "Lilongwe",
+    status: "reviewing",
+    adminNote: "",
+    createdAt: "2026-11-06T14:40:00.000Z",
+  },
+  {
+    id: "report-mock-3",
+    type: "Route",
+    itemName: "Mzuzu to Lilongwe",
+    description: "The arrival estimate is too early. The coach usually reaches Lilongwe about an hour later than listed.",
+    location: "Mzuzu Bus Terminal",
+    status: "resolved",
+    adminNote: "",
+    createdAt: "2026-11-04T09:05:00.000Z",
+  },
+];
 
 export const SEED_STOPS: StopItem[] = [
   { id: "s-1", name: "Blantyre Bus Depot", kind: "pickup", city: "Blantyre", lat: -15.7861, lng: 35.0058 },
   { id: "s-2", name: "Chichiri Shopping Centre", kind: "pickup", city: "Blantyre", lat: -15.7945, lng: 35.0233 },
   { id: "s-3", name: "Limbe Bus Station", kind: "both", city: "Limbe", lat: -15.8103, lng: 35.0586 },
   { id: "s-4", name: "Limbe Market", kind: "dropoff", city: "Limbe", lat: -15.8076, lng: 35.0527 },
-  { id: "s-5", name: "Zomba Bus Depot", kind: "both", city: "Zomba", lat: -15.3833, lng: 35.3188 },
+  { id: "s-5", name: "Zomba Bus Depot", kind: "dropoff", city: "Zomba", lat: -15.3833, lng: 35.3188 },
   { id: "s-6", name: "Zomba Market", kind: "dropoff", city: "Zomba", lat: -15.3869, lng: 35.3262 },
   { id: "s-7", name: "Lilongwe Bus Terminal", kind: "dropoff", city: "Lilongwe", lat: -13.9626, lng: 33.7741 },
   { id: "s-8", name: "Mzuzu Bus Terminal (location pending)", kind: "pickup", city: "Mzuzu", lat: null, lng: null },

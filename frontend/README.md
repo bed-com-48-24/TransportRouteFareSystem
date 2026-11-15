@@ -22,25 +22,64 @@ npm run dev
 
 ## Passenger pages
 
-- `/routes-fares` — search between towns and see direct or connecting routes, estimated fares, and pickup/drop-off points.
-- `/transport-booking` — compare departures, select a trip, enter passenger details, confirm a reservation, and view or cancel bookings.
-<<<<<<< HEAD
-- `/accounts-reports` — submit travel reports and check local demo updates.
-- `/accounts-reports/home` — passenger dashboard with local profile and notification pages.
-- `/transport-booking/my-bookings` — find or cancel demo bookings on this device.
-- `/maps-admin-integration` — explore the route map and nearby stops; the admin demo manages routes, stops, reports, and bookings.
-=======
-- `/accounts-reports` — sign in, create an account, reset a password, update a profile, continue as a guest, or report incorrect transport information.
-- `/maps-admin-integration` — use your location to find pickup and drop-off stops within 30 km; authorized administrators can manage transport information.
->>>>>>> origin/feature/integration
+- `/` — opens the login and account-choice screen.
+- `/login` — choose between the separate user and company-admin sign-in pages.
+- `/login/user` — sign in or register with a passenger Gmail address.
+- `/login/admin` — sign in or register with a company name and company email.
+- `/home` — the travel homepage shown after successful sign-in. It detects the nearest supported town (with permission), lets the passenger enter a destination, and checks for a direct or connecting admin-defined route before showing results.
+- `/routes-fares` — public route discovery and autocomplete journey search; see direct or connecting results, route details, estimated fares, and pickup/drop-off points without signing in.
+- `/transport-booking` — search by starting town, destination, and travel date; choose an admin-scheduled departure, seats, and a simulated payment option to receive a QR ticket.
+- `/accounts-reports` — sign in, create an account, update a profile, continue as a guest, or report incorrect transport information and follow the report's status.
+- `/help` — booking steps plus the same signed-in or guest report form, with report status and staff notes.
+- `/maps-admin-integration` — the administration map page. Passengers see route maps inside the booking flow (the Cards/Map switch and each trip's map), not in the main navigation. Authorized administrators open the company workspace from `?panel=admin` and can deep-link to a section with `?panel=admin&section=<section>`, or open the public map from the workspace.
 
 Stops can be pickup points, drop-off points, or both. Route and stop information is shared between search, booking, map, and administration views.
 
-## Mockup scope
+## Company admin workspace
 
-This is a frontend-only demonstration. Routes, schedules, profile details, bookings, reports, and notifications use sample data or browser storage. There are no calls to the MOVA backend, bookings are not shared across devices, and checkout is simulated; no money is collected. Browser administrator access is for demonstration only and is not secure.
+Sign in at `/login/admin`, then open **Overview** or **Management** in the site navigation. The workspace sections are deep-linkable:
 
-The mobile-to-web feature notes and future API expectations are documented in [docs/API-ENDPOINTS.md](./docs/API-ENDPOINTS.md). That document is a handoff reference, not an implemented backend integration.
+- **Overview** — live counts for routes, upcoming departures, seats sold and available, paid demo revenue, bookings, reports, passengers, and stops, plus the latest passenger bookings and reports.
+- **Routes & fares** — add, edit, or remove a route and its estimated fare. Changes immediately affect passenger route search, fare estimates, and saved routes.
+- **Trip schedules** — add or edit future departures with date, times, seat capacity, fare, and pickup/drop-off points. Only these departures can be booked by passengers.
+- **Pickup & drop-off points** — add, edit, or remove stops and map coordinates. Renaming a stop updates the scheduled trips and existing bookings that use it.
+- **Bookings** — search, filter, cancel, and re-confirm passenger bookings. Seat availability is checked against the live seat map, including seat 1 reserved for the transport admin, and the passenger receives an in-app notification.
+- **Customer reports** — filter by status, save a staff note, change the report status, or delete a report. Status changes and notes appear in the passenger's report updates and notification feed.
+- **Passengers** — see registered passenger accounts and guest contacts from bookings and reports, then send an in-app update to a passenger.
+- **Company profile** — update the company name or send an announcement to the passenger notification feed.
+
+Administrator actions use the same browser data as passenger pages, so route, fare, schedule, stop, booking, report, and notification changes stay aligned. The old `/maps-admin-integration/admin/bookings` and `/maps-admin-integration/admin/reports` URLs redirect to the matching workspace section.
+
+## Colour system
+
+The interface uses one documented palette defined as CSS custom properties at the top of `app/globals.css`. New work should reference the tokens rather than hard-coded hex values.
+
+| Role | Token | Value | Used for |
+| --- | --- | --- | --- |
+| Brand ink | `--sb-ink` | `#12304a` | Header marks, headings, dark heroes, primary buttons |
+| Ink soft | `--sb-ink-soft` | `#29466d` | Secondary headings, hover ink, badges |
+| Text | `--sb-text` | `#334e68` | Body copy and nav labels |
+| Text muted | `--sb-text-muted` | `#526d87` | Supporting copy and form help |
+| Text quiet | `--sb-text-quiet` | `#5b7288` | Captions, metadata, placeholders |
+| Accent | `--sb-accent` | `#1d4ed8` | Links, focus, primary actions |
+| Accent soft | `--sb-accent-soft` | `#eaf2fa` | Selected and highlighted surfaces |
+| Page | `--sb-page` | `#f5f8fb` | App background |
+| Surface | `--sb-surface` | `#ffffff` | Cards, panels, inputs |
+| Border | `--sb-border` | `#d7e2ef` | Default dividers and outlines |
+| Border strong | `--sb-border-strong` | `#b7cde0` | Emphasised edges |
+| Success | `--sb-success` | `#1f6b45` | Positive states (on `#e6f6ec`) |
+| Danger | `--sb-danger` | `#943f37` | Errors and cancellation (on `#fff1ef`) |
+| Warning | `--sb-warning` | `#8a5a16` | Pending and advisory states (on `#fff4e0`) |
+
+Design rules followed:
+
+- **One accent.** Every interactive state uses the same blue, so links, focus rings, and primary buttons read as one system.
+- **Ink for identity, neutrals for reading.** Navy carries brand meaning; text is a grey-blue scale rather than pure black or grey.
+- **Contrast first.** All text tokens clear WCAG AA on the page background (text-quiet is 4.7:1, the lightest step). Status text on its tint is at least 5.4:1. Disabled controls are intentionally exempt.
+- **Semantic colour only for status.** Green, red, and amber never decorate; they only signal an outcome.
+- **Map pins keep their own scheme** (origin green, destination red, user location sky) because they encode data rather than interface state.
+
+Legacy names `--navy`, `--navy-light`, `--line`, `--muted`, `--background`, and `--foreground` are aliases of the tokens above, so older rules keep working while they are migrated.
 
 ## Validation
 
@@ -49,18 +88,9 @@ npm run test:seat-availability
 npm run lint
 npm run build
 ```
-<<<<<<< HEAD
-=======
-
-## Passenger authentication setup
-
-Passenger sign-in, account creation, and password recovery use Supabase Auth. Create a Supabase project, enable email/password authentication, and copy `.env.example` to `.env.local` with the project URL and public anon key. These `NEXT_PUBLIC_` values are intentionally public; never put a Supabase service-role key in the frontend.
-
-In the Supabase Auth URL configuration, set the local site URL to `http://localhost:3000` and allow the deployed site URL too. Allow `/login?mode=reset` and `/login?mode=confirmed` as redirect URLs (or use an appropriately scoped wildcard). Configure email delivery in Supabase before expecting real messages.
-
-Passenger accounts created by the earlier browser-only prototype are not migrated. Those passengers must create new Supabase accounts; existing routes and bookings remain in browser storage.
 
 ## Prototype limitations
 
-This project stores reports, routes, fares, stops, and reservations in the current browser. Passenger credentials and authentication sessions are managed by Supabase, but bookings are not shared between devices. Browser-side administrator access is not production security. Trip schedules and fares are examples; reservations do not collect payment.
->>>>>>> origin/feature/integration
+This project stores accounts, reports, routes, fares, stops, admin-created trip schedules, reservations, and in-app booking notifications in the current browser. An administrator adds a route schedule with a future date, times, seat capacity, and fare; passengers can book only an exact matching route and date. If none exists, the booking page says the trip was not scheduled. Account creation uses an existing email address; it does not create Google/Gmail accounts or verify company email addresses. Location access requires browser permission and suggests an approximate supported starting town; if access is unavailable, the passenger can enter a town manually. Data is not shared between devices, and browser-side administrator access is not production security. Checkout is a demo: no money is collected, and the demo mobile-money/bank details and payment PIN are never stored or sent anywhere.
+
+The map pages request road-following geometry from the public OSRM routing demo service using OpenStreetMap road data. The service is external, keyless, and has no availability guarantee; while a request is pending or if it fails, a dashed direct-line connection remains visible. Road geometry depends on mapped roads and driving access, and is an estimate rather than an operator-verified itinerary.

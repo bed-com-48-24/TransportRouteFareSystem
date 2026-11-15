@@ -1,214 +1,99 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { MapContainer, Polyline, RouteLocationMarker, TileLayer } from "@/components/ClientLeaflet";
+import dynamic from "next/dynamic";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import AdminWorkspace, { isAdminSection, type AdminSection } from "@/components/AdminWorkspace";
 import RequireAdmin from "@/components/RequireAdmin";
-import { availableSeats, fmtDate, TRIPS } from "@/lib/booking-data";
+import { useRoadRoutes } from "@/components/road-routing";
+import { useSession } from "@/lib/auth";
 import { distanceKm, hasCoords } from "@/lib/geo";
 import { DISTRICT_COORDINATES, MALAWI_LOCATIONS, type Coordinates } from "@/lib/malawi-locations";
 import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
-import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
-import type { Booking, FareItem, ReportItem, ReportStatus, RouteItem, StopItem, StopKind, Trip } from "@/lib/types";
+import { useStoredList } from "@/lib/storage";
+import type { FareItem, RouteItem, StopItem, StopKind } from "@/lib/types";
 
-type MainPanel = "map" | "admin";
-<<<<<<< HEAD
-type AdminPanel = "routes" | "stops" | "schedules" | "reports" | "bookings";
-=======
-type AdminPanel = "routes" | "stops" | "reports" | "bookings";
-type RoutePoint = [number, number];
->>>>>>> origin/feature/integration
+const RouteNetworkMap = dynamic(() => import("@/components/RouteNetworkMap"), {
+  ssr: false,
+  loading: () => <p className="module-empty">Loading map…</p>,
+});
 
-const ROUTE_TOWN_COORDINATES: Record<string, Coordinates> = {
+const CITY_COORDINATES: Record<string, Coordinates> = {
   ...DISTRICT_COORDINATES,
   Limbe: { lat: -15.8103, lng: 35.0586 },
   Mzuzu: { lat: -11.4656, lng: 34.0207 },
 };
 
-const ADMIN_SECTIONS: { id: AdminPanel; label: string }[] = [
-  { id: "routes", label: "Routes & fares" },
-  { id: "stops", label: "Pickup & drop-off points" },
-  { id: "schedules", label: "Schedules" },
-  { id: "reports", label: "Passenger reports" },
-  { id: "bookings", label: "Bookings" },
-];
-
-const MOCK_ADMIN_BOOKINGS: Booking[] = [
-  {
-    reference: "DEMO-BK-001",
-    tripId: "BT-LB-0800",
-    route: "Blantyre → Limbe",
-    travelDate: "2026-11-03",
-    pickup: "Blantyre Bus Depot",
-    dropoff: "Limbe Bus Station",
-    passengers: 2,
-    name: "Sample Passenger One",
-    email: "passenger1@example.invalid",
-    status: "confirmed",
-    createdAt: "2026-11-01T10:00:00.000Z",
-  },
-  {
-    reference: "DEMO-BK-002",
-    tripId: "BT-LB-1030",
-    route: "Blantyre → Limbe",
-    travelDate: "2026-11-03",
-    pickup: "Chichiri Shopping Centre",
-    dropoff: "Limbe Market",
-    passengers: 1,
-    name: "Sample Passenger Two",
-    email: "passenger2@example.invalid",
-    status: "confirmed",
-    createdAt: "2026-11-01T11:30:00.000Z",
-  },
-  {
-    reference: "DEMO-BK-003",
-    tripId: "BT-ZO-0900",
-    route: "Blantyre → Zomba",
-    travelDate: "2026-11-04",
-    pickup: "Limbe Bus Station",
-    dropoff: "Zomba Bus Depot",
-    passengers: 3,
-    name: "Sample Passenger Three",
-    email: "passenger3@example.invalid",
-    status: "cancelled",
-    createdAt: "2026-11-01T13:15:00.000Z",
-  },
-];
+function coordinatesForCity(city: string): Coordinates | null {
+  return CITY_COORDINATES[city] ?? null;
+}
 
 function stopKindLabel(kind: StopKind) {
-  if (kind === "dropoff") return "Drop-off";
-  return "Pickup & drop-off";
+  if (kind === "both") return "Pickup & drop-off";
+  return kind === "pickup" ? "Pickup" : "Drop-off";
 }
 
-function getRoadRoute(value: unknown): RoutePoint[] | null {
-  if (typeof value !== "object" || value === null || !("routes" in value) || !Array.isArray(value.routes)) {
-    return null;
-  }
-
-  const route = value.routes[0];
-  if (typeof route !== "object" || route === null || !("geometry" in route)) return null;
-  const geometry = route.geometry;
-  if (typeof geometry !== "object" || geometry === null || !("coordinates" in geometry) || !Array.isArray(geometry.coordinates)) {
-    return null;
-  }
-
-  const positions: RoutePoint[] = [];
-  for (const point of geometry.coordinates) {
-    if (
-      !Array.isArray(point) ||
-      typeof point[0] !== "number" ||
-      !Number.isFinite(point[0]) ||
-      point[0] < -180 ||
-      point[0] > 180 ||
-      typeof point[1] !== "number" ||
-      !Number.isFinite(point[1]) ||
-      point[1] < -90 ||
-      point[1] > 90
-    ) {
-      return null;
-    }
-    positions.push([point[1], point[0]]);
-  }
-
-  return positions.length >= 2 ? positions : null;
+export default function MapAdminIntegrationPage() {
+  return (
+    <Suspense fallback={<main className="module-shell" aria-busy="true" />}>
+      <MapAdminContent />
+    </Suspense>
+  );
 }
 
-function MapAdminIntegrationPage() {
+function MapAdminContent() {
+  const router = useRouter();
+  const session = useSession();
+  const searchParams = useSearchParams();
+  const rawSection = searchParams.get("section");
+  const adminSection: AdminSection = isAdminSection(rawSection) ? rawSection : "overview";
+  const mainPanel = searchParams.get("panel") === "admin" ? "admin" : "map";
+
+  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
+  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
   const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
-  const [mainPanel, setMainPanel] = useState<MainPanel>("map");
-  const [panelReady, setPanelReady] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState("all");
+  const [city, setCity] = useState("Blantyre");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [locationMessage, setLocationMessage] = useState("");
   const [locating, setLocating] = useState(false);
-  const [routeTowns, setRouteTowns] = useState<string[]>([]);
-  const [routeResult, setRouteResult] = useState<{
-    key: string;
-    positions: RoutePoint[];
-    status: "ready" | "fallback";
-  } | null>(null);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(window.location.search);
-      setMainPanel(params.get("panel") === "admin" ? "admin" : "map");
-      const requestedTowns = params.get("route")?.split("|").map((town) => town.trim()) ?? [];
-      if (requestedTowns.length >= 2 && requestedTowns.every((town) => town in ROUTE_TOWN_COORDINATES)) {
-        setRouteTowns(requestedTowns);
-      }
-      setPanelReady(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const routePositions = useMemo<RoutePoint[]>(
-    () => routeTowns.map((town) => {
-      const coordinates = ROUTE_TOWN_COORDINATES[town];
-      return [coordinates.lat, coordinates.lng];
-    }),
-    [routeTowns],
-  );
-  const routeKey = routeTowns.join("|");
-  const currentRouteResult = routeResult?.key === routeKey ? routeResult : null;
-  const routeGeometry = currentRouteResult?.positions ?? routePositions;
-  const routeStatus = currentRouteResult?.status ?? "loading";
-  const routeCities = useMemo(
-    () => new Set(routeTowns.map((town) => town.toLocaleLowerCase())),
-    [routeTowns],
-  );
-  const routeStops = useMemo(
-    () => stops
-      .filter((stop) => routeCities.has(stop.city.trim().toLocaleLowerCase()))
-      .sort((first, second) =>
-        routeTowns.findIndex((town) => town.toLocaleLowerCase() === first.city.trim().toLocaleLowerCase()) -
-          routeTowns.findIndex((town) => town.toLocaleLowerCase() === second.city.trim().toLocaleLowerCase()) ||
-        first.name.localeCompare(second.name),
-      ),
-    [routeCities, routeTowns, stops],
-  );
-
-<<<<<<< HEAD
-  const publicRoutes = routes.filter((route) => route.active !== false);
-  const visibleRoutes = selectedRouteId === "all" ? publicRoutes : publicRoutes.filter((route) => route.id === selectedRouteId);
-  const mapCenter = useMemo(() => [-13.5, 34.2] as [number, number], []);
-=======
-  useEffect(() => {
-    if (routePositions.length < 2) return;
-
-    const controller = new AbortController();
-    const coordinates = routePositions.map(([lat, lng]) => `${lng},${lat}`).join(";");
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`;
-
-    async function loadRoadRoute() {
-      try {
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Routing service returned ${response.status}`);
-        const result: unknown = await response.json();
-        const roadRoute = getRoadRoute(result);
-        if (!roadRoute) throw new Error("Routing service returned an invalid route");
-        setRouteResult({ key: routeKey, positions: roadRoute, status: "ready" });
-      } catch {
-        if (controller.signal.aborted) return;
-        setRouteResult({ key: routeKey, positions: routePositions, status: "fallback" });
-      }
-    }
-
-    void loadRoadRoute();
-    return () => controller.abort();
-  }, [routeKey, routePositions]);
-
-  const nearbyStops = useMemo(() => {
-    if (!userLocation) return [];
-    return stops
+  const origin = userLocation ?? CITY_COORDINATES[city];
+  const { nearbyStops, unlocatedStops } = useMemo(() => {
+    const located = stops
       .filter(hasCoords)
-      .map((stop) => ({ ...stop, distance: distanceKm(userLocation.lat, userLocation.lng, stop.lat, stop.lng) }))
-      .filter((stop) => stop.distance <= 30)
+      .map((stop) => ({ ...stop, distance: distanceKm(origin.lat, origin.lng, stop.lat, stop.lng) }))
       .sort((first, second) => first.distance - second.distance);
-  }, [userLocation, stops]);
->>>>>>> origin/feature/integration
+    return {
+      nearbyStops: located.filter((stop) => stop.distance <= 30),
+      unlocatedStops: stops.filter((stop) => !hasCoords(stop)),
+    };
+  }, [origin, stops]);
+
+  const visibleRoutes = selectedRouteId === "all" ? routes : routes.filter((route) => route.id === selectedRouteId);
+  const roadRoutes = useRoadRoutes(mainPanel === "map" ? routes.flatMap((route) => {
+    const originCoordinates = coordinatesForCity(route.origin);
+    const destinationCoordinates = coordinatesForCity(route.destination);
+    return originCoordinates && destinationCoordinates ? [{ id: route.id, origin: originCoordinates, destination: destinationCoordinates }] : [];
+  }) : []);
+  const visibleRoutableRoutes = visibleRoutes.filter((route) => coordinatesForCity(route.origin) && coordinatesForCity(route.destination));
+  const visibleRouteGeometry = visibleRoutableRoutes.map((route) => roadRoutes[route.id]);
+  const isRouting = visibleRouteGeometry.some((geometry) => !geometry || geometry.status === "loading");
+  const fallbackRouteCount = visibleRouteGeometry.filter((geometry) => geometry?.status === "fallback").length;
+  const mapCenter = useMemo(() => [-13.5, 34.2] as [number, number], []);
+
+  function showAdmin() {
+    router.replace("/maps-admin-integration?panel=admin&section=overview");
+  }
+
+  function showMap() {
+    router.replace("/maps-admin-integration");
+  }
 
   function useMyLocation() {
     setLocationMessage("");
     if (!navigator.geolocation) {
-      setLocationMessage("Location is unavailable in this browser. Enable location services to find nearby stops.");
+      setLocationMessage("Location is not available in this browser. Choose a town instead.");
       return;
     }
 
@@ -223,8 +108,8 @@ function MapAdminIntegrationPage() {
         setUserLocation(null);
         setLocationMessage(
           error.code === error.PERMISSION_DENIED
-            ? "Location permission was denied. Allow location access in your browser and try again."
-            : "Your location could not be found. Check your device settings and try again.",
+            ? "Location permission was denied. Choose a town to find nearby stops."
+            : "Your location could not be found. Choose a town to find nearby stops.",
         );
         setLocating(false);
       },
@@ -232,22 +117,21 @@ function MapAdminIntegrationPage() {
     );
   }
 
-  if (!panelReady) return <main className="module-shell" aria-busy="true" />;
-
   return (
-    <main className={`module-shell${mainPanel === "admin" ? " admin-login-shell" : ""}`}>
+    <main className="module-shell">
       {mainPanel === "map" ? (
         <>
           <header className="module-intro">
-            <p className="module-eyebrow">NEARBY TRANSPORT STOPS</p>
-            <h1>{routeTowns.length > 0 ? `Stops along ${routeTowns[0]} to ${routeTowns[routeTowns.length - 1]}` : "Find stops near you"}</h1>
-            <p>{routeTowns.length > 0 ? "View the selected route and pickup and drop-off stops along the way." : "Share your location to see pickup and drop-off stops within 30 km."}</p>
+            <p className="module-eyebrow">TRANSPORT MAP</p>
+            <h1>Routes, stops, and service information</h1>
+            <p>Explore route locations across Malawi and find nearby pickup or drop-off points.</p>
           </header>
 
-<<<<<<< HEAD
           <nav className="module-tabs" aria-label="Map and administration">
             <button type="button" className="is-active" aria-pressed="true">Explore map &amp; nearby stops</button>
-            <button type="button" aria-pressed="false" onClick={() => setMainPanel("admin")}>Staff sign in</button>
+            <button type="button" aria-pressed="false" onClick={showAdmin}>
+              {session?.role === "admin" ? "Admin workspace" : "Staff sign in"}
+            </button>
           </nav>
 
           <section className="module-section" aria-labelledby="map-heading">
@@ -256,78 +140,23 @@ function MapAdminIntegrationPage() {
               <label className="map-route-filter">Show
                 <select value={selectedRouteId} onChange={(event) => setSelectedRouteId(event.target.value)}>
                   <option value="all">All routes</option>
-                  {publicRoutes.map((route) => <option key={route.id} value={route.id}>{route.origin} to {route.destination}</option>)}
+                  {routes.map((route) => <option key={route.id} value={route.id}>{route.origin} to {route.destination}</option>)}
                 </select>
               </label>
             </div>
-            {publicRoutes.length === 0 ? (
+            {routes.length === 0 ? (
               <p className="module-empty">There are no routes to show yet.</p>
             ) : (
-              <div className="network-map">
-                <MapContainer center={mapCenter} zoom={7} scrollWheelZoom className="route-map" worldCopyJump>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-
-                  {publicRoutes.map((route) => {
-                    const origin = coordinatesForCity(route.origin);
-                    const destination = coordinatesForCity(route.destination);
-                    if (!origin || !destination) return null;
-
-                    const isSelected = selectedRouteId === "all" || selectedRouteId === route.id;
-
-                    return (
-                      <Polyline
-                        key={route.id}
-                        positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
-                        pathOptions={{
-                          color: isSelected ? "#12304A" : "#8CA6BF",
-                          weight: isSelected ? 5 : 2.5,
-                          opacity: isSelected ? 1 : 0.7,
-                        }}
-                      >
-                        <Popup>
-                          <strong>{route.origin} → {route.destination}</strong><br />
-                          {route.service}
-                        </Popup>
-                      </Polyline>
-                    );
-                  })}
-
-                  {Object.entries(CITY_COORDINATES).map(([name, coordinates]) => (
-                    <CircleMarker key={name} center={[coordinates.lat, coordinates.lng]} radius={7} pathOptions={{ color: "#12304A", fillColor: "#12304A", fillOpacity: 1 }}>
-                      <Popup>{name}</Popup>
-                    </CircleMarker>
-                  ))}
-
-                  {stops.filter(hasCoords).map((stop) => (
-                    <CircleMarker
-                      key={stop.id}
-                      center={[stop.lat, stop.lng]}
-                      radius={stop.kind === "both" ? 6 : 5}
-                      pathOptions={{
-                        color: stop.kind === "pickup" ? "#2F80ED" : stop.kind === "dropoff" ? "#E67E22" : "#7E57C2",
-                        fillColor: stop.kind === "pickup" ? "#2F80ED" : stop.kind === "dropoff" ? "#E67E22" : "#7E57C2",
-                        fillOpacity: 0.9,
-                      }}
-                    >
-                      <Popup>
-                        <strong>{stop.name}</strong><br />
-                        {stop.city}<br />
-                        {stopKindLabel(stop.kind)}
-                      </Popup>
-                    </CircleMarker>
-                  ))}
-                </MapContainer>
-
-                <div className="map-legend" aria-label="Map legend">
-                  <span><i className="legend-route" /> Route connection</span>
-                  <span><i className="legend-pickup" /> Pickup point</span>
-                  <span><i className="legend-dropoff" /> Drop-off point</span>
-                  <span><i className="legend-both" /> Pickup and drop-off</span>
-                </div>
-              </div>
+              <RouteNetworkMap
+                routes={routes}
+                stops={stops}
+                selectedRouteId={selectedRouteId}
+                roadRoutes={roadRoutes}
+                cityCoordinates={CITY_COORDINATES}
+                mapCenter={mapCenter}
+                isRouting={isRouting}
+                fallbackRouteCount={fallbackRouteCount}
+              />
             )}
             <div className="map-route-list">
               {visibleRoutes.map((route) => {
@@ -337,7 +166,6 @@ function MapAdminIntegrationPage() {
                     <strong>{route.origin} <span aria-hidden="true">→</span> {route.destination}</strong>
                     <span>{route.service}</span>
                     <span>{fare ? `Estimated fare: MWK ${fare.amount.toLocaleString("en-MW")}` : "Fare estimate unavailable"}</span>
-                    <a href={`/routes-fares/${encodeURIComponent(route.id)}`}>Route details</a>
                   </article>
                 );
               })}
@@ -345,574 +173,46 @@ function MapAdminIntegrationPage() {
             <p className="module-footnote">District markers use approximate center coordinates; transport stop markers use recorded stop coordinates. Stops without recorded coordinates are listed below.</p>
           </section>
 
-=======
->>>>>>> origin/feature/integration
           <section className="module-section" aria-labelledby="nearby-heading">
             <div className="module-section-heading">
-              <div><p className="module-eyebrow">{routeTowns.length > 0 ? "SELECTED ROUTE" : "YOUR LOCATION"}</p><h2 id="nearby-heading">{routeTowns.length > 0 ? "Stops along this route" : "Nearby stops"}</h2></div>
-              {routeTowns.length === 0 && (
-                <button className="secondary-button" type="button" onClick={useMyLocation} disabled={locating}>
-                  {locating ? "Finding location…" : userLocation ? "Refresh my location" : "Use my location"}
-                </button>
-              )}
+              <div><p className="module-eyebrow">PICKUP &amp; DROP-OFF</p><h2 id="nearby-heading">Find nearby transport points</h2></div>
+            </div>
+            <div className="nearby-toolbar">
+              <label>Choose a town
+                <select value={city} onChange={(event) => { setCity(event.target.value); setUserLocation(null); setLocationMessage(""); }}>
+                  {MALAWI_LOCATIONS.map((town) => <option key={town} value={town}>{town}</option>)}
+                </select>
+              </label>
+              <button className="secondary-button" type="button" onClick={useMyLocation} disabled={locating}>{locating ? "Finding location…" : "Use my location"}</button>
+              <span className="nearby-radius">Within 30 km of {userLocation ? "your location" : city}</span>
             </div>
             {locationMessage && <p className="module-feedback" role="status">{locationMessage}</p>}
-            {routeTowns.length > 0 ? (
-              <>
-                <p className="nearby-radius">Route: {routeTowns.join(" → ")}. Pickup and drop-off stops are shown for towns along this route.</p>
-                {routeStatus === "fallback" && <p className="module-feedback" role="status">The road route could not be loaded, so the map shows connections between the route towns.</p>}
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.9fr)]">
-                  <div className="network-map">
-                    <MapContainer
-                      key={`${routeKey}:${routeStatus}`}
-                      bounds={routeGeometry.length > 1 ? routeGeometry : routePositions}
-                      boundsOptions={{ paddingTopLeft: [24, 24], paddingBottomRight: [24, 24] }}
-                      scrollWheelZoom
-                      className="route-map"
-                      style={{ height: "clamp(360px, 65vh, 560px)", minHeight: "360px" }}
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      {routeGeometry.length > 1 && <Polyline positions={routeGeometry} pathOptions={{ color: "#12304A", weight: 5, opacity: 0.85 }} />}
-                      {routeStops.filter(hasCoords).map((stop) => (
-                        <RouteLocationMarker
-                          key={stop.id}
-                          position={[stop.lat, stop.lng]}
-                          label={stop.kind === "dropoff" ? "Drop-off" : "Pickup & drop-off"}
-                          town={stop.name}
-                          details={stop.city}
-                        />
-                      ))}
-                    </MapContainer>
-                  </div>
-                  <div className="max-h-[470px] overflow-y-auto max-[760px]:max-h-[360px]">
-                    {routeStops.length === 0 ? (
-                      <p className="module-empty">No pickup or drop-off stops are recorded along this route yet.</p>
-                    ) : (
-                      <ul className="nearby-stop-list">
-                        {routeStops.map((stop) => (
-                          <li key={stop.id}>
-                            <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
-                            <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
-                            <span className="stop-distance">{hasCoords(stop) ? "On route" : "No map location"}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : !userLocation ? (
-              <p className="module-empty">Use your location to see nearby pickup and drop-off stops on the map.</p>
+            {nearbyStops.length === 0 ? (
+              <p className="module-empty">No recorded stops are within 30 km. Choose another town to search.</p>
             ) : (
-              <>
-                <p className="nearby-radius">Showing stops within 30 km of your location.</p>
-                <div className="network-map">
-                  <MapContainer
-                    key={`${userLocation.lat}:${userLocation.lng}:${nearbyStops.map((stop) => stop.id).join(",")}`}
-                    center={[userLocation.lat, userLocation.lng]}
-                    zoom={9}
-                    scrollWheelZoom
-                    className="route-map"
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {nearbyStops.map((stop) => (
-                      <RouteLocationMarker
-                        key={stop.id}
-                        position={[stop.lat, stop.lng]}
-                        label={stop.kind === "dropoff" ? "Drop-off" : "Pickup & drop-off"}
-                        town={stop.name}
-                        details={stop.city}
-                      />
-                    ))}
-                  </MapContainer>
-                </div>
-                {nearbyStops.length === 0 ? (
-                  <p className="module-empty">No recorded stops are within 30 km of your location.</p>
-                ) : (
-                  <ul className="nearby-stop-list">
-                    {nearbyStops.map((stop) => (
-                      <li key={stop.id}>
-                        <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
-                        <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
-                        <span className="stop-distance">{stop.distance.toFixed(1)} km</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
+              <ul className="nearby-stop-list">
+                {nearbyStops.map((stop) => (
+                  <li key={stop.id}>
+                    <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
+                    <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
+                    <span className="stop-distance">{stop.distance.toFixed(1)} km</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {unlocatedStops.length > 0 && (
+              <div className="unlocated-stops">
+                <h3>Location not recorded yet</h3>
+                <ul>{unlocatedStops.map((stop) => <li key={stop.id}>{stop.name} · {stopKindLabel(stop.kind)} · {stop.city}</li>)}</ul>
+              </div>
             )}
           </section>
         </>
       ) : (
-        <RequireAdmin><AdminDashboard /></RequireAdmin>
+        <RequireAdmin>
+          <AdminWorkspace initialSection={adminSection} onShowMap={showMap} />
+        </RequireAdmin>
       )}
     </main>
   );
 }
-
-function AdminDashboard() {
-  const [section, setSection] = useState<AdminPanel>("routes");
-  return (
-    <section className="admin-workspace" aria-labelledby="admin-heading">
-      <p className="module-eyebrow">AUTHORIZED ADMINISTRATORS</p>
-      <h2 id="admin-heading">Manage transport information</h2>
-      <p className="module-copy">Changes are saved in this browser in this demonstration.</p>
-      <nav className="admin-tabs" aria-label="Administration sections">
-        {ADMIN_SECTIONS.map((item) => (
-          <button key={item.id} type="button" aria-pressed={section === item.id} className={section === item.id ? "is-active" : ""} onClick={() => setSection(item.id)}>{item.label}</button>
-        ))}
-      </nav>
-      {section === "routes" && <RouteFareManagement />}
-      {section === "stops" && <StopManagement />}
-      {section === "schedules" && <ScheduleManagement />}
-      {section === "reports" && <ReportManagement />}
-      {section === "bookings" && <BookingManagement />}
-    </section>
-  );
-}
-
-function RouteFareManagement() {
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const schedules = useStoredList<Trip>(KEYS.schedules, TRIPS);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [service, setService] = useState("Minibus");
-  const [fare, setFare] = useState("");
-  const [intermediateStops, setIntermediateStops] = useState("");
-  const [featured, setFeatured] = useState(false);
-  const [active, setActive] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
-
-  function submitRoute(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalizedOrigin = origin.trim();
-    const normalizedDestination = destination.trim();
-    const amount = Number(fare);
-    if (normalizedOrigin.length < 2 || normalizedDestination.length < 2 || normalizedOrigin.toLowerCase() === normalizedDestination.toLowerCase()) {
-      setFeedback("Enter two different town names.");
-      return;
-    }
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      setFeedback("Enter an estimated fare as a positive whole number of MWK.");
-      return;
-    }
-    if (routes.some((route) =>
-      route.id !== editingId &&
-      route.active !== false &&
-      route.origin.trim().toLowerCase() === normalizedOrigin.toLowerCase() &&
-      route.destination.trim().toLowerCase() === normalizedDestination.toLowerCase(),
-    )) {
-      setFeedback("An active route already exists for these towns. Edit it or deactivate it first.");
-      return;
-    }
-
-    try {
-      const currentRoutes = loadList<RouteItem>(KEYS.routes, SEED_ROUTES);
-      const currentFares = loadList<FareItem>(KEYS.fares, SEED_FARES);
-      const routeId = editingId ?? newId("route");
-      const previous = currentRoutes.find((route) => route.id === routeId);
-      const stops = [normalizedOrigin, ...intermediateStops.split(",").map((stop) => stop.trim()).filter(Boolean), normalizedDestination];
-      if (new Set(stops.map((stop) => stop.toLowerCase())).size !== stops.length) {
-        setFeedback("Route stops must be unique.");
-        return;
-      }
-      const nextRoute: RouteItem = {
-        ...previous,
-        id: routeId,
-        origin: normalizedOrigin,
-        destination: normalizedDestination,
-        service: service.trim(),
-        name: `${normalizedOrigin} - ${normalizedDestination}`,
-        companyName: previous?.companyName ?? "MOVA",
-        stops,
-        featured,
-        active,
-        fareIsEstimate: true,
-        updatedAt: new Date().toISOString(),
-      };
-      saveList(KEYS.routes, editingId
-        ? currentRoutes.map((route) => route.id === routeId ? nextRoute : route)
-        : [...currentRoutes, nextRoute]);
-      const existingFare = currentFares.find((item) => item.routeId === routeId);
-      saveList(KEYS.fares, existingFare
-        ? currentFares.map((item) => item.routeId === routeId ? { ...item, amount } : item)
-        : [...currentFares, { id: newId("fare"), routeId, amount }]);
-      setOrigin("");
-      setDestination("");
-      setFare("");
-      setIntermediateStops("");
-      setService("Minibus");
-      setFeatured(false);
-      setActive(true);
-      setEditingId(null);
-      setFeedback(editingId ? "Route and fare updated." : "Route and fare added.");
-    } catch {
-      setFeedback("The route or fare could not be saved. Check browser storage and try again.");
-    }
-  }
-
-  function editRoute(route: RouteItem) {
-    setEditingId(route.id);
-    setOrigin(route.origin);
-    setDestination(route.destination);
-    setService(route.service);
-    setFare(String(fares.find((item) => item.routeId === route.id)?.amount ?? ""));
-    setIntermediateStops((route.stops ?? [route.origin, route.destination]).slice(1, -1).join(", "));
-    setFeatured(route.featured ?? false);
-    setActive(route.active !== false);
-    setFeedback("");
-  }
-
-  function deleteRoute(routeId: string) {
-    const route = routes.find((item) => item.id === routeId);
-    const routeName = route ? `${route.origin} → ${route.destination}` : "";
-    const dependentSchedules = schedules.filter((trip) => trip.routeId === routeId || trip.route === routeName);
-    if (dependentSchedules.some((trip) => bookings.some((booking) => booking.tripId === trip.id))) {
-      setFeedback("This route has booking history and cannot be removed. Deactivate it instead.");
-      return;
-    }
-    if (dependentSchedules.length > 0) {
-      setFeedback("This route has schedules. Deactivate it instead of removing its history.");
-      return;
-    }
-    try {
-      saveList(KEYS.routes, loadList<RouteItem>(KEYS.routes, SEED_ROUTES).filter((route) => route.id !== routeId));
-      saveList(KEYS.fares, loadList<FareItem>(KEYS.fares, SEED_FARES).filter((item) => item.routeId !== routeId));
-      setFeedback("Route and its fare estimate removed.");
-    } catch {
-      setFeedback("The route could not be removed. Please try again.");
-    }
-  }
-
-  return (
-    <div className="admin-section-content">
-      <h3>{editingId ? "Edit route and fare" : "Add a route and estimated fare"}</h3>
-      <form className="module-form admin-data-form" onSubmit={submitRoute}>
-        <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => setOrigin(event.target.value)} maxLength={60} required /></label>
-        <label>Destination town<input list="malawi-route-towns" value={destination} onChange={(event) => setDestination(event.target.value)} maxLength={60} required /></label>
-        <datalist id="malawi-route-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
-        <label>Service type<input value={service} onChange={(event) => setService(event.target.value)} maxLength={60} required /></label>
-        <label>Estimated fare (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
-        <label>Intermediate stops <span className="optional-label">Comma separated</span><input value={intermediateStops} onChange={(event) => setIntermediateStops(event.target.value)} placeholder="e.g. Ntcheu, Balaka" /></label>
-        <label className="checkbox-field"><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /> Feature this route</label>
-        <label className="checkbox-field"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} /> Route is active</label>
-        <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add route"}</button>
-        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setOrigin(""); setDestination(""); setFare(""); setFeedback(""); }}>Stop editing</button>}
-      </form>
-      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      <div className="admin-record-list">
-        {routes.map((route) => (
-          <article key={route.id}>
-            <div><strong>{route.origin} → {route.destination}{route.featured ? " · Featured" : ""}</strong><small>{route.service} · {route.active === false ? "Inactive" : "Active"} · {(route.stops ?? [route.origin, route.destination]).join(" → ")} · {fares.find((item) => item.routeId === route.id) ? `MWK ${fares.find((item) => item.routeId === route.id)?.amount.toLocaleString("en-MW")}` : "Fare not set"}</small></div>
-            <div className="admin-record-actions">
-              <button type="button" className="text-action" onClick={() => editRoute(route)}>Edit</button>
-              <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${route.origin} to ${route.destination}?`)) deleteRoute(route.id); }}>Remove</button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ScheduleManagement() {
-  const schedules = useStoredList<Trip>(KEYS.schedules, TRIPS);
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  const [routeId, setRouteId] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [date, setDate] = useState("");
-  const [departure, setDeparture] = useState("");
-  const [arrival, setArrival] = useState("");
-  const [fare, setFare] = useState("");
-  const [service, setService] = useState("Coach");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-  function chooseRoute(id: string) {
-    setRouteId(id);
-    const route = routes.find((item) => item.id === id);
-    if (!route) return;
-    setOrigin(route.origin);
-    setDestination(route.destination);
-    setFare(String(fares.find((item) => item.routeId === id)?.amount ?? ""));
-    setService(route.service);
-  }
-
-  function submitSchedule(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const amount = Number(fare);
-    const departureAt = new Date(`${date}T${departure}:00`);
-    const arrivalAt = new Date(`${date}T${arrival}:00`);
-    if (origin.trim().toLowerCase() === destination.trim().toLowerCase()) {
-      setFeedback("Schedule origin and destination must differ.");
-      return;
-    }
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      setFeedback("Enter a positive whole-number MWK fare.");
-      return;
-    }
-    if (date < tomorrow || !departure || !arrival || arrivalAt <= departureAt) {
-      setFeedback("Choose a future date and an arrival time later than departure.");
-      return;
-    }
-
-    const trip: Trip = {
-      id: editingId ?? newId("schedule"),
-      route: `${origin.trim()} → ${destination.trim()}`,
-      pickup: [origin.trim()],
-      dropoff: [destination.trim()],
-      date,
-      departure,
-      arrival,
-      capacity: 41,
-      fare: amount,
-      routeId: routeId || undefined,
-      departureTime: departure,
-      arrivalTime: arrival,
-      fareIsEstimate: false,
-      transportMode: service.trim(),
-      operatorName: "MOVA",
-      routeName: `${origin.trim()} - ${destination.trim()}`,
-    };
-    const current = loadList<Trip>(KEYS.schedules, TRIPS);
-    saveList(KEYS.schedules, editingId
-      ? current.map((item) => item.id === editingId ? { ...trip, capacity: item.capacity } : item)
-      : [...current, trip]);
-    resetForm();
-    setFeedback(editingId ? "Sample schedule updated on this device." : "Sample schedule added on this device.");
-  }
-
-  function editSchedule(trip: Trip) {
-    setEditingId(trip.id);
-    setRouteId(trip.routeId ?? "");
-    setOrigin(trip.route.split(" → ")[0] ?? "");
-    setDestination(trip.route.split(" → ")[1] ?? "");
-    setDate(trip.date);
-    setDeparture(trip.departure);
-    setArrival(trip.arrival);
-    setFare(String(trip.fare));
-    setService(trip.transportMode ?? "Coach");
-    setFeedback("");
-  }
-
-  function deleteSchedule(trip: Trip) {
-    if (bookings.some((booking) => booking.tripId === trip.id)) {
-      setFeedback("This schedule has booking history and cannot be removed in the demo.");
-      return;
-    }
-    saveList(KEYS.schedules, loadList<Trip>(KEYS.schedules, TRIPS).filter((item) => item.id !== trip.id));
-    setFeedback("Sample schedule removed.");
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setRouteId("");
-    setOrigin("");
-    setDestination("");
-    setDate("");
-    setDeparture("");
-    setArrival("");
-    setFare("");
-    setService("Coach");
-  }
-
-  return (
-    <div className="admin-section-content">
-      <h3>{editingId ? "Edit sample schedule" : "Add a sample schedule"}</h3>
-      <p className="module-footnote">Capacity is fixed at 41 in this mockup; booked-seat counts come from local demo bookings.</p>
-      <form className="module-form admin-data-form" onSubmit={submitSchedule}>
-        <label>Configured route <span className="optional-label">Optional</span>
-          <select value={routeId} onChange={(event) => chooseRoute(event.target.value)}>
-            <option value="">Custom route</option>
-            {routes.filter((route) => route.active !== false).map((route) => <option key={route.id} value={route.id}>{route.origin} → {route.destination}</option>)}
-          </select>
-        </label>
-        <label>Origin<input value={origin} onChange={(event) => setOrigin(event.target.value)} required /></label>
-        <label>Destination<input value={destination} onChange={(event) => setDestination(event.target.value)} required /></label>
-        <label>Date<input type="date" min={tomorrow} value={date} onChange={(event) => setDate(event.target.value)} required /></label>
-        <label>Departure<input type="time" value={departure} onChange={(event) => setDeparture(event.target.value)} required /></label>
-        <label>Arrival<input type="time" value={arrival} onChange={(event) => setArrival(event.target.value)} required /></label>
-        <label>Fare (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
-        <label>Transport mode<input value={service} onChange={(event) => setService(event.target.value)} required /></label>
-        <button className="primary-button" type="submit">{editingId ? "Save schedule" : "Add schedule"}</button>
-        {editingId && <button className="secondary-button" type="button" onClick={resetForm}>Stop editing</button>}
-      </form>
-      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      <div className="admin-record-list">
-        {schedules.map((trip) => (
-          <article key={trip.id}>
-            <div><strong>{trip.route}</strong><small>{fmtDate(trip.date)} · {trip.departure}–{trip.arrival} · MWK {trip.fare.toLocaleString("en-MW")} · Capacity {trip.capacity} · {availableSeats(trip, bookings)} available</small></div>
-            <div className="admin-record-actions">
-              <button type="button" className="text-action" onClick={() => editSchedule(trip)}>Edit</button>
-              <button type="button" className="text-action danger-action" onClick={() => deleteSchedule(trip)}>Remove</button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StopManagement() {
-  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
-  const [kind, setKind] = useState<StopKind>("pickup");
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
-
-  function submitStop(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parsedLat = lat.trim() === "" ? null : Number(lat);
-    const parsedLng = lng.trim() === "" ? null : Number(lng);
-    if (name.trim().length < 2 || city.trim().length < 2) {
-      setFeedback("Enter a stop name and town.");
-      return;
-    }
-    if ((parsedLat === null) !== (parsedLng === null)) {
-      setFeedback("Enter both coordinates, or leave both blank.");
-      return;
-    }
-    if (parsedLat !== null && !hasCoords({ lat: parsedLat, lng: parsedLng })) {
-      setFeedback("Latitude must be from -90 to 90 and longitude from -180 to 180.");
-      return;
-    }
-
-    try {
-      const current = loadList<StopItem>(KEYS.stops, SEED_STOPS);
-      const item = { name: name.trim(), city: city.trim(), kind, lat: parsedLat, lng: parsedLng };
-      saveList(KEYS.stops, editingId
-        ? current.map((stop) => stop.id === editingId ? { ...stop, ...item } : stop)
-        : [...current, { id: newId("stop"), ...item }]);
-      setName("");
-      setCity("");
-      setKind("pickup");
-      setLat("");
-      setLng("");
-      setEditingId(null);
-      setFeedback(editingId ? "Stop updated." : "Stop added.");
-    } catch {
-      setFeedback("The stop could not be saved. Please try again.");
-    }
-  }
-
-  function editStop(stop: StopItem) {
-    setEditingId(stop.id);
-    setName(stop.name);
-    setCity(stop.city);
-    setKind(stop.kind);
-    setLat(stop.lat?.toString() ?? "");
-    setLng(stop.lng?.toString() ?? "");
-    setFeedback("");
-  }
-
-  function deleteStop(stopId: string) {
-    try {
-      saveList(KEYS.stops, loadList<StopItem>(KEYS.stops, SEED_STOPS).filter((stop) => stop.id !== stopId));
-      setFeedback("Stop removed.");
-    } catch {
-      setFeedback("The stop could not be removed. Please try again.");
-    }
-  }
-
-  return (
-    <div className="admin-section-content">
-      <h3>{editingId ? "Edit pickup or drop-off point" : "Add a pickup or drop-off point"}</h3>
-      <form className="module-form admin-data-form" onSubmit={submitStop}>
-        <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
-        <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
-        <datalist id="malawi-stop-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
-        <label>Point type<select value={kind} onChange={(event) => setKind(event.target.value as StopKind)}><option value="pickup">Pickup (also drop-off)</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
-        <label>Latitude <span className="optional-label">Optional</span><input type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} /></label>
-        <label>Longitude <span className="optional-label">Optional</span><input type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} /></label>
-        <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add stop"}</button>
-        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setName(""); setCity(""); setLat(""); setLng(""); setFeedback(""); }}>Stop editing</button>}
-      </form>
-      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      <div className="admin-record-list">
-        {stops.map((stop) => (
-          <article key={stop.id}>
-            <div><strong>{stop.name}</strong><small>{stopKindLabel(stop.kind)} · {stop.city} · {hasCoords(stop) ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}` : "No map coordinates"}</small></div>
-            <div className="admin-record-actions">
-              <button type="button" className="text-action" onClick={() => editStop(stop)}>Edit</button>
-              <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${stop.name}?`)) deleteStop(stop.id); }}>Remove</button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ReportManagement() {
-  const reports = useStoredList<ReportItem>(KEYS.reports, []);
-  const [feedback, setFeedback] = useState("");
-
-  function updateStatus(reportId: string, status: ReportStatus) {
-    try {
-      const updated = loadList<ReportItem>(KEYS.reports, []).map((report) =>
-        report.id === reportId ? { ...report, status } : report,
-      );
-      saveList(KEYS.reports, updated);
-      setFeedback("Report status updated.");
-    } catch {
-      setFeedback("The report could not be updated. Please try again.");
-    }
-  }
-
-  return (
-    <div className="admin-section-content">
-      <h3>Passenger reports</h3>
-      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      {reports.length === 0 ? <p className="module-empty">There are no passenger reports to review yet.</p> : (
-        <div className="admin-record-list">
-          {[...reports].reverse().map((report) => (
-            <article className="admin-report-record" key={report.id}>
-              <div><strong>{report.type}: {report.itemName}</strong><small>Reported by {report.reporterName || "Unknown sender"}{report.reporterEmail ? ` · ${report.reporterEmail}` : ""} · {report.location || "Location not provided"} · {new Date(report.createdAt).toLocaleDateString()}</small><p>{report.description}</p></div>
-              <label className="status-control">Status<select value={report.status} onChange={(event) => updateStatus(report.id, event.target.value as ReportStatus)}><option value="open">Open</option><option value="reviewing">Reviewing</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></label>
-            </article>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BookingManagement() {
-  return (
-    <div className="admin-section-content">
-      <h3>Sample passenger bookings</h3>
-      <p className="module-copy">{MOCK_ADMIN_BOOKINGS.length} fictional records for the admin preview. These are not real reservations or passenger details.</p>
-      <div className="admin-record-list">
-        {MOCK_ADMIN_BOOKINGS.map((booking) => (
-          <article key={booking.reference}>
-            <div>
-              <strong>{booking.route} · {fmtDate(booking.travelDate)}</strong>
-              <small>{booking.name} · {booking.passengers} passenger{booking.passengers === 1 ? "" : "s"}</small>
-              <small>{booking.pickup} → {booking.dropoff} · Reference {booking.reference}</small>
-            </div>
-            <span className={`booking-state ${booking.status}`}>{booking.status}</span>
-          </article>
-        ))}
-      </div>
-      <p className="module-footnote">This preview is static mock data and is not connected to passenger booking submissions.</p>
-    </div>
-  );
-}
-
-export default MapAdminIntegrationPage;

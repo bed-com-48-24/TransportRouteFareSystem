@@ -1,3 +1,5 @@
+import { distanceKm } from "./geo";
+
 export type Coordinates = { lat: number; lng: number };
 
 export const DISTRICT_COORDINATES: Record<string, Coordinates> = {
@@ -33,3 +35,22 @@ export const DISTRICT_COORDINATES: Record<string, Coordinates> = {
 
 export const MALAWI_DISTRICTS = Object.keys(DISTRICT_COORDINATES);
 export const MALAWI_LOCATIONS = [...MALAWI_DISTRICTS, "Limbe", "Mzuzu"];
+export const TRANSPORT_TOWN_COORDINATES: Record<string, Coordinates> = {
+  ...DISTRICT_COORDINATES,
+  Limbe: { lat: -15.8103, lng: 35.0586 },
+  Mzuzu: { lat: -11.4656, lng: 34.0207 },
+};
+
+export function nearestTransportTown(
+  position: Coordinates,
+  maxDistanceKm = 60,
+): { town: string; distance: number } | null {
+  const nearest = Object.entries(TRANSPORT_TOWN_COORDINATES)
+    .map(([town, coordinates]) => ({
+      town,
+      distance: distanceKm(position.lat, position.lng, coordinates.lat, coordinates.lng),
+    }))
+    .sort((first, second) => first.distance - second.distance)[0];
+
+  return nearest && nearest.distance <= maxDistanceKm ? nearest : null;
+}
