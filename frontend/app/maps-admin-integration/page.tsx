@@ -7,11 +7,11 @@ import AdminWorkspace, { isAdminSection, type AdminSection } from "@/components/
 import RequireAdmin from "@/components/RequireAdmin";
 import { useRoadRoutes } from "@/components/road-routing";
 import { useSession } from "@/lib/auth";
+import DemoDataNotice from "@/components/DemoDataNotice";
 import { distanceKm, hasCoords } from "@/lib/geo";
 import { DISTRICT_COORDINATES, MALAWI_LOCATIONS, type Coordinates } from "@/lib/malawi-locations";
-import { KEYS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
-import type { FareItem, RouteItem, StopItem, StopKind } from "@/lib/types";
+import { useBackendFares, useBackendRoutes, useBackendStops } from "@/lib/use-backend-data";
+import type { StopKind } from "@/lib/types";
 
 const RouteNetworkMap = dynamic(() => import("@/components/RouteNetworkMap"), {
   ssr: false,
@@ -49,9 +49,9 @@ function MapAdminContent() {
   const adminSection: AdminSection = isAdminSection(rawSection) ? rawSection : "overview";
   const mainPanel = searchParams.get("panel") === "admin" ? "admin" : "map";
 
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
+  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: fares } = useBackendFares();
+  const { data: stops, usingDemo: stopsAreDemo } = useBackendStops();
   const [selectedRouteId, setSelectedRouteId] = useState("all");
   const [city, setCity] = useState("Blantyre");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -133,6 +133,8 @@ function MapAdminContent() {
               {session?.role === "admin" ? "Admin workspace" : "Staff sign in"}
             </button>
           </nav>
+
+          <DemoDataNotice show={routesAreDemo || stopsAreDemo} what="routes and stops" />
 
           <section className="module-section" aria-labelledby="map-heading">
             <div className="module-section-heading">

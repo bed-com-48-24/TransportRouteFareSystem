@@ -18,7 +18,6 @@ import {
   notifyReportUpdate,
   notifyRouteUpdate,
 } from "@/lib/notifications";
-import { PASSENGER_ACCOUNTS_KEY, type PassengerSession } from "@/lib/passenger-auth";
 import { ensureRouteStops, ensureStop, ensureVehicle, resolveStopId } from "@/lib/admin-api";
 import { KEYS, MOCK_REPORTS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
@@ -31,7 +30,6 @@ import {
   useBackendStops,
 } from "@/lib/use-backend-data";
 import { fromStopItem, weekdaysForDate } from "@/services/adapters";
-import type { BackendUser } from "@/services/types";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiFares from "@/services/fares.service";
 import * as apiRoutes from "@/services/routes.service";
@@ -75,7 +73,6 @@ export function isAdminSection(value: string | null): value is AdminSection {
 
 const EMPTY_TRIPS: Trip[] = [];
 const EMPTY_BOOKINGS: Booking[] = [];
-const EMPTY_ACCOUNTS: PassengerSession[] = [];
 
 const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   open: "Open",
@@ -181,13 +178,13 @@ export default function AdminWorkspace({
 }
 
 function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
-  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: routes, usingDemo: routesAreDemo, error: routesError } = useBackendRoutes();
   const { data: fares } = useBackendFares();
   const { data: stops } = useBackendStops();
-  const { data: trips } = useAdminTrips();
-  const { data: bookings, usingDemo: bookingsAreDemo } = useAdminBookings();
+  const { data: trips, error: tripsError } = useAdminTrips();
+  const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
-  const { data: accounts } = useAdminUsers();
+  const { data: accounts, error: usersError } = useAdminUsers();
   const today = localDateValue();
 
   const upcomingTrips = trips.filter((trip) => trip.date >= today);
@@ -222,6 +219,11 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
     <div className="admin-section-content">
       <h3>Today at a glance</h3>
       <DemoDataNotice show={routesAreDemo || bookingsAreDemo} what="admin records" />
+      {(routesError || tripsError || bookingsError || usersError) && (
+        <p className="module-error" role="alert">
+          {routesError || tripsError || bookingsError || usersError}
+        </p>
+      )}
       <p className="module-copy">
         Live figures come from the YendaRoute backend. Customer reports and notifications are kept
         in this browser because the backend has no reports endpoint yet.
@@ -306,7 +308,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
 }
 
 function RouteFareManagement() {
-  const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes } = useBackendRoutes();
+  const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes, error: routesError } = useBackendRoutes();
   const { data: fares, reload: reloadFares } = useBackendFares();
   const { data: trips } = useAdminTrips();
   const [origin, setOrigin] = useState("");
@@ -467,6 +469,7 @@ function RouteFareManagement() {
     <div className="admin-section-content">
       <h3>{editingId ? "Edit route and fare" : "Add a route and estimated fare"}</h3>
       <DemoDataNotice show={routesAreDemo} what="routes and fares" />
+      {routesError && <p className="module-error" role="alert">{routesError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitRoute}>
         <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => setOrigin(event.target.value)} maxLength={60} required /></label>
         <label>Destination town<input list="malawi-route-towns" value={destination} onChange={(event) => setDestination(event.target.value)} maxLength={60} required /></label>
@@ -518,7 +521,7 @@ function TripScheduleManagement() {
   const { data: routes } = useBackendRoutes();
   const { data: fares } = useBackendFares();
   const { data: stops } = useBackendStops();
-  const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips } = useAdminTrips();
+  const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips, error: tripsError } = useAdminTrips();
   const { data: bookings } = useAdminBookings();
   const [routeId, setRouteId] = useState("");
   const [date, setDate] = useState("");
@@ -746,6 +749,7 @@ function TripScheduleManagement() {
     <div className="admin-section-content">
       <h3>{editingTripId ? "Edit a scheduled departure" : "Schedule a departure"}</h3>
       <DemoDataNotice show={tripsAreDemo} what="scheduled departures" />
+      {tripsError && <p className="module-error" role="alert">{tripsError}</p>}
       <p className="module-copy">Only departures scheduled here can be booked by passengers. Choose a future travel date.</p>
       {routes.length === 0 ? (
         <p className="module-empty">Add a route and fare in Routes &amp; fares before scheduling a departure.</p>
@@ -831,7 +835,7 @@ function TripScheduleManagement() {
 }
 
 function StopManagement() {
-  const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops } = useBackendStops();
+  const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops, error: stopsError } = useBackendStops();
   const { data: trips } = useAdminTrips();
   const { data: bookings } = useAdminBookings();
   const [name, setName] = useState("");
@@ -975,6 +979,7 @@ function StopManagement() {
     <div className="admin-section-content">
       <h3>{editingId ? "Edit pickup or drop-off point" : "Add a pickup or drop-off point"}</h3>
       <DemoDataNotice show={stopsAreDemo} what="stops" />
+      {stopsError && <p className="module-error" role="alert">{stopsError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitStop}>
         <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
         <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
@@ -1021,7 +1026,7 @@ function StopManagement() {
 }
 
 function BookingManagement() {
-  const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useAdminBookings();
+  const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings, error: bookingsError } = useAdminBookings();
   const { data: trips } = useAdminTrips();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Booking["status"]>("all");
@@ -1121,6 +1126,7 @@ function BookingManagement() {
     <div className="admin-section-content">
       <h3>Passenger bookings</h3>
       <DemoDataNotice show={bookingsAreDemo} what="bookings" />
+      {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
       <p className="module-copy">
         {bookings.length} reservation{bookings.length === 1 ? "" : "s"} {bookingsAreDemo ? "in this browser" : "from the backend"} · {confirmedCount} confirmed ·{" "}
         {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")} collected.
@@ -1328,7 +1334,7 @@ type PassengerRow = {
 
 function PassengerManagement() {
   const { data: accounts } = useAdminUsers();
-  const { data: bookings, usingDemo: bookingsAreDemo } = useAdminBookings();
+  const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const [query, setQuery] = useState("");
   const [messaging, setMessaging] = useState<string | null>(null);
@@ -1408,6 +1414,7 @@ function PassengerManagement() {
     <div className="admin-section-content">
       <h3>Passengers and booking contacts</h3>
       <DemoDataNotice show={bookingsAreDemo} what="passengers and bookings" />
+      {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
       <p className="module-copy">
         {registeredCount} registered passenger account{registeredCount === 1 ? "" : "s"} and {guestCount} guest
         contact{guestCount === 1 ? "" : "s"} from the backend accounts, bookings, and local reports.

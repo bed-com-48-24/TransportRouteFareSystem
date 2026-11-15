@@ -65,8 +65,7 @@ function readQueryParam(name: string): string {
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
   const { data: trips, usingDemo: tripsAreDemo } = useBackendTrips();
   const { data: routes } = useBackendRoutes();
-  const { data: bookings, usingDemo: bookingsAreDemo } = useMyBookings();
-  const backendDown = tripsAreDemo && bookingsAreDemo;
+  const { data: bookings } = useMyBookings();
   const initialTrip = trips.find((trip) => trip.id === initialTripId);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
   const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));

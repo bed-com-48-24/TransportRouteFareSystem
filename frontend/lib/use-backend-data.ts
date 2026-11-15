@@ -22,6 +22,7 @@ import * as apiRoutes from "@/services/routes.service";
 import * as apiSchedules from "@/services/schedules.service";
 import * as apiStops from "@/services/stops.service";
 import * as apiUsers from "@/services/users.service";
+import * as apiVehicles from "@/services/vehicles.service";
 import type { BackendUser } from "@/services/types";
 
 /** How many days ahead the schedule screens look. */
@@ -118,17 +119,34 @@ export function useMyBookings(): ApiList<Booking> {
 }
 
 /**
- * Admin schedule list. Schedules repeat weekly, so each row is dated to its
- * next occurrence; that keeps every schedule visible whatever day it runs.
+ * Admin schedule list, enriched with route and vehicle records so the rows can
+ * show names and seat capacity even if the list endpoint omits the joins.
  */
+async function fetchAdminTrips(): Promise<Trip[]> {
+  const [schedules, routes, vehicles] = await Promise.all([
+    apiSchedules.listForAdmin(),
+    apiRoutes.list().catch(() => []),
+    apiVehicles.list().catch(() => []),
+  ]);
+  const routeById = new Map(routes.map((route) => [route.id, route]));
+  const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
+  return schedules.map((schedule) =>
+    toTrip(
+      {
+        ...schedule,
+        route: schedule.route ?? routeById.get(schedule.routeId),
+        vehicle: schedule.vehicle ?? vehicleById.get(schedule.vehicleId),
+      },
+      nextDateForWeekdays(schedule.daysOfWeek),
+    ),
+  );
+}
+
+/** Admin schedule list. Each weekly schedule is dated to its next occurrence. */
 export function useAdminTrips(): ApiList<Trip> {
   return useApiList<Trip>(
-    async () => {
-      const schedules = await apiSchedules.listForAdmin();
-      return schedules.map((schedule) =>
-        toTrip(schedule, nextDateForWeekdays(schedule.daysOfWeek)),
-      );
-    },
+    fetchAdminTrips,
     () => buildDemoTrips(),
     "admin-trips",
   );
@@ -138,27 +156,22 @@ export function useAdminTrips(): ApiList<Trip> {
 export function useAdminBookings(): ApiList<Booking> {
   return useApiList<Booking>(
     async () => {
-      const [rows, schedules] = await Promise.all([
+      const [rows, trips] = await Promise.all([
         apiBookings.listForAdmin({ pageSize: 100 }),
-        apiSchedules.listForAdmin().catch(() => []),
+        fetchAdminTrips().catch(() => [] as Trip[]),
       ]);
-      const trips = new Map(
-        schedules.map((schedule) => [
-          String(schedule.id),
-          toTrip(schedule, nextDateForWeekdays(schedule.daysOfWeek)),
-        ]),
-      );
-      return rows.map((booking) => toBooking(booking, trips.get(String(booking.scheduleId))));
+      const tripById = new Map(trips.map((trip) => [trip.id, trip]));
+      return rows.map((booking) => toBooking(booking, tripById.get(String(booking.scheduleId))));
     },
     () => buildDemoBookings(buildDemoTrips()),
     "admin-bookings",
   );
 }
 
-/** Registered accounts, used by the admin passengers panel. */
+/** Registered passenger accounts, used by the admin passengers panel. */
 export function useAdminUsers(): ApiList<BackendUser> {
   return useApiList<BackendUser>(
-    async () => apiUsers.list(),
+    async () => apiUsers.list("passenger"),
     () => [],
     "admin-users",
   );
