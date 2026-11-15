@@ -10,6 +10,7 @@ import { SEED_FARES, SEED_ROUTES, SEED_STOPS } from "./seed";
 import type { Booking, FareItem, RouteItem, StopItem, Trip } from "./types";
 import {
   isoDateInDays,
+  nextDateForWeekdays,
   toBooking,
   toFareItem,
   toRouteItem,
@@ -20,6 +21,8 @@ import * as apiBookings from "@/services/bookings.service";
 import * as apiRoutes from "@/services/routes.service";
 import * as apiSchedules from "@/services/schedules.service";
 import * as apiStops from "@/services/stops.service";
+import * as apiUsers from "@/services/users.service";
+import type { BackendUser } from "@/services/types";
 
 /** How many days ahead the schedule screens look. */
 export const SCHEDULE_DAYS = 7;
@@ -111,5 +114,52 @@ export function useMyBookings(): ApiList<Booking> {
     },
     () => buildDemoBookings(buildDemoTrips()),
     "my-bookings",
+  );
+}
+
+/**
+ * Admin schedule list. Schedules repeat weekly, so each row is dated to its
+ * next occurrence; that keeps every schedule visible whatever day it runs.
+ */
+export function useAdminTrips(): ApiList<Trip> {
+  return useApiList<Trip>(
+    async () => {
+      const schedules = await apiSchedules.listForAdmin();
+      return schedules.map((schedule) =>
+        toTrip(schedule, nextDateForWeekdays(schedule.daysOfWeek)),
+      );
+    },
+    () => buildDemoTrips(),
+    "admin-trips",
+  );
+}
+
+/** Every passenger booking, for the admin bookings panel. */
+export function useAdminBookings(): ApiList<Booking> {
+  return useApiList<Booking>(
+    async () => {
+      const [rows, schedules] = await Promise.all([
+        apiBookings.listForAdmin({ pageSize: 100 }),
+        apiSchedules.listForAdmin().catch(() => []),
+      ]);
+      const trips = new Map(
+        schedules.map((schedule) => [
+          String(schedule.id),
+          toTrip(schedule, nextDateForWeekdays(schedule.daysOfWeek)),
+        ]),
+      );
+      return rows.map((booking) => toBooking(booking, trips.get(String(booking.scheduleId))));
+    },
+    () => buildDemoBookings(buildDemoTrips()),
+    "admin-bookings",
+  );
+}
+
+/** Registered accounts, used by the admin passengers panel. */
+export function useAdminUsers(): ApiList<BackendUser> {
+  return useApiList<BackendUser>(
+    async () => apiUsers.list(),
+    () => [],
+    "admin-users",
   );
 }

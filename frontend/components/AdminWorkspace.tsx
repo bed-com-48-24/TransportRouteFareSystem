@@ -9,6 +9,7 @@ import {
   fmtDate,
 } from "@/lib/booking-data";
 import { readAdminProfile, updateAdminCompanyName, useSession } from "@/lib/auth";
+import DemoDataNotice from "@/components/DemoDataNotice";
 import { hasCoords } from "@/lib/geo";
 import { MALAWI_LOCATIONS } from "@/lib/malawi-locations";
 import {
@@ -18,8 +19,24 @@ import {
   notifyRouteUpdate,
 } from "@/lib/notifications";
 import { PASSENGER_ACCOUNTS_KEY, type PassengerSession } from "@/lib/passenger-auth";
+import { ensureRouteStops, ensureStop, ensureVehicle, resolveStopId } from "@/lib/admin-api";
 import { KEYS, MOCK_REPORTS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
+import {
+  useAdminBookings,
+  useAdminTrips,
+  useAdminUsers,
+  useBackendFares,
+  useBackendRoutes,
+  useBackendStops,
+} from "@/lib/use-backend-data";
+import { fromStopItem, weekdaysForDate } from "@/services/adapters";
+import type { BackendUser } from "@/services/types";
+import * as apiBookings from "@/services/bookings.service";
+import * as apiFares from "@/services/fares.service";
+import * as apiRoutes from "@/services/routes.service";
+import * as apiSchedules from "@/services/schedules.service";
+import * as apiStops from "@/services/stops.service";
 import type {
   Booking,
   FareItem,
@@ -126,8 +143,8 @@ export default function AdminWorkspace({
           <p className="module-eyebrow">AUTHORIZED ADMINISTRATORS</p>
           <h2 id="admin-heading">Company admin workspace</h2>
           <p className="module-copy">
-            Everything passengers see and do is controlled from here. Changes are saved in this
-            browser for the demonstration.
+            Routes, fares, departures, stops, and bookings are read from and saved to the YendaRoute
+            backend. Customer reports and notifications stay in this browser for now.
           </p>
         </div>
         {onShowMap && (
@@ -164,13 +181,13 @@ export default function AdminWorkspace({
 }
 
 function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
-  const trips = useStoredList<Trip>(KEYS.trips, EMPTY_TRIPS);
-  const bookings = useStoredList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: fares } = useBackendFares();
+  const { data: stops } = useBackendStops();
+  const { data: trips } = useAdminTrips();
+  const { data: bookings, usingDemo: bookingsAreDemo } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
-  const accounts = useStoredList<PassengerSession>(PASSENGER_ACCOUNTS_KEY, EMPTY_ACCOUNTS);
+  const { data: accounts } = useAdminUsers();
   const today = localDateValue();
 
   const upcomingTrips = trips.filter((trip) => trip.date >= today);
@@ -197,16 +214,17 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
     { id: "reports", label: "Reports to review", value: String(openReports.length), hint: `${reports.length} report${reports.length === 1 ? "" : "s"} in total` },
     { id: "passengers", label: "Registered passengers", value: String(accounts.length), hint: "Guest bookings also appear in Passengers" },
     { id: "stops", label: "Pickup & drop-off points", value: String(stops.length), hint: `${stops.filter(hasCoords).length} with map coordinates` },
-    { id: "bookings", label: "Demo revenue collected", value: `MWK ${revenue.toLocaleString("en-MW")}`, hint: `${paidBookings.length} paid booking${paidBookings.length === 1 ? "" : "s"}` },
+    { id: "bookings", label: "Revenue collected", value: `MWK ${revenue.toLocaleString("en-MW")}`, hint: `${paidBookings.length} paid booking${paidBookings.length === 1 ? "" : "s"}` },
     { id: "company", label: "Company profile", value: "Manage", hint: "Update the company name or message passengers" },
   ];
 
   return (
     <div className="admin-section-content">
       <h3>Today at a glance</h3>
+      <DemoDataNotice show={routesAreDemo || bookingsAreDemo} what="admin records" />
       <p className="module-copy">
-        This overview is built from the same browser data that powers passenger search, booking,
-        cancellation, reports, and notifications.
+        Live figures come from the YendaRoute backend. Customer reports and notifications are kept
+        in this browser because the backend has no reports endpoint yet.
       </p>
 
       <div className="admin-overview-grid">
@@ -288,9 +306,9 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
 }
 
 function RouteFareManagement() {
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const trips = useStoredList<Trip>(KEYS.trips, EMPTY_TRIPS);
+  const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes } = useBackendRoutes();
+  const { data: fares, reload: reloadFares } = useBackendFares();
+  const { data: trips } = useAdminTrips();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [service, setService] = useState("Minibus");
@@ -304,7 +322,7 @@ function RouteFareManagement() {
     `${route.origin} ${route.destination} ${route.service}`.toLowerCase().includes(normalizedQuery),
   );
 
-  function submitRoute(event: FormEvent<HTMLFormElement>) {
+  async function submitRoute(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedOrigin = origin.trim();
     const normalizedDestination = destination.trim();
@@ -329,21 +347,53 @@ function RouteFareManagement() {
     }
 
     try {
-      const currentRoutes = loadList<RouteItem>(KEYS.routes, SEED_ROUTES);
-      const currentFares = loadList<FareItem>(KEYS.fares, SEED_FARES);
-      const routeId = editingId ?? newId("route");
-      const nextRoute = { id: routeId, origin: normalizedOrigin, destination: normalizedDestination, service: service.trim() };
-      saveList(KEYS.routes, editingId
-        ? currentRoutes.map((route) => route.id === routeId ? nextRoute : route)
-        : [...currentRoutes, nextRoute]);
-      const existingFare = currentFares.find((item) => item.routeId === routeId);
-      saveList(KEYS.fares, existingFare
-        ? currentFares.map((item) => item.routeId === routeId ? { ...item, amount } : item)
-        : [...currentFares, { id: newId("fare"), routeId, amount }]);
+      if (routesAreDemo) {
+        const currentRoutes = loadList<RouteItem>(KEYS.routes, SEED_ROUTES);
+        const currentFares = loadList<FareItem>(KEYS.fares, SEED_FARES);
+        const routeId = editingId ?? newId("route");
+        const nextRoute = { id: routeId, origin: normalizedOrigin, destination: normalizedDestination, service: service.trim() };
+        saveList(KEYS.routes, editingId
+          ? currentRoutes.map((route) => route.id === routeId ? nextRoute : route)
+          : [...currentRoutes, nextRoute]);
+        const existingFare = currentFares.find((item) => item.routeId === routeId);
+        saveList(KEYS.fares, existingFare
+          ? currentFares.map((item) => item.routeId === routeId ? { ...item, amount } : item)
+          : [...currentFares, { id: newId("fare"), routeId, amount }]);
+        reloadRoutes();
+        reloadFares();
+      } else {
+        const stopIds = await ensureRouteStops(normalizedOrigin, normalizedDestination);
+        let routeId: number;
+
+        if (editingId) {
+          routeId = Number(editingId);
+          await apiRoutes.update(routeId, {
+            name: `${normalizedOrigin} → ${normalizedDestination}`,
+            companyName: service.trim(),
+          });
+        } else {
+          const created = await apiRoutes.create({
+            name: `${normalizedOrigin} → ${normalizedDestination}`,
+            ...stopIds,
+            companyName: service.trim(),
+          });
+          routeId = created.id;
+        }
+
+        const existingFare = fares.find((item) => item.routeId === String(routeId));
+        if (existingFare) {
+          await apiFares.update(Number(existingFare.id), { amount });
+        } else {
+          await apiFares.create(routeId, { ...stopIds, amount });
+        }
+        reloadRoutes();
+        reloadFares();
+      }
+
       try {
         notifyRouteUpdate(
-          `${editingId ? "Route and fare updated" : "New route and fare added"}: ${normalizedOrigin} → ${normalizedDestination}${nextRoute.service ? ` (${nextRoute.service})` : ""} · MWK ${amount.toLocaleString("en-MW")}. Passengers can now search this journey.`,
-          routeId,
+          `${editingId ? "Route and fare updated" : "New route and fare added"}: ${normalizedOrigin} → ${normalizedDestination}${service.trim() ? ` (${service.trim()})` : ""} · MWK ${amount.toLocaleString("en-MW")}. Passengers can now search this journey.`,
+          editingId ?? `${normalizedOrigin}-${normalizedDestination}`,
         );
       } catch {
         // The route is saved; a blocked notification store must not undo it.
@@ -354,8 +404,12 @@ function RouteFareManagement() {
       setService("Minibus");
       setEditingId(null);
       setFeedback(editingId ? "Route and fare updated for passenger search." : "Route and fare added for passenger search.");
-    } catch {
-      setFeedback("The route or fare could not be saved. Check browser storage and try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The route or fare could not be saved. Please try again.",
+      );
     }
   }
 
@@ -368,7 +422,7 @@ function RouteFareManagement() {
     setFeedback("");
   }
 
-  function deleteRoute(routeId: string) {
+  async function deleteRoute(routeId: string) {
     const route = routes.find((item) => item.id === routeId);
     if (route && trips.some((trip) =>
       trip.route.toLocaleLowerCase() === `${route.origin} → ${route.destination}`.toLocaleLowerCase(),
@@ -377,8 +431,20 @@ function RouteFareManagement() {
       return;
     }
     try {
-      saveList(KEYS.routes, loadList<RouteItem>(KEYS.routes, SEED_ROUTES).filter((item) => item.id !== routeId));
-      saveList(KEYS.fares, loadList<FareItem>(KEYS.fares, SEED_FARES).filter((item) => item.routeId !== routeId));
+      if (routesAreDemo) {
+        saveList(KEYS.routes, loadList<RouteItem>(KEYS.routes, SEED_ROUTES).filter((item) => item.id !== routeId));
+        saveList(KEYS.fares, loadList<FareItem>(KEYS.fares, SEED_FARES).filter((item) => item.routeId !== routeId));
+        reloadRoutes();
+        reloadFares();
+      } else {
+        const numericId = Number(routeId);
+        const routeFares = fares.filter((item) => item.routeId === routeId);
+        await Promise.allSettled(routeFares.map((item) => apiFares.remove(Number(item.id))));
+        await apiRoutes.remove(numericId);
+        reloadRoutes();
+        reloadFares();
+      }
+
       try {
         notifyRouteUpdate(
           `Route removed: ${route ? `${route.origin} → ${route.destination}` : routeId}. Its fare estimate was removed too, so passengers can no longer search it.`,
@@ -388,14 +454,19 @@ function RouteFareManagement() {
         // The route is removed; a blocked notification store must not undo it.
       }
       setFeedback("Route and its fare estimate removed.");
-    } catch {
-      setFeedback("The route could not be removed. Please try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The route could not be removed. Please try again.",
+      );
     }
   }
 
   return (
     <div className="admin-section-content">
       <h3>{editingId ? "Edit route and fare" : "Add a route and estimated fare"}</h3>
+      <DemoDataNotice show={routesAreDemo} what="routes and fares" />
       <form className="module-form admin-data-form" onSubmit={submitRoute}>
         <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => setOrigin(event.target.value)} maxLength={60} required /></label>
         <label>Destination town<input list="malawi-route-towns" value={destination} onChange={(event) => setDestination(event.target.value)} maxLength={60} required /></label>
@@ -444,11 +515,11 @@ function RouteFareManagement() {
 }
 
 function TripScheduleManagement() {
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
-  const trips = useStoredList<Trip>(KEYS.trips, EMPTY_TRIPS);
-  const bookings = useStoredList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+  const { data: routes } = useBackendRoutes();
+  const { data: fares } = useBackendFares();
+  const { data: stops } = useBackendStops();
+  const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips } = useAdminTrips();
+  const { data: bookings } = useAdminBookings();
   const [routeId, setRouteId] = useState("");
   const [date, setDate] = useState("");
   const [departure, setDeparture] = useState("");
@@ -509,7 +580,7 @@ function TripScheduleManagement() {
     setFeedback("");
   }
 
-  function submitSchedule(event: FormEvent<HTMLFormElement>) {
+  async function submitSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback("");
     const selectedRoute = routes.find((item) => item.id === routeId);
@@ -535,8 +606,7 @@ function TripScheduleManagement() {
     }
 
     try {
-      const currentTrips = loadList<Trip>(KEYS.trips, EMPTY_TRIPS);
-      if (currentTrips.some((trip) =>
+      if (trips.some((trip) =>
         trip.id !== editingTripId &&
         trip.route.toLowerCase() === `${selectedRoute.origin} → ${selectedRoute.destination}`.toLowerCase() &&
         trip.date === date &&
@@ -589,9 +659,37 @@ function TripScheduleManagement() {
         }
       }
 
-      saveList(KEYS.trips, editingTripId
-        ? currentTrips.map((trip) => trip.id === editingTripId ? nextTrip : trip)
-        : [...currentTrips, nextTrip]);
+      if (tripsAreDemo) {
+        const currentTrips = loadList<Trip>(KEYS.trips, EMPTY_TRIPS);
+        saveList(KEYS.trips, editingTripId
+          ? currentTrips.map((trip) => trip.id === editingTripId ? nextTrip : trip)
+          : [...currentTrips, nextTrip]);
+      } else {
+        // The backend stores a weekly schedule, so the chosen date becomes its weekday.
+        const routeRecord = await apiRoutes.get(Number(selectedRoute.id));
+        const vehicleId = await ensureVehicle(seatCapacity);
+        const departureStopId = await resolveStopId(
+          nextTrip.pickup[0] ?? "",
+          routeRecord.originStopId ?? routeRecord.stops?.[0]?.stopId ?? 0,
+        );
+        const payload = {
+          routeId: Number(selectedRoute.id),
+          vehicleId,
+          departureStopId,
+          departureTime: departure,
+          arrivalAt: arrival,
+          fare: amount,
+          daysOfWeek: weekdaysForDate(date),
+        };
+
+        if (editingTripId) {
+          await apiSchedules.update(Number(editingTripId), payload);
+        } else {
+          await apiSchedules.create(payload);
+        }
+        reloadTrips();
+      }
+
       try {
         notifyRouteUpdate(
           `${editingTripId ? "Departure updated" : "New departure scheduled"}: ${nextTrip.route} on ${fmtDate(nextTrip.date)} at ${nextTrip.departure}, ${nextTrip.capacity} seats, MWK ${nextTrip.fare.toLocaleString("en-MW")}. Passengers can ${editingTripId ? "still " : "now "}book this trip.`,
@@ -602,19 +700,29 @@ function TripScheduleManagement() {
       }
       resetForm();
       setFeedback(editingTripId ? "Scheduled departure updated for passengers." : "Trip scheduled. Passengers can now book this departure.");
-    } catch {
-      setFeedback("The schedule could not be saved. Check browser storage and try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The schedule could not be saved. Please try again.",
+      );
     }
   }
 
-  function removeSchedule(trip: Trip) {
+  async function removeSchedule(trip: Trip) {
     if (bookings.some((booking) => booking.tripId === trip.id && booking.status === "confirmed")) {
       setFeedback("This departure has confirmed bookings and cannot be removed. Cancel the bookings first.");
       return;
     }
     if (!window.confirm(`Remove the ${trip.route} departure on ${fmtDate(trip.date)} at ${trip.departure}?`)) return;
     try {
-      saveList(KEYS.trips, loadList<Trip>(KEYS.trips, EMPTY_TRIPS).filter((item) => item.id !== trip.id));
+      if (tripsAreDemo) {
+        saveList(KEYS.trips, loadList<Trip>(KEYS.trips, EMPTY_TRIPS).filter((item) => item.id !== trip.id));
+        reloadTrips();
+      } else {
+        await apiSchedules.remove(Number(trip.id));
+        reloadTrips();
+      }
       try {
         notifyRouteUpdate(
           `Departure removed: ${trip.route} on ${fmtDate(trip.date)} at ${trip.departure}. It can no longer be booked.`,
@@ -625,14 +733,19 @@ function TripScheduleManagement() {
       }
       if (editingTripId === trip.id) resetForm();
       setFeedback("Scheduled departure removed.");
-    } catch {
-      setFeedback("The departure could not be removed. Please try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The departure could not be removed. Please try again.",
+      );
     }
   }
 
   return (
     <div className="admin-section-content">
       <h3>{editingTripId ? "Edit a scheduled departure" : "Schedule a departure"}</h3>
+      <DemoDataNotice show={tripsAreDemo} what="scheduled departures" />
       <p className="module-copy">Only departures scheduled here can be booked by passengers. Choose a future travel date.</p>
       {routes.length === 0 ? (
         <p className="module-empty">Add a route and fare in Routes &amp; fares before scheduling a departure.</p>
@@ -718,9 +831,9 @@ function TripScheduleManagement() {
 }
 
 function StopManagement() {
-  const stops = useStoredList<StopItem>(KEYS.stops, SEED_STOPS);
-  const trips = useStoredList<Trip>(KEYS.trips, EMPTY_TRIPS);
-  const bookings = useStoredList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+  const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops } = useBackendStops();
+  const { data: trips } = useAdminTrips();
+  const { data: bookings } = useAdminBookings();
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [kind, setKind] = useState<StopKind>("pickup");
@@ -738,7 +851,7 @@ function StopManagement() {
     return trips.filter((trip) => trip.pickup.includes(nameToFind) || trip.dropoff.includes(nameToFind));
   }
 
-  function submitStop(event: FormEvent<HTMLFormElement>) {
+  async function submitStop(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedLat = lat.trim() === "" ? null : Number(lat);
     const parsedLng = lng.trim() === "" ? null : Number(lng);
@@ -756,39 +869,49 @@ function StopManagement() {
     }
 
     try {
-      const current = loadList<StopItem>(KEYS.stops, SEED_STOPS);
-      const previous = editingId ? current.find((stop) => stop.id === editingId) : undefined;
       const item = { name: name.trim(), city: city.trim(), kind, lat: parsedLat, lng: parsedLng };
-      saveList(KEYS.stops, editingId
-        ? current.map((stop) => stop.id === editingId ? { ...stop, ...item } : stop)
-        : [...current, { id: newId("stop"), ...item }]);
 
-      let updatedTrips = 0;
-      let updatedBookings = 0;
-      if (previous && previous.name !== item.name) {
-        const currentTrips = loadList<Trip>(KEYS.trips, EMPTY_TRIPS);
-        const nextTrips = currentTrips.map((trip) => {
-          const pickup = trip.pickup.map((point) => point === previous.name ? item.name : point);
-          const dropoff = trip.dropoff.map((point) => point === previous.name ? item.name : point);
-          if (pickup.some((point, index) => point !== trip.pickup[index]) || dropoff.some((point, index) => point !== trip.dropoff[index])) {
-            updatedTrips += 1;
-            return { ...trip, pickup, dropoff };
-          }
-          return trip;
-        });
-        if (updatedTrips > 0) saveList(KEYS.trips, nextTrips);
+      if (stopsAreDemo) {
+        const current = loadList<StopItem>(KEYS.stops, SEED_STOPS);
+        const previous = editingId ? current.find((stop) => stop.id === editingId) : undefined;
+        saveList(KEYS.stops, editingId
+          ? current.map((stop) => stop.id === editingId ? { ...stop, ...item } : stop)
+          : [...current, { id: newId("stop"), ...item }]);
 
-        const currentBookings = loadList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
-        const nextBookings = currentBookings.map((booking) => {
-          const nextPickup = booking.pickup === previous.name ? item.name : booking.pickup;
-          const nextDropoff = booking.dropoff === previous.name ? item.name : booking.dropoff;
-          if (nextPickup !== booking.pickup || nextDropoff !== booking.dropoff) {
-            updatedBookings += 1;
-            return { ...booking, pickup: nextPickup, dropoff: nextDropoff };
-          }
-          return booking;
-        });
-        if (updatedBookings > 0) saveList(KEYS.bookings, nextBookings);
+        let updatedTrips = 0;
+        let updatedBookings = 0;
+        if (previous && previous.name !== item.name) {
+          const currentTrips = loadList<Trip>(KEYS.trips, EMPTY_TRIPS);
+          const nextTrips = currentTrips.map((trip) => {
+            const pickup = trip.pickup.map((point) => point === previous.name ? item.name : point);
+            const dropoff = trip.dropoff.map((point) => point === previous.name ? item.name : point);
+            if (pickup.some((point, index) => point !== trip.pickup[index]) || dropoff.some((point, index) => point !== trip.dropoff[index])) {
+              updatedTrips += 1;
+              return { ...trip, pickup, dropoff };
+            }
+            return trip;
+          });
+          if (updatedTrips > 0) saveList(KEYS.trips, nextTrips);
+
+          const currentBookings = loadList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+          const nextBookings = currentBookings.map((booking) => {
+            const nextPickup = booking.pickup === previous.name ? item.name : booking.pickup;
+            const nextDropoff = booking.dropoff === previous.name ? item.name : booking.dropoff;
+            if (nextPickup !== booking.pickup || nextDropoff !== booking.dropoff) {
+              updatedBookings += 1;
+              return { ...booking, pickup: nextPickup, dropoff: nextDropoff };
+            }
+            return booking;
+          });
+          if (updatedBookings > 0) saveList(KEYS.bookings, nextBookings);
+        }
+        reloadStops();
+      } else if (editingId) {
+        await apiStops.update(Number(editingId), fromStopItem(item));
+        reloadStops();
+      } else {
+        await ensureStop(item.name, item.city, item.kind);
+        reloadStops();
       }
 
       setName("");
@@ -798,14 +921,17 @@ function StopManagement() {
       setLng("");
       setEditingId(null);
       const extra = [
-        updatedTrips > 0 ? `${updatedTrips} scheduled trip${updatedTrips === 1 ? "" : "s"} updated` : "",
-        updatedBookings > 0 ? `${updatedBookings} passenger booking${updatedBookings === 1 ? "" : "s"} updated` : "",
+        !stopsAreDemo && editingId ? "Stop renamed; its routes show the new name." : "",
       ].filter(Boolean).join(" · ");
       setFeedback(
         (editingId ? "Stop updated." : "Stop added.") + (extra ? ` ${extra}.` : ""),
       );
-    } catch {
-      setFeedback("The stop could not be saved. Please try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The stop could not be saved. Please try again.",
+      );
     }
   }
 
@@ -819,7 +945,7 @@ function StopManagement() {
     setFeedback("");
   }
 
-  function deleteStop(stop: StopItem) {
+  async function deleteStop(stop: StopItem) {
     const linkedTrips = tripsUsing(stop.name);
     const linkedBookings = bookings.filter((booking) => booking.pickup === stop.name || booking.dropoff === stop.name);
     if (linkedTrips.length > 0 || linkedBookings.length > 0) {
@@ -829,16 +955,26 @@ function StopManagement() {
       return;
     }
     try {
-      saveList(KEYS.stops, loadList<StopItem>(KEYS.stops, SEED_STOPS).filter((item) => item.id !== stop.id));
+      if (stopsAreDemo) {
+        saveList(KEYS.stops, loadList<StopItem>(KEYS.stops, SEED_STOPS).filter((item) => item.id !== stop.id));
+      } else {
+        await apiStops.remove(Number(stop.id));
+      }
+      reloadStops();
       setFeedback("Stop removed.");
-    } catch {
-      setFeedback("The stop could not be removed. Please try again.");
+    } catch (reason) {
+      setFeedback(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The stop could not be removed. Please try again.",
+      );
     }
   }
 
   return (
     <div className="admin-section-content">
       <h3>{editingId ? "Edit pickup or drop-off point" : "Add a pickup or drop-off point"}</h3>
+      <DemoDataNotice show={stopsAreDemo} what="stops" />
       <form className="module-form admin-data-form" onSubmit={submitStop}>
         <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
         <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
@@ -885,8 +1021,8 @@ function StopManagement() {
 }
 
 function BookingManagement() {
-  const bookings = useStoredList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
-  const trips = useStoredList<Trip>(KEYS.trips, EMPTY_TRIPS);
+  const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useAdminBookings();
+  const { data: trips } = useAdminTrips();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Booking["status"]>("all");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "pending">("all");
@@ -909,10 +1045,16 @@ function BookingManagement() {
     )
     .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
 
-  function setStatus(reference: string, status: Booking["status"]) {
-    const all = loadList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
-    const target = all.find((booking) => booking.reference === reference);
+  async function setStatus(reference: string, status: Booking["status"]) {
+    const target = bookings.find((booking) => booking.reference === reference);
     if (!target || target.status === status) return;
+
+    if (status === "confirmed" && !bookingsAreDemo) {
+      setError(
+        `The backend cannot re-confirm ${reference}. Ask the passenger to make a new booking instead.`,
+      );
+      return;
+    }
 
     if (status === "confirmed") {
       const trip = trips.find((item) => item.id === target.tripId);
@@ -920,7 +1062,7 @@ function BookingManagement() {
         setError(`Cannot re-confirm ${reference}: its scheduled trip is no longer available.`);
         return;
       }
-      const others = all.filter((booking) => booking.reference !== reference);
+      const others = bookings.filter((booking) => booking.reference !== reference);
       const available = availableSeatNumbers(trip, others);
       const availableSet = new Set(available);
       if (target.seats?.length && !target.seats.every((seat) => availableSet.has(seat))) {
@@ -935,7 +1077,23 @@ function BookingManagement() {
 
     setError("");
     const updatedBooking = { ...target, status };
-    saveList(KEYS.bookings, all.map((booking) => (booking.reference === reference ? updatedBooking : booking)));
+    try {
+      if (bookingsAreDemo) {
+        const all = loadList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+        saveList(KEYS.bookings, all.map((booking) => (booking.reference === reference ? updatedBooking : booking)));
+      } else {
+        await apiBookings.cancel(reference);
+      }
+      reloadBookings();
+    } catch (reason) {
+      setError(
+        reason instanceof Error && reason.message
+          ? reason.message
+          : "The booking status could not be updated. Please try again.",
+      );
+      return;
+    }
+
     try {
       notifyBookingStatus(
         updatedBooking,
@@ -962,9 +1120,10 @@ function BookingManagement() {
   return (
     <div className="admin-section-content">
       <h3>Passenger bookings</h3>
+      <DemoDataNotice show={bookingsAreDemo} what="bookings" />
       <p className="module-copy">
-        {bookings.length} reservation{bookings.length === 1 ? "" : "s"} stored in this browser · {confirmedCount} confirmed ·{" "}
-        {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")} collected in this demo.
+        {bookings.length} reservation{bookings.length === 1 ? "" : "s"} {bookingsAreDemo ? "in this browser" : "from the backend"} · {confirmedCount} confirmed ·{" "}
+        {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")} collected.
       </p>
 
       <div className="admin-toolbar">
@@ -1092,8 +1251,8 @@ function ReportManagement() {
     <div className="admin-section-content">
       <h3>Customer submitted reports</h3>
       <p className="module-copy">
-        {reports.length} report{reports.length === 1 ? "" : "s"} in total. Status changes and staff
-        notes are shown to passengers in their report updates and notification feed.
+        {reports.length} report{reports.length === 1 ? "" : "s"} in total. Reports and staff notes are
+        kept in this browser because the backend has no reports endpoint yet.
       </p>
 
       <div className="admin-toolbar">
@@ -1168,8 +1327,8 @@ type PassengerRow = {
 };
 
 function PassengerManagement() {
-  const accounts = useStoredList<PassengerSession>(PASSENGER_ACCOUNTS_KEY, EMPTY_ACCOUNTS);
-  const bookings = useStoredList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
+  const { data: accounts } = useAdminUsers();
+  const { data: bookings, usingDemo: bookingsAreDemo } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const [query, setQuery] = useState("");
   const [messaging, setMessaging] = useState<string | null>(null);
@@ -1201,7 +1360,7 @@ function PassengerManagement() {
       return row;
     };
 
-    for (const account of accounts) ensure(account.fullName, account.email, true);
+    for (const account of accounts) ensure(account.fullName, account.email ?? "", true);
 
     for (const booking of bookings) {
       const row = ensure(booking.name, booking.email, false);
@@ -1248,9 +1407,10 @@ function PassengerManagement() {
   return (
     <div className="admin-section-content">
       <h3>Passengers and booking contacts</h3>
+      <DemoDataNotice show={bookingsAreDemo} what="passengers and bookings" />
       <p className="module-copy">
         {registeredCount} registered passenger account{registeredCount === 1 ? "" : "s"} and {guestCount} guest
-        contact{guestCount === 1 ? "" : "s"} from bookings and reports in this browser.
+        contact{guestCount === 1 ? "" : "s"} from the backend accounts, bookings, and local reports.
       </p>
 
       <div className="admin-toolbar">
@@ -1316,8 +1476,8 @@ function PassengerManagement() {
         </div>
       )}
       <p className="module-footnote">
-        Passenger accounts, bookings, and reports are stored in this browser only. Messages appear in the
-        shared notification feed used by passenger pages.
+        Passenger accounts and bookings come from the backend. Reports and notification messages are
+        still stored in this browser because the backend has no reports endpoint yet.
       </p>
     </div>
   );

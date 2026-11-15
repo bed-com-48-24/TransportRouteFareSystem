@@ -8,6 +8,7 @@ import type {
   Route,
   Schedule,
   Stop,
+  Weekday,
 } from "./types";
 import type { Booking, FareItem, RouteItem, StopItem, Trip } from "@/lib/types";
 
@@ -19,13 +20,16 @@ function splitRouteName(name: string): { origin: string; destination: string } {
   return { origin: name, destination: "" };
 }
 
-/** City names for a route, preferring the joined stop records. */
+/** City names for a route, preferring the route name then the joined stops. */
 export function routeEndpoints(route: Route): { origin: string; destination: string } {
   const fromStops = {
     origin: route.originStop?.name,
     destination: route.destinationStop?.name,
   };
   const parsed = splitRouteName(route.name);
+  // A name like "Blantyre → Lilongwe" is the freshest source; stops can be
+  // older than an admin rename.
+  if (parsed.destination) return parsed;
   return {
     origin: fromStops.origin ?? parsed.origin,
     destination: fromStops.destination ?? parsed.destination,
@@ -192,8 +196,8 @@ export function nextDateForWeekdays(days?: readonly string[] | null): string {
 }
 
 /** The backend day codes for one calendar date: ["MON"] etc. */
-export function weekdaysForDate(date: string): string[] {
+export function weekdaysForDate(date: string): Weekday[] {
   const parsed = new Date(`${date}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return [];
-  return [WEEKDAYS[parsed.getDay()]];
+  return [WEEKDAYS[parsed.getDay()] as Weekday];
 }
