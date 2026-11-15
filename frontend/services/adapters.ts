@@ -43,14 +43,54 @@ export function routeStopNames(route: Route | undefined): string[] {
   return route.pickupLocation ? [route.pickupLocation] : [];
 }
 
+type StopMeta = { city?: unknown; kind?: unknown };
+
+/**
+ * The backend stop record only has name/latitude/longitude, so the admin screen
+ * keeps its town and point-type fields in `description` as JSON.
+ */
+function stopMeta(stop: Stop): StopMeta {
+  if (!stop.description) return {};
+  try {
+    const parsed = JSON.parse(stop.description) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as StopMeta) : {};
+  } catch {
+    return {};
+  }
+}
+
 export function toStopItem(stop: Stop): StopItem {
+  const meta = stopMeta(stop);
+  const kind =
+    meta.kind === "pickup" || meta.kind === "dropoff" || meta.kind === "both"
+      ? meta.kind
+      : "both";
   return {
     id: String(stop.id),
     name: stop.name,
-    kind: "both",
-    city: stop.name.split(" ")[0] ?? stop.name,
+    kind,
+    city:
+      typeof meta.city === "string" && meta.city
+        ? meta.city
+        : (stop.name.split(" ")[0] ?? stop.name),
     lat: stop.latitude,
     lng: stop.longitude,
+  };
+}
+
+/** Inverse of toStopItem, for POST/PATCH /stops. */
+export function fromStopItem(stop: {
+  name: string;
+  city: string;
+  kind: StopItem["kind"];
+  lat: number | null;
+  lng: number | null;
+}): { name: string; latitude: number; longitude: number; description: string } {
+  return {
+    name: stop.name,
+    latitude: stop.lat ?? 0,
+    longitude: stop.lng ?? 0,
+    description: JSON.stringify({ city: stop.city, kind: stop.kind }),
   };
 }
 
@@ -131,4 +171,29 @@ export function isoDateInDays(days: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate(),
   ).padStart(2, "0")}`;
+}
+
+const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
+
+/**
+ * A schedule repeats weekly, so an admin row needs a representative date: the
+ * next day it actually runs, starting today.
+ */
+export function nextDateForWeekdays(days?: readonly string[] | null): string {
+  const wanted = new Set((days ?? []).map((day) => day.toUpperCase()));
+  if (wanted.size === 0) return isoDateInDays(0);
+
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    if (wanted.has(WEEKDAYS[date.getDay()])) return isoDateInDays(offset);
+  }
+  return isoDateInDays(0);
+}
+
+/** The backend day codes for one calendar date: ["MON"] etc. */
+export function weekdaysForDate(date: string): string[] {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return [];
+  return [WEEKDAYS[parsed.getDay()]];
 }

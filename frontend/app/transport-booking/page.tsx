@@ -597,6 +597,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       setBookingStage("seats");
       setName("");
       setEmail("");
+      setPassengerPhone("");
       setMobileNumber("");
       setAccountNumber("");
       setPin("");
@@ -692,6 +693,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
 
   return (
     <main className="module-shell">
+      <DemoDataNotice show={tripsAreDemo} what="departures" />
       <header className="module-intro">
         <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
         <p>

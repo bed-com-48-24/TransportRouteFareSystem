@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { logout, useSession } from "@/lib/auth";
+import DemoDataNotice from "@/components/DemoDataNotice";
 import { fmtDate, readBookings, saveBookings } from "@/lib/booking-data";
 import { nearestTransportTown, type Coordinates } from "@/lib/malawi-locations";
 import { notifyBookingStatus, readBookingNotifications, type BookingNotification } from "@/lib/notifications";
 import { logoutPassenger, readPassengerSession } from "@/lib/passenger-auth";
 import { readSavedRoutes, removeSavedRoute, type SavedRoute } from "@/lib/saved-routes";
+import { useMyBookings } from "@/lib/use-backend-data";
 import type { Booking } from "@/lib/types";
+import * as apiBookings from "@/services/bookings.service";
 
 type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved";
 
@@ -91,7 +94,7 @@ export default function ProfilePage() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<ProfileTab>("bookings");
   const [displayName, setDisplayName] = useState("");
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useMyBookings();
   const [notifications, setNotifications] = useState<BookingNotification[]>([]);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [dataError, setDataError] = useState("");
@@ -112,7 +115,6 @@ export default function ProfilePage() {
         }
 
         setDisplayName(storedName);
-        setBookings(readBookings());
         setNotifications(readBookingNotifications());
         setSavedRoutes(readSavedRoutes());
       } catch {
@@ -157,7 +159,9 @@ export default function ProfilePage() {
   }, []);
 
   const email = session?.email?.trim().toLowerCase() ?? "";
-  const myBookings = bookings.filter((booking) => booking.email.trim().toLowerCase() === email);
+  const myBookings = bookingsAreDemo
+    ? bookings.filter((booking) => booking.email.trim().toLowerCase() === email)
+    : bookings;
   const sortedBookings = [...myBookings].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
   const recentJourneys = myBookings
     .filter((booking) => booking.travelDate < localToday())
@@ -186,32 +190,48 @@ export default function ProfilePage() {
     router.push("/");
   }
 
-  function cancelBooking(reference: string) {
-    const current = readBookings();
-    const target = current.find((booking) => booking.reference === reference);
+  async function cancelBooking(reference: string) {
+    const target = bookings.find((booking) => booking.reference === reference);
     if (!target || target.status !== "confirmed") return;
 
     const updatedBooking: Booking = { ...target, status: "cancelled" };
-    const updated = current.map((booking) =>
-      booking.reference === reference ? updatedBooking : booking,
-    );
 
-    try {
-      saveBookings(updated);
-      setBookings(updated);
-      setBookingNotice(
-        `Booking ${reference} cancelled. The seats are now available for other passengers.`,
+    if (bookingsAreDemo) {
+      const current = readBookings();
+      const updated = current.map((booking) =>
+        booking.reference === reference ? updatedBooking : booking,
       );
-    } catch {
-      setDataError("The booking could not be cancelled on this device. Please try again.");
-      return;
+      try {
+        saveBookings(updated);
+        setBookingNotice(
+          `Booking ${reference} cancelled. The seats are now available for other passengers.`,
+        );
+      } catch {
+        setDataError("The booking could not be cancelled on this device. Please try again.");
+        return;
+      }
+    } else {
+      try {
+        await apiBookings.cancel(reference);
+        setBookingNotice(
+          `Booking ${reference} cancelled. The seats are now available for other passengers.`,
+        );
+        reloadBookings();
+      } catch (reason) {
+        setDataError(
+          reason instanceof Error
+            ? reason.message
+            : "The booking could not be cancelled. Please try again.",
+        );
+        return;
+      }
     }
 
     try {
       notifyBookingStatus(
         updatedBooking,
         "booking-cancelled",
-        `You cancelled your booking for ${target.route} on ${fmtDate(target.travelDate)}. The seats have been released for other passengers.`,
+        `You cancelled your booking for ${target.route || `trip ${target.tripId}`} on ${fmtDate(target.travelDate)}. The seats have been released for other passengers.`,
       );
       setNotifications(readBookingNotifications());
     } catch {
@@ -241,6 +261,7 @@ export default function ProfilePage() {
         <p>Manage the details that follow you through planning, booking, and travelling.</p>
       </header>
 
+      <DemoDataNotice show={bookingsAreDemo} what="bookings" />
       {dataError && <p className="module-error" role="alert">{dataError}</p>}
 
       {!ready ? (
