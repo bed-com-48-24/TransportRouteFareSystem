@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
+    "react-auth-kit": "4.0.2-alpha.11",
     "leaflet": "^1.9.4",
     "next": "16.4.0",
     "qrcode": "^1.5.4",

@@ -9,7 +9,7 @@ export { getBookedSeatNumbers };
 
 const STANDARD_BUS_CAPACITY = 41;
 
-export const TRIPS: Trip[] = [
+const TRIP_SCHEDULE: Trip[] = [
   {
     id: "BT-LB-0800",
     route: "Blantyre → Limbe",
@@ -176,6 +176,11 @@ export const TRIPS: Trip[] = [
     fare: 7000,
   },
 ];
+
+export const TRIPS: Trip[] = TRIP_SCHEDULE.map((trip) => ({
+  ...trip,
+  dropoff: [...new Set([...trip.dropoff, ...trip.pickup])],
+}));
 
 export const STORAGE_KEY = KEYS.bookings;
 
