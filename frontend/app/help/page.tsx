@@ -16,8 +16,8 @@ const bookingSteps = [
   },
   {
     number: "03",
-    title: "Complete demo checkout",
-    detail: "Review the mock amount and choose a mock payment method. Press Pay to simulate checkout; no money is charged.",
+    title: "Complete checkout",
+    detail: "Review the fare and select a payment method. The booking and payment request are sent to the YendaRoute backend.",
   },
   {
     number: "04",
@@ -32,7 +32,7 @@ export default function HelpPage() {
       <header className="module-intro">
         <p className="module-eyebrow">PASSENGER HELP</p>
         <h1>How to book a trip</h1>
-        <p>Follow these steps to choose a departure and get a mock QR ticket.</p>
+        <p>Follow these steps to choose a departure and receive your booking reference.</p>
         <div className="module-shortcuts">
           <Link className="primary-button" href="/transport-booking">Browse trips <span aria-hidden="true">→</span></Link>
         </div>
@@ -54,7 +54,7 @@ export default function HelpPage() {
               </li>
             ))}
           </ol>
-          <p className="module-footnote">This is a frontend demonstration. Trips, bookings, and payments are mock data stored locally in this browser.</p>
+          <p className="module-footnote">Departures, bookings, and payment requests are loaded from the YendaRoute backend.</p>
         </section>
 
         <section className="module-section help-report" aria-labelledby="report-heading">
@@ -67,7 +67,7 @@ export default function HelpPage() {
           <p className="module-copy">
             Tell us if a route, fare, or pickup point looks wrong or out of date. Your report
             appears in the administrator&apos;s report queue, and the status and staff note are
-            shown below once they respond.
+            shown below once a report service is available.
           </p>
           <PassengerReportForm />
         </section>

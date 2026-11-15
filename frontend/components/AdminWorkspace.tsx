@@ -20,7 +20,7 @@ import {
 } from "@/lib/notifications";
 import { ensureRouteStops, ensureStop, ensureVehicle, resolveStopId } from "@/lib/admin-api";
 import { KEYS, MOCK_REPORTS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
-import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
+import { loadList, newId, saveList } from "@/lib/storage";
 import {
   useAdminBookings,
   useAdminTrips,
@@ -183,7 +183,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
   const { data: stops } = useBackendStops();
   const { data: trips, error: tripsError } = useAdminTrips();
   const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
-  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
+  const reports: ReportItem[] = [];
   const { data: accounts, error: usersError } = useAdminUsers();
   const today = localDateValue();
 
@@ -1206,7 +1206,7 @@ function BookingManagement() {
 }
 
 function ReportManagement() {
-  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
+  const reports: ReportItem[] = [];
   const [filter, setFilter] = useState<"all" | ReportStatus>("all");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
@@ -1335,7 +1335,7 @@ type PassengerRow = {
 function PassengerManagement() {
   const { data: accounts } = useAdminUsers();
   const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
-  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
+  const reports: ReportItem[] = [];
   const [query, setQuery] = useState("");
   const [messaging, setMessaging] = useState<string | null>(null);
   const [message, setMessage] = useState("");

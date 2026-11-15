@@ -1,35 +1,58 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  markBookingNotificationRead,
-  type BookingNotification,
-} from "@/lib/notifications";
-import { KEYS } from "@/lib/seed";
-import { useStoredList } from "@/lib/storage";
-
-const NO_NOTIFICATIONS: BookingNotification[] = [];
+import { useSession } from "@/lib/auth";
+import * as apiNotifications from "@/services/notifications.service";
+import type { Notification } from "@/services/types";
 
 export default function BookingNotificationCenter() {
-  const notifications = useStoredList<BookingNotification>(KEYS.notifications, NO_NOTIFICATIONS);
+  const session = useSession();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const unread = notifications.filter((notification) => !notification.read);
-  const toggleLabel = unread.length > 0 ? `Notifications, ${unread.length} unread` : "Notifications";
+  const toggleLabel = unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications";
+
+  async function loadNotifications() {
+    if (!session) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const [items, count] = await Promise.all([
+        apiNotifications.list(),
+        apiNotifications.unreadCount(),
+      ]);
+      setNotifications(items);
+      setUnreadCount(count);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
+    }
+  }
+
+  useEffect(() => {
+    void loadNotifications();
+    // Session email changes when the user signs in or out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.email]);
 
   function closePanel(restoreFocus = false) {
     setOpen(false);
     if (restoreFocus) toggleRef.current?.focus();
   }
 
-  function acknowledge(id: string) {
+  async function acknowledge(id: string) {
     setError("");
     try {
-      markBookingNotificationRead(id);
-    } catch {
-      setError("This notification could not be marked as read.");
+      await apiNotifications.markAsRead(id);
+      await loadNotifications();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This notification could not be marked as read.");
     }
   }
 
@@ -112,7 +135,9 @@ export default function BookingNotificationCenter() {
             </button>
           </div>
 
-          {unread.length > 0 && (
+          {!session ? (
+            <p className="module-empty">Sign in to view your notifications.</p>
+          ) : unread.length > 0 ? (
             <ul className="booking-notification-list">
               {unread.map((notification) => (
                 <li key={notification.id}>
@@ -125,7 +150,6 @@ export default function BookingNotificationCenter() {
                     <strong>{notification.title}</strong>
                     <p>{notification.message}</p>
                     <small>
-                      Ref. {notification.reference} ·{" "}
                       {new Date(notification.createdAt).toLocaleString()}
                     </small>
                     <span className="booking-notification-item-hint">Open to mark as read</span>
@@ -133,7 +157,7 @@ export default function BookingNotificationCenter() {
                 </li>
               ))}
             </ul>
-          )}
+          ) : <p className="module-empty">No unread notifications.</p>}
 
           {error && <p className="site-nav-error" role="alert">{error}</p>}
         </section>

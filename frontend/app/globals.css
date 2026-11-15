@@ -821,11 +821,11 @@ body { background: var(--background); color: var(--foreground); }
 .trip-browser-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .trip-browser-controls .map-route-filter { min-width: 145px; }
 .trip-browser-controls .module-count { margin-bottom: 3px; }
-.mock-payment-panel { display: grid; max-width: 620px; gap: 15px; border: 1px solid var(--line); border-radius: 10px; padding: 20px; background: var(--sb-page); }
-.mock-payment-panel h3 { margin: 4px 0; color: var(--navy); font-size: 19px; }
-.mock-payment-panel p { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.mock-payment-panel strong { color: var(--navy); font-size: 15px; }
-.mock-payment-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.payment-panel { display: grid; max-width: 620px; gap: 15px; border: 1px solid var(--line); border-radius: 10px; padding: 20px; background: var(--sb-page); }
+.payment-panel h3 { margin: 4px 0; color: var(--navy); font-size: 19px; }
+.payment-panel p { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.payment-panel strong { color: var(--navy); font-size: 15px; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .ticket-card { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 24px; align-items: center; margin-top: 20px; border: 1px solid var(--sb-border-strong); border-left: 6px solid var(--sb-success); border-radius: 10px; padding: 22px; background: var(--sb-surface); }
 .ticket-details h3 { margin: 4px 0 12px; color: var(--navy); font-size: 23px; }
 .ticket-details > p:not(.module-eyebrow) { margin: 6px 0; color: var(--sb-text-quiet); font-size: 12px; line-height: 1.6; }

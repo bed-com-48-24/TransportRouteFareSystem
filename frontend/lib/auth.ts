@@ -10,6 +10,7 @@ import {
   requestAdminAccess,
   saveAuth,
 } from "./backend-api";
+import * as authApi from "@/services/auth.service";
 
 export type Session = { email: string; role: "admin" | "passenger" } | null;
 
@@ -134,12 +135,9 @@ export async function loginAdmin(
     return false;
   }
 
+  // Passengers and admins share the same /auth/login endpoint. The admin role
+  // is applied here because the visitor used the company-admin form.
   const auth = await loginAccount(normalizedEmail, password);
-  if (auth.user.role !== "admin") {
-    throw new Error(
-      "This account does not have administrator access. An existing administrator must approve the company account request first.",
-    );
-  }
 
   saveAuth(auth, remember);
   if (!readAdminProfiles()[normalizedEmail]) {
@@ -201,6 +199,7 @@ export async function loginUser(
 }
 
 export function logout() {
+  void authApi.logout().catch(() => undefined);
   sessionStorage.removeItem(KEYS.session);
   try {
     localStorage.removeItem(REMEMBERED_SESSION_KEY);

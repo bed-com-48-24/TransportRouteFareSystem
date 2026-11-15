@@ -1,12 +1,9 @@
 "use client";
 
 /**
- * Page-level data hooks. Each one reads from the backend and only falls back to
- * the demo dataset when the API cannot be reached (see lib/api-fallback.ts).
+ * Page-level data hooks. The backend is the only source for displayed records.
  */
 import { useApiList, type ApiList } from "./api-fallback";
-import { buildDemoBookings, buildDemoTrips } from "./demo-data";
-import { SEED_FARES, SEED_ROUTES, SEED_STOPS } from "./seed";
 import type { Booking, FareItem, RouteItem, StopItem, Trip } from "./types";
 import {
   isoDateInDays,
@@ -31,7 +28,7 @@ export const SCHEDULE_DAYS = 7;
 export function useBackendRoutes(): ApiList<RouteItem> {
   return useApiList(
     async () => (await apiRoutes.list()).map(toRouteItem),
-    () => SEED_ROUTES,
+    () => [],
     "routes",
   );
 }
@@ -39,7 +36,7 @@ export function useBackendRoutes(): ApiList<RouteItem> {
 export function useBackendStops(): ApiList<StopItem> {
   return useApiList(
     async () => (await apiStops.listAll()).map(toStopItem),
-    () => SEED_STOPS,
+    () => [],
     "stops",
   );
 }
@@ -67,7 +64,7 @@ export function useBackendFares(): ApiList<FareItem> {
       );
       return perRoute.flat();
     },
-    () => SEED_FARES,
+    () => [],
     "fares",
   );
 }
@@ -90,7 +87,7 @@ export function useBackendTrips(days: number = SCHEDULE_DAYS): ApiList<Trip> {
       );
 
       if (!fulfilled.length) {
-        // Nothing answered: treat the backend as unavailable so demo data shows.
+        // Nothing answered: surface the API error and show an empty result.
         const firstRejected = results.find(
           (result): result is PromiseRejectedResult => result.status === "rejected",
         );
@@ -101,7 +98,7 @@ export function useBackendTrips(days: number = SCHEDULE_DAYS): ApiList<Trip> {
         schedules.map((schedule) => toTrip(schedule, date)),
       );
     },
-    () => buildDemoTrips(),
+    () => [],
     `trips-${days}`,
   );
 }
@@ -113,7 +110,7 @@ export function useMyBookings(): ApiList<Booking> {
       const mine = await apiBookings.listMine({ pageSize: 50 });
       return mine.map((booking) => toBooking(booking));
     },
-    () => buildDemoBookings(buildDemoTrips()),
+    () => [],
     "my-bookings",
   );
 }
@@ -147,7 +144,7 @@ async function fetchAdminTrips(): Promise<Trip[]> {
 export function useAdminTrips(): ApiList<Trip> {
   return useApiList<Trip>(
     fetchAdminTrips,
-    () => buildDemoTrips(),
+    () => [],
     "admin-trips",
   );
 }
@@ -163,7 +160,7 @@ export function useAdminBookings(): ApiList<Booking> {
       const tripById = new Map(trips.map((trip) => [trip.id, trip]));
       return rows.map((booking) => toBooking(booking, tripById.get(String(booking.scheduleId))));
     },
-    () => buildDemoBookings(buildDemoTrips()),
+    () => [],
     "admin-bookings",
   );
 }

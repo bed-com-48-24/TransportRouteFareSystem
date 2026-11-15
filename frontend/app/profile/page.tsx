@@ -7,12 +7,13 @@ import { logout, useSession } from "@/lib/auth";
 import DemoDataNotice from "@/components/DemoDataNotice";
 import { fmtDate, readBookings, saveBookings } from "@/lib/booking-data";
 import { nearestTransportTown, type Coordinates } from "@/lib/malawi-locations";
-import { notifyBookingStatus, readBookingNotifications, type BookingNotification } from "@/lib/notifications";
+import * as apiNotifications from "@/services/notifications.service";
 import { logoutPassenger, readPassengerSession } from "@/lib/passenger-auth";
 import { readSavedRoutes, removeSavedRoute, type SavedRoute } from "@/lib/saved-routes";
 import { useMyBookings } from "@/lib/use-backend-data";
 import type { Booking } from "@/lib/types";
 import * as apiBookings from "@/services/bookings.service";
+import type { Notification } from "@/services/types";
 
 type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved";
 
@@ -95,7 +96,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<ProfileTab>("bookings");
   const [displayName, setDisplayName] = useState("");
   const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useMyBookings();
-  const [notifications, setNotifications] = useState<BookingNotification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [dataError, setDataError] = useState("");
   const [bookingNotice, setBookingNotice] = useState("");
@@ -115,7 +116,6 @@ export default function ProfilePage() {
         }
 
         setDisplayName(storedName);
-        setNotifications(readBookingNotifications());
         setSavedRoutes(readSavedRoutes());
       } catch {
         setDataError("Some of your profile details could not be loaded from this browser.");
@@ -126,6 +126,20 @@ export default function ProfilePage() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setNotifications([]);
+      return;
+    }
+    let cancelled = false;
+    apiNotifications.list().then((items) => {
+      if (!cancelled) setNotifications(items);
+    }).catch((reason: unknown) => {
+      if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, [session?.email]);
 
   function locate() {
     if (!navigator.geolocation) {

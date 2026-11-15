@@ -8,7 +8,7 @@ import DemoDataNotice from "@/components/DemoDataNotice";
 import { useRoadRoutes } from "@/components/road-routing";
 import { travelEstimate } from "@/lib/geo";
 import QRCode from "qrcode";
-import { adminReservedSeatNumbers, availableSeatNumbers, availableSeats, createBooking, fmtDate } from "@/lib/booking-data";
+import { adminReservedSeatNumbers, availableSeatNumbers, availableSeats, fmtDate } from "@/lib/booking-data";
 import { nearestTransportTown, TRANSPORT_TOWN_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { notifyBookingStatus } from "@/lib/notifications";
 import { readSavedRoutes, savedRouteId, toggleSavedRoute } from "@/lib/saved-routes";
@@ -17,6 +17,7 @@ import type { Booking, Trip } from "@/lib/types";
 import { toBooking } from "@/services/adapters";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiPayments from "@/services/payments.service";
+import { useSession } from "@/lib/auth";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), {
   ssr: false,
@@ -25,13 +26,6 @@ const TripMap = dynamic(() => import("@/components/TripMap"), {
 
 const MAX_PASSENGERS = 5;
 const SEAT_COLUMNS = [1, 2, 4, 5];
-
-function maskPhone(phone?: string) {
-  if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 5) return "••••";
-  return `${digits.slice(0, 4)} ••• ${digits.slice(-2)}`;
-}
 
 function paymentMethodLabel(method?: Booking["paymentMethod"]) {
   switch (method) {
@@ -43,19 +37,6 @@ function paymentMethodLabel(method?: Booking["paymentMethod"]) {
   }
 }
 
-const MALAWI_BANKS = [
-  "National Bank of Malawi",
-  "Standard Bank Malawi",
-  "NBS Bank",
-  "FDH Bank",
-  "Ecobank Malawi",
-  "First Capital Bank",
-  "CDH Investment Bank",
-  "Nedbank Malawi",
-  "Opportunity Bank Malawi",
-  "Centenary Bank Malawi",
-];
-
 /** Read a booking search value passed from the home page on the client only. */
 function readQueryParam(name: string): string {
   if (typeof window === "undefined") return "";
@@ -63,6 +44,7 @@ function readQueryParam(name: string): string {
 }
 
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
+  const session = useSession();
   const { data: trips, usingDemo: tripsAreDemo } = useBackendTrips();
   const { data: routes } = useBackendRoutes();
   const { data: bookings } = useMyBookings();
@@ -86,11 +68,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [saving, setSaving] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"mobile" | "bank">("mobile");
-  const [mobileProvider, setMobileProvider] = useState<"tnm" | "airtel">("tnm");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [pin, setPin] = useState("");
-  const [bankName, setBankName] = useState(MALAWI_BANKS[0]);
-  const [accountNumber, setAccountNumber] = useState("");
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
   const [showTicket, setShowTicket] = useState(false);
@@ -423,6 +400,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setError("");
     setNotice("");
 
+    if (!session) {
+      setError("Sign in as a passenger before booking. The backend requires an authenticated account.");
+      return;
+    }
+
     if (!selectedTrip) {
       setError("Choose a trip before continuing.");
       return;
@@ -451,27 +433,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setPaymentPending(true);
   }
 
-  async function completeMockPayment() {
+  async function completePayment() {
     if (!selectedTrip) return;
 
-    if (!/^\d{4,6}$/.test(pin.trim())) {
-      setError("Enter the 4–6 digit PIN for your simulated payment.");
-      return;
-    }
-    if (paymentMethod === "mobile" && !/^(?:\+265|265|0)?[0-9]{9}$/.test(mobileNumber.replace(/[\s-]/g, ""))) {
-      setError("Enter a valid Malawi phone number for the simulated mobile-money payment.");
-      return;
-    }
-    if (paymentMethod === "bank" && !/^\d{6,20}$/.test(accountNumber.replace(/[\s-]/g, ""))) {
-      setError("Enter a valid bank account number (6–20 digits) for the simulated bank payment.");
-      return;
-    }
-
-    const paymentLabel = paymentMethod === "mobile"
-      ? mobileProvider === "tnm" ? "TNM Mpamba" : "Airtel Money"
-      : bankName;
-    const paymentReference = `PAY-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
-    const paymentCode = crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
+    const paymentLabel = paymentMethod === "bank" ? "Bank card" : "Mobile money";
 
     setSaving(true);
     setError("");
@@ -490,37 +455,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       }
 
       const seats = [...selectedSeats].sort((first, second) => first - second);
-      const cleanPhone = (passengerPhone || mobileNumber).replace(/[\s-]/g, "");
-      let booking: Booking | null;
-
-      if (tripsAreDemo) {
-        // Backend unreachable: fall back to the original browser-only reservation.
-        booking = await createBooking(
-          {
-            tripId: selectedTrip.id,
-            route: selectedTrip.route,
-            travelDate,
-            pickup,
-            dropoff,
-            passengers,
-            seats,
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            paymentStatus: "paid",
-            paymentMethod: paymentMethod === "bank" ? "bank" : mobileProvider,
-            paymentProvider: paymentLabel,
-            paymentReference,
-            paymentCode,
-            amountPaid: activeTrip.fare * passengers,
-            payerPhone: paymentMethod === "mobile" ? cleanPhone : undefined,
-            payerAccountLast4: paymentMethod === "bank" ? accountNumber.replace(/\D/g, "").slice(-4) : undefined,
-            paidAt: new Date().toISOString(),
-          },
-          activeTrip,
-        );
-      } else {
-        // Live backend: hold the seats, save the passenger, then pay.
-        const created = await apiBookings.create({
+      const cleanPhone = passengerPhone.replace(/[\s-]/g, "");
+      // Hold seats, save the passenger details, then initiate payment through the API.
+      const created = await apiBookings.create({
           scheduleId: Number(selectedTrip.id),
           travelDate,
           seatNumbers: seats,
@@ -532,16 +469,21 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           phoneNumber: cleanPhone,
         });
 
-        await apiPayments.create(
+        const payment = await apiPayments.create(
           created.reference,
           paymentMethod === "bank" ? "bank_card" : "mobile_money",
         );
+        if (payment.status !== "succeeded" && payment.status !== "paid") {
+          setPaymentPending(false);
+          setNotice(`Payment ${payment.status ?? "initiated"}. Booking reference: ${created.reference}.`);
+          return;
+        }
 
-        booking = {
+        const booking: Booking = {
           ...toBooking(
             {
               ...created,
-              status: "confirmed",
+              status: created.status,
               seatNumbers: seats,
               travelDate,
               passengerName: name.trim(),
@@ -549,22 +491,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
             },
             activeTrip,
           ),
-          paymentStatus: "paid",
-          paymentMethod: paymentMethod === "bank" ? "bank" : mobileProvider,
+          paymentStatus: payment.status === "succeeded" || payment.status === "paid" ? "paid" : "pending",
+          paymentMethod: paymentMethod === "bank" ? "bank" : undefined,
           paymentProvider: paymentLabel,
-          paymentReference,
-          paymentCode,
           amountPaid: activeTrip.fare * passengers,
-          payerPhone: paymentMethod === "mobile" ? cleanPhone : undefined,
-          payerAccountLast4: paymentMethod === "bank" ? accountNumber.replace(/\D/g, "").slice(-4) : undefined,
-          paidAt: new Date().toISOString(),
         };
-      }
-
-      if (!booking) {
-        setError("Not enough seats remain for this trip. Choose fewer passengers or another departure.");
-        return;
-      }
 
       const qr = await QRCode.toDataURL(JSON.stringify({
         reference: booking.reference,
@@ -581,12 +512,14 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       setTicketQr(qr);
       setShowTicket(false);
       setPaymentPending(false);
-      setNotice("Mock payment complete. Your bus ticket is ready.");
+      setNotice(payment.status === "succeeded" || payment.status === "paid"
+        ? "Payment confirmed. Your bus ticket is ready."
+        : `Payment ${payment.status ?? "initiated"}. Your booking reference is ${booking.reference}.`);
       try {
         notifyBookingStatus(
           booking,
           "payment-complete",
-          `Payment of MWK ${(activeTrip.fare * passengers).toLocaleString("en-MW")} via ${paymentLabel} (demo) was successful. Payment reference ${paymentReference} · Confirmation code ${paymentCode}. Your e-ticket for ${booking.route} is ready.`,
+          `Payment for ${booking.route} is ${payment.status ?? "in progress"}. Booking reference ${booking.reference}.`,
         );
       } catch {
         setNotificationError("Your booking and ticket are ready, but the in-app notification could not be saved.");
@@ -597,9 +530,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       setName("");
       setEmail("");
       setPassengerPhone("");
-      setMobileNumber("");
-      setAccountNumber("");
-      setPin("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The reservation could not be saved. Please try again.");
     } finally {
@@ -637,14 +567,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       context.font = "700 42px sans-serif";
       context.fillText("SBUS BUS TICKET", 76, 92);
       context.font = "20px sans-serif";
-      context.fillText("MOCK PAYMENT COMPLETE", 78, 130);
+      context.fillText("PAYMENT CONFIRMED", 78, 130);
       const receiptLine = [
         ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod),
-        ticket.payerPhone ? maskPhone(ticket.payerPhone) : "",
-        ticket.payerAccountLast4 ? `•••• ${ticket.payerAccountLast4}` : "",
         `MWK ${(ticket.amountPaid ?? 0).toLocaleString("en-MW")}`,
-        `Ref ${ticket.paymentReference ?? ticket.reference}`,
-        `Code ${ticket.paymentCode ?? "—"}`,
+        `Booking ${ticket.reference}`,
       ].filter(Boolean).join(" · ");
       context.fillStyle = "#526d87";
       context.font = "600 17px sans-serif";
@@ -696,7 +623,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       <header className="module-intro">
         <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
         <p>
-          Enter your departure location and destination, then choose one of the trips scheduled by the transport admin. After selecting a trip, pick your seats, add passenger details, and complete a mock payment to receive your QR ticket.
+          Enter your departure location and destination, then choose one of the trips scheduled by the transport admin. After selecting a trip, pick your seats, add passenger details, and send a payment request to the backend.
         </p>
         <div className="module-shortcuts">
           <a href="#trips-heading">Scheduled departures</a>
@@ -707,7 +634,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       </header>
 
       {notice && <p className="module-notice" role="status">{notice}</p>}
-      {error && <p className="module-error" role="alert">{error}</p>}
+      {error && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login/user">Sign in</Link></>}</p>}
       {notificationError && <p className="module-error" role="alert">{notificationError}</p>}
       {((initialTripId && !initialTrip) || (selectedTripId && !selectedTrip)) && (
         <p className="module-error" role="alert">
@@ -898,9 +825,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         <div className={detailTrip ? "detail-booking-layout" : undefined}>
           <div className={detailTrip ? "detail-booking-main" : undefined}>
         {!selectedTrip ? null : paymentPending ? (
-          <div className="mock-payment-panel">
+          <div className="payment-panel">
             <div>
-              <p className="module-eyebrow">DEMO CHECKOUT</p>
+              <p className="module-eyebrow">CHECKOUT</p>
               <h3>{selectedTrip.route}</h3>
               <p>{fmtDate(travelDate)} · {selectedTrip.departure} · {passengers} passenger{passengers === 1 ? "" : "s"}</p>
               <strong>Amount due: MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
@@ -914,57 +841,14 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
                   setError("");
                 }}
               >
-                <option value="mobile">Mobile money (demo)</option>
-                <option value="bank">Bank (demo)</option>
+                <option value="mobile">Mobile money</option>
+                <option value="bank">Bank card</option>
               </select>
             </label>
-            {paymentMethod === "mobile" ? (
-              <>
-                <label className="map-route-filter">Mobile money provider
-                  <select
-                    value={mobileProvider}
-                    onChange={(event) => {
-                      const provider = event.target.value;
-                      if (provider === "tnm" || provider === "airtel") setMobileProvider(provider);
-                    }}
-                  >
-                    <option value="tnm">TNM Mpamba</option>
-                    <option value="airtel">Airtel Money</option>
-                  </select>
-                </label>
-                <label className="map-route-filter">Phone number
-                  <input type="tel" autoComplete="tel" value={mobileNumber} onChange={(event) => setMobileNumber(event.target.value)} placeholder="e.g. 0991234567" required />
-                </label>
-              </>
-            ) : (
-              <>
-                <label className="map-route-filter">Bank
-                  <select value={bankName} onChange={(event) => setBankName(event.target.value)}>
-                    {MALAWI_BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}
-                  </select>
-                </label>
-                <label className="map-route-filter">Account number
-                  <input type="text" inputMode="numeric" autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="e.g. 1001234567" required />
-                </label>
-              </>
-            )}
-            <label className="map-route-filter">Payment PIN
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={6}
-                value={pin}
-                onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-                placeholder="4–6 digit demo PIN"
-                required
-              />
-            </label>
-            <p className="module-footnote">Demo only: no money is charged and the PIN is never stored. Use a made-up PIN here, never your real one.</p>
             <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
-            <div className="mock-payment-actions">
-              <button className="primary-button" type="button" onClick={completeMockPayment} disabled={saving}>
-                {saving ? "Processing demo payment…" : `Pay now · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
+            <div className="payment-actions">
+              <button className="primary-button" type="button" onClick={completePayment} disabled={saving}>
+                {saving ? "Sending payment request…" : `Pay · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
             </div>
@@ -1145,14 +1029,12 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         </div>
         {ticket && ticketQr && !showTicket && (
           <div className="payment-success-panel" role="status">
-            <p className="module-eyebrow">PAYMENT SUCCESSFUL</p>
+            <p className="module-eyebrow">PAYMENT CONFIRMED</p>
             <h3>Your payment has been received</h3>
             <dl className="payment-success-list">
-              <div><dt>Payment reference</dt><dd>{ticket.paymentReference ?? ticket.reference}</dd></div>
-              {ticket.paymentCode && <div><dt>Confirmation code</dt><dd>{ticket.paymentCode}</dd></div>}
+              <div><dt>Booking reference</dt><dd>{ticket.reference}</dd></div>
               <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
               <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
-              {ticket.payerPhone && <div><dt>Phone number</dt><dd>{maskPhone(ticket.payerPhone)}</dd></div>}
               {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
             </dl>
             <button className="primary-button" type="button" onClick={viewTicket}>View e-ticket</button>
@@ -1161,7 +1043,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         {ticket && ticketQr && showTicket && (
           <article className="ticket-card" aria-labelledby="ticket-heading">
             <div className="ticket-details">
-              <p className="module-eyebrow">MOCK PAYMENT COMPLETE</p>
+              <p className="module-eyebrow">PAYMENT CONFIRMED</p>
               <h3 id="ticket-heading">Your bus ticket</h3>
               <p className="ticket-route">{ticket.route}</p>
               <p>{fmtDate(ticket.travelDate)} · {ticket.pickup} to {ticket.dropoff}</p>
@@ -1174,7 +1056,6 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
                 <p className="module-eyebrow">PAYMENT RECEIPT</p>
                 <dl>
                   <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
-                  {ticket.payerPhone && <div><dt>Phone number</dt><dd>{maskPhone(ticket.payerPhone)}</dd></div>}
                   {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
                   <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
                   {ticket.paidAt && <div><dt>Paid on</dt><dd>{new Date(ticket.paidAt).toLocaleString("en-MW", { dateStyle: "medium", timeStyle: "short" })}</dd></div>}

@@ -34,38 +34,8 @@ export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination
 
 export const SEED_FARES: FareItem[] = ROUTE_ROWS.map(([id, , , , amount]) => ({ id: `f-${id}`, routeId: id, amount }));
 
-export const MOCK_REPORTS: ReportItem[] = [
-  {
-    id: "report-mock-1",
-    type: "Fare",
-    itemName: "Blantyre to Lilongwe",
-    description: "The fare shown on the site is lower than what the conductor charged at the depot this morning.",
-    location: "Blantyre Bus Depot",
-    status: "open",
-    adminNote: "",
-    createdAt: "2026-11-07T08:15:00.000Z",
-  },
-  {
-    id: "report-mock-2",
-    type: "Stop",
-    itemName: "Lilongwe City Centre Stage",
-    description: "The pickup point marker is on the wrong side of the road. Passengers are waiting at the opposite stage.",
-    location: "Lilongwe",
-    status: "reviewing",
-    adminNote: "",
-    createdAt: "2026-11-06T14:40:00.000Z",
-  },
-  {
-    id: "report-mock-3",
-    type: "Route",
-    itemName: "Mzuzu to Lilongwe",
-    description: "The arrival estimate is too early. The coach usually reaches Lilongwe about an hour later than listed.",
-    location: "Mzuzu Bus Terminal",
-    status: "resolved",
-    adminNote: "",
-    createdAt: "2026-11-04T09:05:00.000Z",
-  },
-];
+// The backend currently has no reports endpoint, so start with no report rows.
+export const MOCK_REPORTS: ReportItem[] = [];
 
 export const SEED_STOPS: StopItem[] = [
   { id: "s-1", name: "Blantyre Bus Depot", kind: "pickup", city: "Blantyre", lat: -15.7861, lng: 35.0058 },

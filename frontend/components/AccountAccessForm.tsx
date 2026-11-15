@@ -65,14 +65,18 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const isAdmin = role === "admin";
-  const redirectPath = "/home";
+  // Company admins land in the staff workspace; passengers land on their home page.
+  const redirectPath = isAdmin
+    ? "/maps-admin-integration?panel=admin&section=overview"
+    : "/home";
   const rememberKey = isAdmin ? "sbus-remembered-admin-email" : "sbus-remembered-user-email";
+  const alreadySignedIn = session?.role === (isAdmin ? "admin" : "passenger");
 
   useEffect(() => {
-    if (session) {
+    if (alreadySignedIn) {
       router.replace(redirectPath);
     }
-  }, [redirectPath, router, session]);
+  }, [alreadySignedIn, redirectPath, router]);
 
   useEffect(() => {
     let saved = "";

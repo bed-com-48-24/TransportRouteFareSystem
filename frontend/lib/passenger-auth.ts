@@ -1,4 +1,5 @@
 import { ApiError, clearAuth, loginAccount, registerAccount, saveAuth } from "./backend-api";
+import * as authApi from "@/services/auth.service";
 
 export type PassengerSession = {
   fullName: string;
@@ -62,12 +63,6 @@ export async function loginPassenger(
 
   try {
     const auth = await loginAccount(normalizedEmail, password);
-    if (auth.user.role === "admin") {
-      throw new Error("This is a company admin account. Use the company admin sign-in page.");
-    }
-    if (auth.user.role !== "passenger") {
-      throw new Error("This account cannot sign in as a passenger.");
-    }
 
     const session = {
       fullName: auth.user.fullName,
@@ -104,6 +99,7 @@ export function readPassengerSession(): PassengerSession | null {
 }
 
 export function logoutPassenger(): void {
+  void authApi.logout().catch(() => undefined);
   sessionStorage.removeItem(SESSION_KEY);
   try {
     localStorage.removeItem(REMEMBERED_SESSION_KEY);

@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import PassengerReportForm from "@/components/PassengerReportForm";
 import { loginPassenger, logoutPassenger, readPassengerSession, registerPassenger, updatePassengerName, type PassengerSession } from "@/lib/passenger-auth";
+import * as apiMe from "@/services/me.service";
 
 type AccountTab = "sign-in" | "create-account" | "profile" | "report";
 type Feedback = { kind: "success" | "error"; message: string } | null;
-type SavedProfile = { fullName: string; email: string; phone: string };
-
-const PROFILE_KEY = "routewise-profile-v1";
 
 export default function AccountsReportsPage() {
   const router = useRouter();
@@ -34,11 +32,15 @@ export default function AccountsReportsPage() {
           setEmail(current.email);
         }
 
-        const saved = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? "null") as Partial<SavedProfile> | null;
-        if (saved && typeof saved === "object") {
-          if (typeof saved.fullName === "string") setFullName(saved.fullName);
-          if (typeof saved.email === "string") setEmail(saved.email);
-          if (typeof saved.phone === "string") setPhone(saved.phone);
+        if (current) {
+          void apiMe.getPassengerProfile().then((profile) => {
+            if (!profile) return;
+            setFullName(profile.name);
+            setEmail(profile.email);
+            setPhone(profile.phone ?? "");
+          }).catch((reason: unknown) => {
+            setFeedback({ kind: "error", message: reason instanceof Error ? reason.message : "Passenger profile could not be loaded." });
+          });
         }
       } catch (reason) {
         setFeedback({
@@ -109,7 +111,7 @@ export default function AccountsReportsPage() {
     }
   }
 
-  function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback(null);
 
@@ -122,13 +124,16 @@ export default function AccountsReportsPage() {
       return;
     }
 
+    setBusy(true);
     try {
-      const updated = updatePassengerName(session.email, fullName);
-      localStorage.setItem(PROFILE_KEY, JSON.stringify({
-        fullName: updated.fullName,
-        email: updated.email,
+      const saved = await apiMe.savePassengerProfile({
+        name: fullName.trim(),
+        email: session.email,
         phone: phone.trim(),
-      } satisfies SavedProfile));
+      });
+      const updated = updatePassengerName(session.email, fullName);
+      setFullName(saved.name || updated.fullName);
+      setPhone(saved.phone ?? "");
       setSession(updated);
       setFeedback({ kind: "success", message: "Your profile has been updated." });
     } catch (reason) {
@@ -136,6 +141,8 @@ export default function AccountsReportsPage() {
         kind: "error",
         message: reason instanceof Error ? reason.message : "Your profile could not be saved.",
       });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -215,7 +222,7 @@ export default function AccountsReportsPage() {
               <label>Confirm password<input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></label>
               <button className="primary-button form-submit" type="submit" disabled={busy}>{busy ? "Creating account…" : "Create account"}</button>
             </form>
-            <p className="module-footnote">For this demonstration, account information is stored in this browser. Do not reuse a sensitive password.</p>
+            <p className="module-footnote">Your account is created through the YendaRoute backend.</p>
           </>
         )}
 
