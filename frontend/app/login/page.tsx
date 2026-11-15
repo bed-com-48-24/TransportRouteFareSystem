@@ -45,6 +45,16 @@ export default function LoginPage() {
           </article>
 
           <article className="login-choice">
+            <span className="login-choice-icon"><PassengerIcon /></span>
+            <p className="login-choice-eyebrow">For approved drivers</p>
+            <h2>Driver</h2>
+            <p>Sign in to view the passenger manifest for your assigned trip.</p>
+            <Link className="login-choice-action" href="/login/driver">
+              Continue as driver <span aria-hidden="true">â†’</span>
+            </Link>
+          </article>
+
+          <article className="login-choice">
             <span className="login-choice-icon">
               <CompanyIcon />
             </span>

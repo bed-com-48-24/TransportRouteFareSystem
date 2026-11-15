@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { loginAdmin, loginUser, registerAdmin, useSession } from "@/lib/auth";
+import { loginAdmin, loginDriver, loginUser, registerAdmin, useSession } from "@/lib/auth";
 import { registerPassenger } from "@/lib/passenger-auth";
 
-type AccountRole = "user" | "admin";
+type AccountRole = "user" | "admin" | "driver";
 
 function MailIcon() {
   return (
@@ -65,12 +65,13 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const isAdmin = role === "admin";
+  const isDriver = role === "driver";
   // Company admins land in the staff workspace; passengers land on their home page.
   const redirectPath = isAdmin
     ? "/maps-admin-integration?panel=admin&section=overview"
-    : "/home";
-  const rememberKey = isAdmin ? "sbus-remembered-admin-email" : "sbus-remembered-user-email";
-  const alreadySignedIn = session?.role === (isAdmin ? "admin" : "passenger");
+    : isDriver ? "/driver/manifest" : "/home";
+  const rememberKey = isAdmin ? "sbus-remembered-admin-email" : isDriver ? "sbus-remembered-driver-email" : "sbus-remembered-user-email";
+  const alreadySignedIn = session?.role === (isAdmin ? "admin" : isDriver ? "driver" : "passenger");
 
   useEffect(() => {
     if (alreadySignedIn) {
@@ -106,6 +107,10 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
     setBusy(true);
 
     try {
+      if (isDriver && creating) {
+        setError("Driver accounts sign in after an administrator approves their driver request.");
+        return;
+      }
       if (creating) {
         if (isAdmin && (companyName.trim().length < 2 || companyName.trim().length > 100)) {
           setError("Enter a company name between 2 and 100 characters.");
@@ -152,13 +157,17 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
 
       const signedIn = isAdmin
         ? await loginAdmin(email, password, remember)
-        : await loginUser(email, password, remember);
+        : isDriver
+          ? await loginDriver(email, password, remember)
+          : await loginUser(email, password, remember);
 
       if (!signedIn) {
         setError(
           isAdmin
             ? "Company email or password is not correct. Create a company account first if you do not have one."
-            : "Email or password is not correct. Create a user account first if you do not have one.",
+            : isDriver
+              ? "Driver email or password is not correct. A driver account must be approved first."
+              : "Email or password is not correct. Create a user account first if you do not have one.",
         );
         return;
       }
@@ -195,9 +204,9 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
             ? isAdmin
               ? "Request a company account"
               : "Create a user account"
-            : isAdmin
+              : isAdmin
               ? "Company admin sign in"
-              : "User sign in"}
+              : isDriver ? "Driver sign in" : "User sign in"}
         </h1>
 
         <form className="account-form" onSubmit={submit}>
@@ -352,13 +361,13 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               ? creating
                 ? isAdmin ? "Submitting request…" : "Creating account…"
                 : "Signing in…"
-              : creating ? (isAdmin ? "Request company account" : "Create account") : isAdmin ? "Sign in as company admin" : "Sign in as user"}
+              : creating ? (isAdmin ? "Request company account" : "Create account") : isAdmin ? "Sign in as company admin" : isDriver ? "Sign in as driver" : "Sign in as user"}
             <span aria-hidden="true">→</span>
           </button>
           {error && <p className="account-message" role="alert">{error}</p>}
         </form>
 
-        <p className="account-footnote">
+        {!isDriver && <p className="account-footnote">
           {creating ? (
             <>
               Already have an account?{" "}
@@ -376,7 +385,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               .
             </>
           )}
-        </p>
+        </p>}
       </section>
     </main>
   );

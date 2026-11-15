@@ -12,7 +12,8 @@ import {
 } from "./backend-api";
 import * as authApi from "@/services/auth.service";
 
-export type Session = { email: string; role: "admin" | "passenger" } | null;
+export type SessionRole = "admin" | "passenger" | "driver";
+export type Session = { email: string; role: SessionRole } | null;
 
 const REMEMBERED_SESSION_KEY = "sbus_remembered_session_v1";
 const ADMIN_PROFILES_KEY = "sbus_admin_profiles_v1";
@@ -65,7 +66,7 @@ function demoDisplayName(email: string): string {
     : "Demo Transport Company";
 }
 
-function startSession(email: string, role: "admin" | "passenger", remember = false) {
+function startSession(email: string, role: SessionRole, remember = false) {
   const value = JSON.stringify({ email, role });
   sessionStorage.setItem(KEYS.session, value);
   try {
@@ -195,6 +196,19 @@ export async function loginUser(
   }
 
   startSession(account.email.trim().toLowerCase(), "passenger", remember);
+  return true;
+}
+
+export async function loginDriver(email: string, password: string, remember = false): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !password) return false;
+  const auth = await loginAccount(normalizedEmail, password);
+  if (auth.user.role !== "driver") {
+    clearAuth();
+    throw new Error("This account does not have the driver role. Ask an administrator to approve your driver request.");
+  }
+  saveAuth(auth, remember);
+  startSession(normalizedEmail, "driver", remember);
   return true;
 }
 

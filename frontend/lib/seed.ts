@@ -34,8 +34,33 @@ export const SEED_ROUTES: RouteItem[] = ROUTE_ROWS.map(([id, origin, destination
 
 export const SEED_FARES: FareItem[] = ROUTE_ROWS.map(([id, , , , amount]) => ({ id: `f-${id}`, routeId: id, amount }));
 
-// The backend currently has no reports endpoint, so start with no report rows.
-export const MOCK_REPORTS: ReportItem[] = [];
+// Sample report records for the browser-only reporting demo. Never sent to the API.
+export const MOCK_REPORTS: ReportItem[] = [
+  {
+    id: "demo-report-fare-01",
+    type: "Fare",
+    itemName: "Blantyre to Lilongwe",
+    description: "Demo report: the fare shown may need to be checked with the transport operator.",
+    location: "Blantyre Bus Depot",
+    reporterName: "Demo Passenger",
+    reporterEmail: "demo.passenger@example.mw",
+    status: "open",
+    adminNote: "",
+    createdAt: "2026-11-07T08:15:00.000Z",
+  },
+  {
+    id: "demo-report-stop-02",
+    type: "Stop",
+    itemName: "Lilongwe City Centre Stage",
+    description: "Demo report: pickup point location needs review.",
+    location: "Lilongwe",
+    reporterName: "Demo Passenger",
+    reporterEmail: "demo.passenger@example.mw",
+    status: "reviewing",
+    adminNote: "Demo note: location is being checked.",
+    createdAt: "2026-11-06T14:40:00.000Z",
+  },
+];
 
 export const SEED_STOPS: StopItem[] = [
   { id: "s-1", name: "Blantyre Bus Depot", kind: "pickup", city: "Blantyre", lat: -15.7861, lng: 35.0058 },

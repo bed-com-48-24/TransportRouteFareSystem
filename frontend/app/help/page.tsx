@@ -65,9 +65,7 @@ export default function HelpPage() {
             </div>
           </div>
           <p className="module-copy">
-            Tell us if a route, fare, or pickup point looks wrong or out of date. Your report
-            appears in the administrator&apos;s report queue, and the status and staff note are
-            shown below once a report service is available.
+            Try the browser-only report demo. Submissions and admin notes stay on this device and are not sent to the backend.
           </p>
           <PassengerReportForm />
         </section>

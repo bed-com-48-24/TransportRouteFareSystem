@@ -23,6 +23,7 @@ export default function MainNavigation() {
     { href: "/maps-admin-integration?panel=admin&section=bookings", label: "Bookings" },
     { href: "/maps-admin-integration?panel=admin&section=reports", label: "Reports" },
     { href: "/maps-admin-integration?panel=admin&section=passengers", label: "Passengers" },
+    { href: "/maps-admin-integration?panel=admin&section=operations", label: "Driver tools" },
     { href: "/maps-admin-integration?panel=admin&section=company", label: "Company" },
     { href: "/help", label: "Help" },
   ];
@@ -33,11 +34,17 @@ export default function MainNavigation() {
     { href: "/help", label: "Help" },
   ];
 
-  const navItems = session?.role === "admin" ? adminNavItems : passengerNavItems;
+  const driverNavItems: NavItem[] = [
+    { href: "/home", label: "Home" },
+    { href: "/driver/manifest", label: "Trip manifest" },
+    { href: "/help", label: "Help" },
+  ];
+
+  const navItems = session?.role === "admin" ? adminNavItems : session?.role === "driver" ? driverNavItems : passengerNavItems;
 
   const profileHref = session?.role === "admin"
     ? "/maps-admin-integration?panel=admin&section=company"
-    : "/profile";
+    : session?.role === "driver" ? "/driver/manifest" : "/profile";
 
   function isActive(href: string) {
     const [base, query = ""] = href.split("?");

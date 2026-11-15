@@ -1,6 +1,6 @@
-import { KEYS } from "./seed";
-import { loadList, newId, saveList } from "./storage";
 import type { Booking } from "./types";
+
+const DEMO_NOTIFICATIONS_KEY = "routewise-demo-notifications-v1";
 
 export type BookingNotificationType =
   | "booking-confirmed"
@@ -11,97 +11,97 @@ export type BookingNotificationType =
   | "report-update"
   | "company-update";
 
-export type BookingNotification = {
+export type DemoNotification = {
   id: string;
-  type: BookingNotificationType;
   title: string;
   message: string;
-  reference: string;
-  createdAt: string;
   read: boolean;
+  createdAt: string;
+  source: "demo";
 };
 
-const MAX_NOTIFICATIONS = 50;
-
-function notificationTitle(type: BookingNotificationType) {
-  switch (type) {
-    case "booking-confirmed": return "Booking confirmed";
-    case "booking-cancelled": return "Booking cancelled";
-    case "booking-reconfirmed": return "Booking confirmed again";
-    case "payment-complete": return "Payment complete";
-    case "route-update": return "Route update";
-    case "report-update": return "Report update";
-    case "company-update": return "Message from the transport company";
+function readDemoNotifications(): DemoNotification[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(DEMO_NOTIFICATIONS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed as DemoNotification[] : [];
+  } catch {
+    return [];
   }
 }
 
-function addNotification(
-  type: BookingNotificationType,
-  message: string,
-  reference: string,
-): void {
-  const notifications = loadList<BookingNotification>(KEYS.notifications, []);
+function requestRefresh(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("backend-notifications-changed"));
+  }
+}
 
-  saveList(KEYS.notifications, [
-    {
-      id: newId("notification"),
-      type,
-      title: notificationTitle(type),
+function addDemoNotification(title: string, message: string): void {
+  try {
+    const notification: DemoNotification = {
+      id: `demo-${crypto.randomUUID()}`,
+      title,
       message,
-      reference,
-      createdAt: new Date().toISOString(),
       read: false,
-    },
-    ...notifications,
-  ].slice(0, MAX_NOTIFICATIONS));
+      createdAt: new Date().toISOString(),
+      source: "demo",
+    };
+    localStorage.setItem(
+      DEMO_NOTIFICATIONS_KEY,
+      JSON.stringify([notification, ...readDemoNotifications()].slice(0, 50)),
+    );
+  } catch {
+    // Demo notifications are optional when browser storage is unavailable.
+  }
+  requestRefresh();
 }
 
+/** Backend-generated events are retrieved from the API after each action. */
 export function notifyBookingStatus(
-  booking: Booking,
-  type: BookingNotificationType,
-  message: string,
+  _booking: Booking,
+  _type: BookingNotificationType,
+  _message: string,
 ): void {
-  addNotification(type, message, booking.reference);
+  requestRefresh();
 }
 
-/** Announce an admin change to routes, fares, or scheduled departures. */
-export function notifyRouteUpdate(message: string, reference = "Route schedule"): void {
-  addNotification("route-update", message, reference);
+export function notifyRouteUpdate(_message: string, _reference = "Route schedule"): void {
+  requestRefresh();
 }
 
-/** Tell passengers that an administrator reviewed one of their reports. */
+/** Reports and company announcements have no backend create endpoint yet. */
 export function notifyReportUpdate(message: string, reference: string): void {
-  addNotification("report-update", message, reference);
+  addDemoNotification("Demo report update", `${reference}: ${message}`);
 }
 
-/** Announce company news, a profile change, or a general notice to passengers. */
 export function notifyCompanyUpdate(message: string, reference = "Company announcement"): void {
-  addNotification("company-update", message, reference);
+  addDemoNotification("Demo company update", `${reference}: ${message}`);
 }
 
-export function readBookingNotifications(): BookingNotification[] {
-  return loadList<BookingNotification>(KEYS.notifications, []);
+export function readBookingNotifications(): DemoNotification[] {
+  return readDemoNotifications();
 }
 
-/** Mark one update as seen so it leaves the "new" list and the unread badge drops. */
 export function markBookingNotificationRead(id: string): void {
-  const notifications = loadList<BookingNotification>(KEYS.notifications, []);
-  if (notifications.every((notification) => notification.id !== id || notification.read)) return;
-
-  saveList(
-    KEYS.notifications,
-    notifications.map((notification) =>
-      notification.id === id ? { ...notification, read: true } : notification,
-    ),
-  );
+  try {
+    const notifications = readDemoNotifications();
+    localStorage.setItem(
+      DEMO_NOTIFICATIONS_KEY,
+      JSON.stringify(notifications.map((item) => item.id === id ? { ...item, read: true } : item)),
+    );
+  } catch {
+    // Demo notifications are optional.
+  }
+  requestRefresh();
 }
 
 export function markAllBookingNotificationsRead(): void {
-  const notifications = loadList<BookingNotification>(KEYS.notifications, []);
-  if (notifications.every((notification) => notification.read)) return;
-
-  saveList(
-    KEYS.notifications,
-    notifications.map((notification) => ({ ...notification, read: true })),
-  );
+  try {
+    localStorage.setItem(
+      DEMO_NOTIFICATIONS_KEY,
+      JSON.stringify(readDemoNotifications().map((item) => ({ ...item, read: true }))),
+    );
+  } catch {
+    // Demo notifications are optional.
+  }
+  requestRefresh();
 }

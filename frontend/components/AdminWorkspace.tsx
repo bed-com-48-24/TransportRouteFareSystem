@@ -10,6 +10,7 @@ import {
 } from "@/lib/booking-data";
 import { readAdminProfile, updateAdminCompanyName, useSession } from "@/lib/auth";
 import DemoDataNotice from "@/components/DemoDataNotice";
+import AdminOperations from "@/components/AdminOperations";
 import { hasCoords } from "@/lib/geo";
 import { MALAWI_LOCATIONS } from "@/lib/malawi-locations";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/lib/notifications";
 import { ensureRouteStops, ensureStop, ensureVehicle, resolveStopId } from "@/lib/admin-api";
 import { KEYS, MOCK_REPORTS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
-import { loadList, newId, saveList } from "@/lib/storage";
+import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
 import {
   useAdminBookings,
   useAdminTrips,
@@ -54,7 +55,8 @@ export type AdminSection =
   | "reports"
   | "bookings"
   | "passengers"
-  | "company";
+  | "company"
+  | "operations";
 
 export const ADMIN_SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -65,6 +67,7 @@ export const ADMIN_SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "reports", label: "Customer reports" },
   { id: "passengers", label: "Passengers" },
   { id: "company", label: "Company profile" },
+  { id: "operations", label: "Driver tools" },
 ];
 
 export function isAdminSection(value: string | null): value is AdminSection {
@@ -141,7 +144,7 @@ export default function AdminWorkspace({
           <h2 id="admin-heading">Company admin workspace</h2>
           <p className="module-copy">
             Routes, fares, departures, stops, and bookings are read from and saved to the YendaRoute
-            backend. Customer reports and notifications stay in this browser for now.
+            backend. Driver request approval and individual record lookups use the backend; announcements stay demo-only.
           </p>
         </div>
         {onShowMap && (
@@ -173,6 +176,7 @@ export default function AdminWorkspace({
       {section === "reports" && <ReportManagement />}
       {section === "passengers" && <PassengerManagement />}
       {section === "company" && <CompanyProfileManagement />}
+      {section === "operations" && <AdminOperations />}
     </section>
   );
 }
@@ -183,7 +187,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
   const { data: stops } = useBackendStops();
   const { data: trips, error: tripsError } = useAdminTrips();
   const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
-  const reports: ReportItem[] = [];
+  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const { data: accounts, error: usersError } = useAdminUsers();
   const today = localDateValue();
 
@@ -1206,7 +1210,7 @@ function BookingManagement() {
 }
 
 function ReportManagement() {
-  const reports: ReportItem[] = [];
+  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const [filter, setFilter] = useState<"all" | ReportStatus>("all");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
@@ -1232,7 +1236,7 @@ function ReportManagement() {
       } catch {
         // The report is saved; a blocked notification store must not undo it.
       }
-      setFeedback(`Report ${report.id.toUpperCase()} updated. The passenger notification feed was refreshed.`);
+      setFeedback(`Demo report ${report.id.toUpperCase()} updated. The browser-only demo notification feed was refreshed.`);
     } catch {
       setFeedback("The report could not be updated. Please try again.");
     }
@@ -1335,7 +1339,7 @@ type PassengerRow = {
 function PassengerManagement() {
   const { data: accounts } = useAdminUsers();
   const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
-  const reports: ReportItem[] = [];
+  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const [query, setQuery] = useState("");
   const [messaging, setMessaging] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -1404,7 +1408,7 @@ function PassengerManagement() {
       notifyCompanyUpdate(`Update for ${person.name}: ${text}`, "Passenger update");
       setMessage("");
       setMessaging(null);
-      setFeedback(`Update queued for ${person.name}. It appears in the passenger notification feed.`);
+      setFeedback(`Demo update saved for ${person.name} in this browser. It was not sent to the backend.`);
     } catch {
       setFeedback("The passenger update could not be saved. Please try again.");
     }
@@ -1545,7 +1549,7 @@ function CompanyProfileManagement() {
     try {
       notifyCompanyUpdate(text, "Company announcement");
       setAnnouncement("");
-      setFeedback("Announcement sent to the passenger notification feed.");
+      setFeedback("Demo announcement saved in this browser. It was not sent to the backend.");
     } catch {
       setError("The announcement could not be saved. Please try again.");
     }
@@ -1582,7 +1586,7 @@ function CompanyProfileManagement() {
               placeholder="e.g. New Blantyre to Lilongwe departures are now open for booking."
             />
           </label>
-          <p className="module-footnote">Announcements appear in the notification feed on passenger pages in this browser.</p>
+          <p className="module-footnote">Announcements are demo-only and stored in this browser; the backend has no announcement endpoint.</p>
           <button className="primary-button" type="submit">Send announcement</button>
         </form>
       </div>

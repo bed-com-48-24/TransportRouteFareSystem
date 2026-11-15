@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth";
 import * as apiNotifications from "@/services/notifications.service";
 import type { Notification } from "@/services/types";
+import { markBookingNotificationRead, readBookingNotifications, type DemoNotification } from "@/lib/notifications";
+
+type VisibleNotification = Notification | DemoNotification;
 
 export default function BookingNotificationCenter() {
   const session = useSession();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<VisibleNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,8 +30,9 @@ export default function BookingNotificationCenter() {
         apiNotifications.list(),
         apiNotifications.unreadCount(),
       ]);
-      setNotifications(items);
-      setUnreadCount(count);
+      const demoItems = readBookingNotifications();
+      setNotifications([...items, ...demoItems].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setUnreadCount(count + demoItems.filter((item) => !item.read).length);
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
@@ -41,6 +45,13 @@ export default function BookingNotificationCenter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.email]);
 
+  useEffect(() => {
+    const refresh = () => { void loadNotifications(); };
+    window.addEventListener("backend-notifications-changed", refresh);
+    return () => window.removeEventListener("backend-notifications-changed", refresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.email]);
+
   function closePanel(restoreFocus = false) {
     setOpen(false);
     if (restoreFocus) toggleRef.current?.focus();
@@ -48,6 +59,11 @@ export default function BookingNotificationCenter() {
 
   async function acknowledge(id: string) {
     setError("");
+    if (id.startsWith("demo-")) {
+      markBookingNotificationRead(id);
+      setNotifications((current) => current.map((item) => item.id === id ? { ...item, read: true } : item));
+      return;
+    }
     try {
       await apiNotifications.markAsRead(id);
       await loadNotifications();
@@ -89,7 +105,10 @@ export default function BookingNotificationCenter() {
         title="Notifications"
         onClick={() => {
           setError("");
-          setOpen((current) => !current);
+          setOpen((current) => {
+            if (!current) void loadNotifications();
+            return !current;
+          });
         }}
       >
         <svg
@@ -105,7 +124,7 @@ export default function BookingNotificationCenter() {
           <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
           <path d="M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
-        {unread.length > 0 && <span className="booking-notification-count">{unread.length}</span>}
+        {unreadCount > 0 && <span className="booking-notification-count">{unreadCount}</span>}
       </button>
       {open && (
         <section
@@ -148,6 +167,7 @@ export default function BookingNotificationCenter() {
                     onClick={() => acknowledge(notification.id)}
                   >
                     <strong>{notification.title}</strong>
+                    {"source" in notification && notification.source === "demo" && <small className="booking-notification-demo-tag">Demo · this browser only</small>}
                     <p>{notification.message}</p>
                     <small>
                       {new Date(notification.createdAt).toLocaleString()}

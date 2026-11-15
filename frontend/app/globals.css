@@ -549,6 +549,7 @@ body {
 .booking-notification-item strong { color: var(--sb-ink); font-size: 12px; }
 .booking-notification-item p { margin: 4px 0; color: var(--sb-text-muted); font-size: 11px; line-height: 1.5; }
 .booking-notification-item small { color: var(--sb-text-quiet); font-size: 10px; }
+.booking-notification-demo-tag { justify-self: start; color: var(--sb-warning); font-weight: 750; }
 .booking-notification-item-hint { justify-self: start; margin-top: 4px; color: var(--sb-ink-soft); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 
 .home-shell,
@@ -1090,6 +1091,13 @@ body { background: var(--background); color: var(--foreground); }
 .admin-workspace > h2 { margin: 5px 0; color: var(--navy); font-size: 22px; }
 .admin-workspace > .module-copy { margin: 4px 0 0; }
 .admin-section-content h3 { margin: 4px 0 15px; color: var(--navy); font-size: 15px; }
+.admin-demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.admin-demo-grid h4 { margin: 0 0 12px; color: var(--navy); }
+.admin-demo-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.admin-demo-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--sb-border); border-radius: 8px; padding: 10px; }
+.admin-demo-list li > span:first-child { display: grid; gap: 3px; }
+.admin-demo-list small { color: var(--sb-text-quiet); font-size: 10px; overflow-wrap: anywhere; }
+.admin-demo-record { overflow: auto; border-radius: 8px; padding: 12px; color: var(--sb-text); background: var(--sb-surface-sunken); font-size: 11px; }
 .admin-data-form { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; margin-bottom: 20px; }
 .admin-data-form .primary-button,
 .admin-data-form .secondary-button { justify-self: start; }

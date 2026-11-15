@@ -251,8 +251,7 @@ export default function AccountsReportsPage() {
               <div><p className="module-eyebrow">HELP IMPROVE TRAVEL INFORMATION</p><h2>Report an issue</h2></div>
             </div>
             <p className="module-copy">
-              Tell us what is inaccurate or out of date. Our team can review the route, fare, or
-              stop details. Staff status changes and notes appear under your report updates.
+              Use the browser-only report demo to record a sample issue. Reports and staff notes stay on this device and are not sent to the backend.
             </p>
             <PassengerReportForm />
           </>

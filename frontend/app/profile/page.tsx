@@ -8,14 +8,17 @@ import DemoDataNotice from "@/components/DemoDataNotice";
 import { fmtDate, readBookings, saveBookings } from "@/lib/booking-data";
 import { nearestTransportTown, type Coordinates } from "@/lib/malawi-locations";
 import * as apiNotifications from "@/services/notifications.service";
+import { markBookingNotificationRead, notifyBookingStatus, readBookingNotifications, type DemoNotification } from "@/lib/notifications";
 import { logoutPassenger, readPassengerSession } from "@/lib/passenger-auth";
 import { readSavedRoutes, removeSavedRoute, type SavedRoute } from "@/lib/saved-routes";
 import { useMyBookings } from "@/lib/use-backend-data";
 import type { Booking } from "@/lib/types";
 import * as apiBookings from "@/services/bookings.service";
 import type { Notification } from "@/services/types";
+import * as authApi from "@/services/auth.service";
 
-type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved";
+type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved" | "driver-access";
+type VisibleNotification = Notification | DemoNotification;
 
 const PROFILE_KEY = "routewise-profile-v1";
 
@@ -87,6 +90,7 @@ const TABS: { id: ProfileTab; label: string; hint: string; icon: ReactNode }[] =
   { id: "journeys", label: "Recent journeys", hint: "View your travel history", icon: <HistoryIcon /> },
   { id: "notifications", label: "Notifications", hint: "View notifications", icon: <BellIcon /> },
   { id: "saved", label: "Saved routes", hint: "View your saved routes", icon: <BookmarkIcon /> },
+  { id: "driver-access", label: "Driver access", hint: "Request a driver role", icon: <TicketIcon /> },
 ];
 
 export default function ProfilePage() {
@@ -96,13 +100,16 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<ProfileTab>("bookings");
   const [displayName, setDisplayName] = useState("");
   const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useMyBookings();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<VisibleNotification[]>([]);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [dataError, setDataError] = useState("");
   const [bookingNotice, setBookingNotice] = useState("");
   const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
   const [locationStatus, setLocationStatus] = useState("Share your location to find your nearest departure town.");
   const [locating, setLocating] = useState(false);
+  const [driverLicenseId, setDriverLicenseId] = useState("");
+  const [driverRequestMessage, setDriverRequestMessage] = useState("");
+  const [driverRequestBusy, setDriverRequestBusy] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -134,7 +141,7 @@ export default function ProfilePage() {
     }
     let cancelled = false;
     apiNotifications.list().then((items) => {
-      if (!cancelled) setNotifications(items);
+      if (!cancelled) setNotifications([...items, ...readBookingNotifications()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     }).catch((reason: unknown) => {
       if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
     });
@@ -247,9 +254,41 @@ export default function ProfilePage() {
         "booking-cancelled",
         `You cancelled your booking for ${target.route || `trip ${target.tripId}`} on ${fmtDate(target.travelDate)}. The seats have been released for other passengers.`,
       );
-      setNotifications(readBookingNotifications());
+      void apiNotifications.list().then((items) => {
+        setNotifications([...items, ...readBookingNotifications()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      }).catch(() => undefined);
     } catch {
       // The cancellation is saved even if the notification store is blocked.
+    }
+  }
+
+  async function markNotificationRead(id: string) {
+    if (id.startsWith("demo-")) {
+      markBookingNotificationRead(id);
+      setNotifications((current) => current.map((item) => item.id === id ? { ...item, read: true } : item));
+      return;
+    }
+    try {
+      await apiNotifications.markAsRead(id);
+      setNotifications((current) => current.map((item) => item.id === id ? { ...item, read: true } : item));
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : "Notification could not be marked as read.");
+    }
+  }
+
+  async function requestDriverAccess(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDataError("");
+    setDriverRequestMessage("");
+    setDriverRequestBusy(true);
+    try {
+      await authApi.requestDriver(driverLicenseId.trim());
+      setDriverLicenseId("");
+      setDriverRequestMessage("Driver access request sent. An administrator must approve it before driver sign-in is available.");
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : "Driver access request could not be sent.");
+    } finally {
+      setDriverRequestBusy(false);
     }
   }
 
@@ -471,15 +510,17 @@ export default function ProfilePage() {
                       <li key={notification.id} className={notification.read ? "" : "is-unread"}>
                         <div className="profile-notification-head">
                           <strong>{notification.title}</strong>
+                          {"source" in notification && notification.source === "demo" && <span className="profile-unread-dot">Demo</span>}
                           {!notification.read && <span className="profile-unread-dot">New</span>}
                         </div>
                         <p>{notification.message}</p>
-                        <small>Ref. {notification.reference} · {new Date(notification.createdAt).toLocaleString()}</small>
+                        <small>{new Date(notification.createdAt).toLocaleString()}</small>
+                        {!notification.read && <button type="button" className="text-action" onClick={() => void markNotificationRead(notification.id)}>Mark as read</button>}
                       </li>
                     ))}
                   </ul>
                 )}
-                <p className="module-footnote">Notifications are stored in this browser only.</p>
+                <p className="module-footnote">Notifications are loaded from your YendaRoute account.</p>
               </>
             )}
 
@@ -519,6 +560,17 @@ export default function ProfilePage() {
                     ))}
                   </ul>
                 )}
+              </>
+            )}
+
+            {tab === "driver-access" && (
+              <>
+                <PanelHeading icon={<TicketIcon />} title="Request driver access" description="Submit your license ID for administrator review." />
+                <form className="module-form narrow-form" onSubmit={requestDriverAccess}>
+                  <label>Driver license ID<input value={driverLicenseId} onChange={(event) => setDriverLicenseId(event.target.value)} required /></label>
+                  <button className="primary-button form-submit" type="submit" disabled={driverRequestBusy}>{driverRequestBusy ? "Sending request…" : "Request driver access"}</button>
+                </form>
+                {driverRequestMessage && <p className="module-feedback success" role="status">{driverRequestMessage}</p>}
               </>
             )}
           </section>

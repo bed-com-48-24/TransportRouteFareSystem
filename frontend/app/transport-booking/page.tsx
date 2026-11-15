@@ -17,6 +17,8 @@ import type { Booking, Trip } from "@/lib/types";
 import { toBooking } from "@/services/adapters";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiPayments from "@/services/payments.service";
+import * as apiSchedules from "@/services/schedules.service";
+import type { Payment, PaymentMethod } from "@/services/types";
 import { useSession } from "@/lib/auth";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), {
@@ -67,7 +69,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [notificationError, setNotificationError] = useState("");
   const [saving, setSaving] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"mobile" | "bank">("mobile");
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentResult, setPaymentResult] = useState<Payment | null>(null);
+  const [liveAvailableSeatNumbers, setLiveAvailableSeatNumbers] = useState<number[] | null>(null);
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
   const [showTicket, setShowTicket] = useState(false);
@@ -77,7 +82,46 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [saveRouteError, setSaveRouteError] = useState("");
   const [locationStatus, setLocationStatus] = useState("Finding your current location…");
   const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiPayments.listMethods().then((methods) => {
+      if (cancelled) return;
+      const supported = methods.filter((method) => method.id === "mobile_money" || method.id === "bank_card");
+      setPaymentMethods(supported);
+      setPaymentMethodId((current) => current || supported[0]?.id || "");
+    }).catch((reason: unknown) => {
+      if (!cancelled) setError(reason instanceof Error ? reason.message : "Payment methods could not be loaded.");
+    });
+    return () => { cancelled = true; };
+  }, []);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
+  useEffect(() => {
+    if (!selectedTrip) {
+      setLiveAvailableSeatNumbers(null);
+      return;
+    }
+    let cancelled = false;
+    setLiveAvailableSeatNumbers(null);
+    apiSchedules.getSeats(Number(selectedTrip.id), selectedTrip.date).then((result) => {
+      if (cancelled) return;
+      let available: number[] | null = null;
+      if (Array.isArray(result.seats)) {
+        available = result.seats
+          .filter((seat) => seat.available)
+          .map((seat) => seat.seatNumber);
+      } else if (Array.isArray(result.availableSeats)) {
+        available = result.availableSeats.map(Number);
+      } else if (Array.isArray(result.bookedSeats)) {
+        const booked = new Set(result.bookedSeats.map(Number));
+        available = Array.from({ length: result.capacity ?? selectedTrip.capacity }, (_, index) => index + 1)
+          .filter((seat) => !booked.has(seat));
+      }
+      setLiveAvailableSeatNumbers(available);
+    }).catch(() => {
+      if (!cancelled) setLiveAvailableSeatNumbers(null);
+    });
+    return () => { cancelled = true; };
+  }, [selectedTrip?.id, selectedTrip?.date, selectedTrip?.capacity]);
   const towns = [...new Set([
     ...routes.flatMap((route) => [route.origin, route.destination]),
     ...trips.flatMap((trip) => trip.route.split(" → ")),
@@ -166,15 +210,18 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     () => new Map(trips.map((trip) => [trip.id, availableSeats(trip, bookings)])),
     [trips, bookings],
   );
-  const available = selectedTrip ? (seatsByTrip.get(selectedTrip.id) ?? availableSeats(selectedTrip, bookings)) : 0;
-  const availableSeatList = useMemo(
-    () => (selectedTrip ? availableSeatNumbers(selectedTrip, bookings) : []),
-    [selectedTrip, bookings],
-  );
   const adminSeats = useMemo(
     () => (selectedTrip ? adminReservedSeatNumbers(selectedTrip) : []),
     [selectedTrip],
   );
+  const availableSeatList = useMemo(
+    () => {
+      const seats = liveAvailableSeatNumbers ?? (selectedTrip ? availableSeatNumbers(selectedTrip, bookings) : []);
+      return seats.filter((seat) => !adminSeats.includes(seat));
+    },
+    [selectedTrip, bookings, liveAvailableSeatNumbers, adminSeats],
+  );
+  const available = availableSeatList.length;
   const passengers = selectedSeats.length;
   const seatLimitReached = passengers >= MAX_PASSENGERS;
 
@@ -272,6 +319,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setSearchError("");
     setError("");
     setNotice("");
+    setPaymentResult(null);
   }
 
   function startBooking() {
@@ -436,7 +484,11 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   async function completePayment() {
     if (!selectedTrip) return;
 
-    const paymentLabel = paymentMethod === "bank" ? "Bank card" : "Mobile money";
+    const selectedMethod = paymentMethods.find((method) => method.id === paymentMethodId);
+    if (!selectedMethod) {
+      setError("Choose an available payment method.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -471,9 +523,12 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
 
         const payment = await apiPayments.create(
           created.reference,
-          paymentMethod === "bank" ? "bank_card" : "mobile_money",
+          paymentMethodId as "mobile_money" | "bank_card",
         );
-        if (payment.status !== "succeeded" && payment.status !== "paid") {
+        setPaymentResult(payment);
+        const paymentStatus = payment.status?.toLowerCase() ?? "pending";
+        const paymentConfirmed = ["succeeded", "paid", "completed", "success"].includes(paymentStatus);
+        if (!paymentConfirmed) {
           setPaymentPending(false);
           setNotice(`Payment ${payment.status ?? "initiated"}. Booking reference: ${created.reference}.`);
           return;
@@ -491,9 +546,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
             },
             activeTrip,
           ),
-          paymentStatus: payment.status === "succeeded" || payment.status === "paid" ? "paid" : "pending",
-          paymentMethod: paymentMethod === "bank" ? "bank" : undefined,
-          paymentProvider: paymentLabel,
+          paymentStatus: "paid",
+          paymentMethod: paymentMethodId === "bank_card" ? "bank" : undefined,
+          paymentProvider: selectedMethod.name,
           amountPaid: activeTrip.fare * passengers,
         };
 
@@ -512,7 +567,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       setTicketQr(qr);
       setShowTicket(false);
       setPaymentPending(false);
-      setNotice(payment.status === "succeeded" || payment.status === "paid"
+      setNotice(paymentConfirmed
         ? "Payment confirmed. Your bus ticket is ready."
         : `Payment ${payment.status ?? "initiated"}. Your booking reference is ${booking.reference}.`);
       try {
@@ -620,6 +675,20 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   return (
     <main className="module-shell">
       <DemoDataNotice show={tripsAreDemo} what="departures" />
+      {paymentResult && (
+        <section className="module-section" aria-label="Backend payment result" aria-live="polite">
+          <div className="module-section-heading">
+            <div><p className="module-eyebrow">BACKEND PAYMENT RESULT</p><h2>{paymentResult.status ?? "Response received"}</h2></div>
+          </div>
+          <dl className="payment-success-list">
+            <div><dt>Payment ID</dt><dd>{paymentResult.id}</dd></div>
+            {paymentResult.bookingReference && <div><dt>Booking reference</dt><dd>{paymentResult.bookingReference}</dd></div>}
+            {paymentResult.amount !== undefined && <div><dt>Amount</dt><dd>{paymentResult.currency ?? "MWK"} {paymentResult.amount.toLocaleString("en-MW")}</dd></div>}
+            {paymentResult.method && <div><dt>Method</dt><dd>{paymentResult.method}</dd></div>}
+            {paymentResult.createdAt && <div><dt>Created</dt><dd>{new Date(paymentResult.createdAt).toLocaleString()}</dd></div>}
+          </dl>
+        </section>
+      )}
       <header className="module-intro">
         <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
         <p>
@@ -834,20 +903,16 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
             </div>
             <label className="map-route-filter">Payment method
               <select
-                value={paymentMethod}
-                onChange={(event) => {
-                  const method = event.target.value;
-                  if (method === "mobile" || method === "bank") setPaymentMethod(method);
-                  setError("");
-                }}
+                value={paymentMethodId}
+                onChange={(event) => { setPaymentMethodId(event.target.value); setError(""); }}
               >
-                <option value="mobile">Mobile money</option>
-                <option value="bank">Bank card</option>
+                {paymentMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}
               </select>
             </label>
+            {paymentMethods.length === 0 && <p className="module-error" role="alert">No supported payment methods are available from the backend.</p>}
             <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
             <div className="payment-actions">
-              <button className="primary-button" type="button" onClick={completePayment} disabled={saving}>
+              <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethods.length === 0}>
                 {saving ? "Sending payment request…" : `Pay · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
