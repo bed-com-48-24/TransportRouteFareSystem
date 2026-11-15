@@ -1,0 +1,162 @@
+/**
+ * Shared types for the YendaRoute backend (Swagger: http://localhost:3001/docs).
+ * Kept in one place so pages and components never import raw API shapes.
+ */
+
+export type BackendRole = "admin" | "driver" | "passenger";
+
+export type BackendUser = {
+  id: number;
+  fullName: string;
+  email?: string;
+  phoneNumber?: string;
+  role: BackendRole;
+};
+
+export type AuthPayload = {
+  accessToken: string;
+  refreshToken: string;
+  user: BackendUser;
+};
+
+/** Envelope returned by list endpoints that paginate (e.g. /stops). */
+export type Paginated<T> = {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type Stop = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  description?: string | null;
+};
+
+export type RouteStop = {
+  id?: number;
+  stopId: number;
+  stop?: Stop;
+  order?: number;
+};
+
+export type Fare = {
+  id: number;
+  routeId?: number;
+  originStopId: number;
+  destinationStopId: number;
+  amount: number;
+  currency?: string;
+};
+
+export type Route = {
+  id: number;
+  name: string;
+  originStopId?: number;
+  destinationStopId?: number;
+  originStop?: Stop;
+  destinationStop?: Stop;
+  intermediateStops?: RouteStop[];
+  stops?: RouteStop[];
+  fares?: Fare[];
+  distance?: number | null;
+  companyName?: string | null;
+  pickupLocation?: string | null;
+  featured?: boolean;
+  isActive?: boolean;
+};
+
+export type Vehicle = {
+  id: number;
+  plateNumber: string;
+  vehicleType: string;
+  capacity: number;
+  description?: string | null;
+  driverId?: number | null;
+};
+
+export type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
+
+export type Schedule = {
+  id: number;
+  routeId: number;
+  vehicleId: number;
+  departureStopId: number;
+  departureTime: string;
+  arrivalAt?: string | null;
+  fare?: number | null;
+  daysOfWeek?: Weekday[];
+  route?: Route;
+  vehicle?: Vehicle;
+  seatsAvailable?: number;
+};
+
+export type BookingStatus =
+  | "draft"
+  | "reviewed"
+  | "paid"
+  | "confirmed"
+  | "cancelled"
+  | "expired";
+
+export type Booking = {
+  reference: string;
+  status: BookingStatus;
+  scheduleId: number;
+  travelDate: string;
+  seatNumbers: number[];
+  originStopId?: number;
+  destinationStopId?: number;
+  amount?: number;
+  currency?: string;
+  passengerName?: string;
+  passengerEmail?: string;
+  phoneNumber?: string;
+  identificationNumber?: string;
+  createdAt?: string;
+};
+
+export type PaymentMethod = {
+  id: string;
+  name: string;
+  provider: string;
+  description?: string;
+};
+
+export type Payment = {
+  id: string;
+  bookingReference?: string;
+  amount?: number;
+  currency?: string;
+  method?: string;
+  status?: string;
+  createdAt?: string;
+};
+
+export type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  type?: string;
+};
+
+export type PassengerProfile = {
+  name: string;
+  email: string;
+  phone?: string;
+  identificationNumber?: string;
+};
+
+export type SeatAvailability = {
+  seatNumber: number;
+  available: boolean;
+};
+
+export type PaginationQuery = {
+  page?: number;
+  pageSize?: number;
+};
