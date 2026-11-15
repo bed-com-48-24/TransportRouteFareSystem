@@ -13,18 +13,11 @@ import {
   useMyBookings,
 } from "@/lib/use-backend-data";
 
-const POPULAR_ROUTES = [
-  { origin: "Blantyre", destination: "Lilongwe", defaultService: "Intercity coach", tag: "Most popular" },
-  { origin: "Lilongwe", destination: "Blantyre", defaultService: "Intercity coach", tag: "High demand" },
-  { origin: "Lilongwe", destination: "Mzuzu", defaultService: "Intercity coach", tag: "Northern corridor" },
-  { origin: "Blantyre", destination: "Zomba", defaultService: "Minibus", tag: "Daily departures" },
-];
-
 export default function HomePage() {
   const router = useRouter();
-  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: routes, usingDemo: routesAreDemo, loading: routesLoading } = useBackendRoutes();
   const { data: fares } = useBackendFares();
-  const { data: trips, usingDemo: tripsAreDemo, error: tripsError } = useBackendTrips();
+  const { data: trips, usingDemo: tripsAreDemo, error: tripsError, loading: tripsLoading } = useBackendTrips();
   const { data: bookings } = useMyBookings();
   const towns = [...new Set(routes.flatMap((route) => [route.origin, route.destination]))].sort();
   const [todayValue, setTodayValue] = useState("");
@@ -35,6 +28,12 @@ export default function HomePage() {
         .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure)),
     [trips, bookings, todayValue],
   );
+  const popularRoutes = useMemo(() => routes.flatMap((route) => {
+    const routeTrips = trips
+      .filter((trip) => trip.routeId === route.id && trip.date >= todayValue)
+      .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
+    return routeTrips.length ? [{ route, routeTrips }] : [];
+  }).sort((first, second) => Number(Boolean(second.route.featured)) - Number(Boolean(first.route.featured))), [routes, trips, todayValue]);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [selectedTrips, setSelectedTrips] = useState<Record<string, string>>({});
@@ -201,6 +200,9 @@ export default function HomePage() {
         <div className="home-hero-content">
           <h1>Where would you like to go?</h1>
           <form className="home-destination-search" onSubmit={search}>
+            <p className="home-location-hint">
+              We use your device location to suggest a starting town. If location access is unavailable, enter your starting town below.
+            </p>
             {!tracking && <p className="home-location-status" role="status">{locationStatus}</p>}
             {origin ? (
               <div className="home-current-origin">
@@ -246,7 +248,7 @@ export default function HomePage() {
               {towns.map((town) => <option key={town} value={town} />)}
             </datalist>
             <div className="home-search-buttons">
-              <button type="button" className="home-book-button" onClick={handleBookDirect}>Book now →</button>
+              <button type="button" className="primary-button home-book-button" onClick={handleBookDirect}>Book now <span aria-hidden="true">&rarr;</span></button>
             </div>
             {error && <p className="home-search-error" role="alert">{error}</p>}
           </form>
@@ -256,54 +258,33 @@ export default function HomePage() {
       <section className="home-popular-panel" aria-labelledby="popular-routes-heading">
         <div className="home-section-heading">
           <h2 id="popular-routes-heading">Popular travel routes</h2>
-          <p>Explore the most traveled transport routes across Malawi. Check fares and book your seat directly.</p>
+          <p>Routes appear here when an admin has scheduled an upcoming departure.</p>
         </div>
         <div className="home-popular-grid">
-          {POPULAR_ROUTES.map((item) => {
-            const routeDef = routes.find(
-              (r) => r.origin.toLowerCase() === item.origin.toLowerCase() && r.destination.toLowerCase() === item.destination.toLowerCase(),
-            );
-            const fareDef = routeDef ? fares.find((f) => f.routeId === routeDef.id) : undefined;
-            const routeTrips = trips
-              .filter(
-                (t) =>
-                  t.route.toLowerCase() === `${item.origin} → ${item.destination}`.toLowerCase() &&
-                  t.date >= todayValue,
-              )
-              .sort(
-                (first, second) =>
-                  first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure),
-              );
-            const routeKey = `${item.origin}-${item.destination}`;
-            const bookableRouteTrips = routeTrips.filter((t) => availableSeats(t, bookings) > 0);
-            const tripDef =
-              bookableRouteTrips.find((t) => t.id === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
-            const fareAmount = fareDef?.amount ?? 30000;
-            const serviceName = routeDef?.service ?? item.defaultService;
+          {popularRoutes.map(({ route, routeTrips }) => {
+            const routeKey = `${route.origin}-${route.destination}`;
+            const bookableRouteTrips = routeTrips.filter((trip) => availableSeats(trip, bookings) > 0);
+            const tripDef = bookableRouteTrips.find((trip) => trip.id === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
+            const fareDef = fares.find((fare) => fare.routeId === route.id);
             const bookHref = tripDef
               ? `/transport-booking/details/${tripDef.id}`
-              : `/transport-booking?origin=${encodeURIComponent(item.origin)}&destination=${encodeURIComponent(item.destination)}`;
+              : `/transport-booking?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(route.destination)}`;
 
             return (
               <article className="home-popular-card" key={routeKey}>
                 <div>
                   <div className="home-popular-top">
-                    <span className="home-popular-tag">{item.tag}</span>
-                    <span className="home-popular-service">{serviceName}</span>
+                    <span className="home-popular-tag">{route.featured ? "Featured route" : "Upcoming departure"}</span>
+                    <span className="home-popular-service">{route.service}</span>
                   </div>
-                  <h3>{item.origin} → {item.destination}</h3>
+                  <h3>{route.origin} &rarr; {route.destination}</h3>
                   <p className="home-popular-fare">
-                    From <strong>MWK {fareAmount.toLocaleString("en-MW")}</strong>
+                    {fareDef ? <>From <strong>MWK {fareDef.amount.toLocaleString("en-MW")}</strong></> : "Fare not listed"}
                   </p>
                   {bookableRouteTrips.length > 0 ? (
                     <label className="home-popular-choose">
                       <span>Choose a trip</span>
-                      <select
-                        value={tripDef?.id ?? ""}
-                        onChange={(event) =>
-                          setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))
-                        }
-                      >
+                      <select value={tripDef?.id ?? ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
                         {bookableRouteTrips.map((trip) => (
                           <option key={trip.id} value={trip.id}>
                             {fmtDate(trip.date)} · {trip.departure} · {availableSeats(trip, bookings)} seats left
@@ -312,28 +293,19 @@ export default function HomePage() {
                       </select>
                     </label>
                   ) : (
-                    <p className="home-popular-schedule">
-                      {routeTrips.length > 0
-                        ? "Scheduled departures are full — check the route screen for details."
-                        : "No admin-scheduled departure yet — check the route screen for details."}
-                    </p>
+                    <p className="home-popular-schedule">Scheduled departures are full. Check the trip page for details.</p>
                   )}
                 </div>
                 <div className="home-popular-actions">
-                  <Link className="primary-button" href={bookHref}>
-                    {tripDef ? "Book this trip" : "Check schedule"}
-                  </Link>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => selectPopularRoute(item.origin, item.destination)}
-                  >
-                    Select route
-                  </button>
+                  <Link className="primary-button" href={bookHref}>{tripDef ? "Book this trip" : "Check schedule"}</Link>
+                  <button type="button" className="secondary-button" onClick={() => selectPopularRoute(route.origin, route.destination)}>Select route</button>
                 </div>
               </article>
             );
           })}
+          {!routesLoading && !tripsLoading && popularRoutes.length === 0 && (
+            <p className="module-empty">No upcoming admin-scheduled departures yet. Routes will appear here after an admin schedules a trip.</p>
+          )}
         </div>
       </section>
       </div>

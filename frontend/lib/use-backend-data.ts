@@ -33,6 +33,15 @@ export function useBackendRoutes(): ApiList<RouteItem> {
   );
 }
 
+/** Admin route list includes inactive routes that are hidden from passengers. */
+export function useAdminBackendRoutes(): ApiList<RouteItem> {
+  return useApiList(
+    async () => (await apiRoutes.listForAdmin()).map(toRouteItem),
+    () => [],
+    "admin-routes",
+  );
+}
+
 export function useBackendStops(): ApiList<StopItem> {
   return useApiList(
     async () => (await apiStops.listAll()).map(toStopItem),

@@ -105,6 +105,11 @@ export function toRouteItem(route: Route): RouteItem {
     origin,
     destination,
     service: route.companyName ?? "Bus",
+    isActive: route.isActive ?? true,
+    featured: route.featured ?? false,
+    intermediateStopIds: (route.intermediateStops ?? []).map((item) => item.stopId),
+    distance: route.distance,
+    pickupLocation: route.pickupLocation,
   };
 }
 
@@ -134,6 +139,8 @@ export function toTrip(schedule: Schedule, date: string): Trip {
 
   return {
     id: String(schedule.id),
+    routeId: String(schedule.routeId),
+    vehicleId: String(schedule.vehicleId),
     route: `${origin} → ${destination}`,
     pickup: stops,
     dropoff: stops,
@@ -142,6 +149,7 @@ export function toTrip(schedule: Schedule, date: string): Trip {
     arrival: schedule.arrivalAt ?? "",
     capacity: schedule.vehicle?.capacity ?? 0,
     fare: schedule.fare ?? cheapestFare(route) ?? 0,
+    daysOfWeek: schedule.daysOfWeek,
   };
 }
 

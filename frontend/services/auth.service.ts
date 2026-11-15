@@ -17,6 +17,7 @@ export type PendingRequest = {
   id: number;
   type?: string;
   status?: string;
+  reason?: string;
   user?: { id: number; fullName: string; email?: string };
 };
 

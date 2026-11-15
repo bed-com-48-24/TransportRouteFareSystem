@@ -16,15 +16,7 @@ export default function MainNavigation() {
   const [error, setError] = useState("");
 
   const adminNavItems: NavItem[] = [
-    { href: "/home", label: "Home" },
     { href: "/maps-admin-integration?panel=admin&section=overview", label: "Overview" },
-    { href: "/maps-admin-integration?panel=admin&section=routes", label: "Routes & fares" },
-    { href: "/maps-admin-integration?panel=admin&section=schedules", label: "Schedules" },
-    { href: "/maps-admin-integration?panel=admin&section=bookings", label: "Bookings" },
-    { href: "/maps-admin-integration?panel=admin&section=reports", label: "Reports" },
-    { href: "/maps-admin-integration?panel=admin&section=passengers", label: "Passengers" },
-    { href: "/maps-admin-integration?panel=admin&section=operations", label: "Driver tools" },
-    { href: "/maps-admin-integration?panel=admin&section=company", label: "Company" },
     { href: "/help", label: "Help" },
   ];
 

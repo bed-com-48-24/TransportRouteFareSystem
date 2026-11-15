@@ -5,6 +5,11 @@ export type RouteItem = {
   origin: string;
   destination: string;
   service: string; 
+  isActive?: boolean;
+  featured?: boolean;
+  intermediateStopIds?: number[];
+  distance?: number | null;
+  pickupLocation?: string | null;
 };
 
 export type FareItem = {
@@ -39,6 +44,8 @@ export type ReportItem = {
 
 export type Trip = {
   id: string;
+  routeId?: string;
+  vehicleId?: string;
   route: string;
   pickup: string[];
   dropoff: string[];
@@ -47,6 +54,7 @@ export type Trip = {
   arrival: string;
   capacity: number;
   fare: number;
+  daysOfWeek?: ("MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN")[];
 };
 
 export type Booking = {
