@@ -1,7 +1,6 @@
 export type SeatBooking = {
   tripId: string;
   passengers: number;
-  seatNumbers?: number[];
   status: "confirmed" | "cancelled";
   reference?: string;
 };
@@ -21,16 +20,9 @@ export function getAvailableSeats(
   tripId: string,
 ): number;
 
-export function getBookedSeatNumbers(
-  capacity: number,
-  bookings: SeatBooking[],
-  tripId: string,
-): number[];
-
 export function reserveBooking<T extends SeatBooking>({
   trip,
   passengers,
-  seatNumbers,
   locks,
   readBookings,
   writeBookings,
@@ -38,9 +30,8 @@ export function reserveBooking<T extends SeatBooking>({
 }: {
   trip: SeatTrip;
   passengers: number;
-  seatNumbers: number[];
   locks: SeatLockManager | undefined;
   readBookings: () => T[];
   writeBookings: (bookings: T[]) => void;
-  createBooking: (seatNumbers: number[]) => T;
+  createBooking: () => T;
 }): Promise<T | null>;

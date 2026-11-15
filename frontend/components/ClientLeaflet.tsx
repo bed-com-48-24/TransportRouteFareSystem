@@ -24,13 +24,8 @@ export const Popup = dynamic(
   () => import("react-leaflet").then((module) => module.Popup),
   { ssr: false },
 );
-<<<<<<< HEAD
 export const Marker = dynamic(
   () => import("react-leaflet").then((module) => module.Marker),
-=======
-export const ZoomControl = dynamic(
-  () => import("react-leaflet").then((module) => module.ZoomControl),
->>>>>>> origin/feature/integration
   { ssr: false },
 );
 export const TileLayer = dynamic(

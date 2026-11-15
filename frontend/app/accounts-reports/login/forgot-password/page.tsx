@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ForgotPasswordPage() {
-  redirect("/login?mode=forgot");
+  redirect("/accounts-reports?mode=forgot-password");
 }

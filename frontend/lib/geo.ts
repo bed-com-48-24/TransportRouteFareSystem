@@ -9,6 +9,20 @@ export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: numbe
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/**
+ * Mock travel estimate from a straight-line distance: widen it for road bends
+ * and assume an average driving speed of about 50 km/h.
+ */
+export function travelEstimate(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  const straightLineKm = distanceKm(fromLat, fromLng, toLat, toLng);
+  if (straightLineKm < 0.5) {
+    return { label: "You are at the departure town", km: 0, minutes: 0 };
+  }
+  const km = Math.max(1, Math.round(straightLineKm * 1.3));
+  const minutes = Math.max(2, Math.round((km / 50) * 60));
+  return { label: `≈ ${km} km · ~${minutes} min drive`, km, minutes };
+}
+
 type MaybeLocated = { lat: number | null; lng: number | null };
 
 /** True only when the item has real, in-range coordinates. */
