@@ -4,17 +4,19 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import DemoDataNotice from "@/components/DemoDataNotice";
 import { useRoadRoutes } from "@/components/road-routing";
 import { travelEstimate } from "@/lib/geo";
 import QRCode from "qrcode";
 import { adminReservedSeatNumbers, availableSeatNumbers, availableSeats, createBooking, fmtDate } from "@/lib/booking-data";
-import { useDemoSeed } from "@/lib/demo-data";
 import { nearestTransportTown, TRANSPORT_TOWN_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { notifyBookingStatus } from "@/lib/notifications";
 import { readSavedRoutes, savedRouteId, toggleSavedRoute } from "@/lib/saved-routes";
-import { KEYS, SEED_ROUTES } from "@/lib/seed";
-import { loadList, useStoredList } from "@/lib/storage";
-import type { Booking, RouteItem, Trip } from "@/lib/types";
+import { useBackendRoutes, useBackendTrips, useMyBookings } from "@/lib/use-backend-data";
+import type { Booking, Trip } from "@/lib/types";
+import { toBooking } from "@/services/adapters";
+import * as apiBookings from "@/services/bookings.service";
+import * as apiPayments from "@/services/payments.service";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), {
   ssr: false,
@@ -61,10 +63,10 @@ function readQueryParam(name: string): string {
 }
 
 export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
-  const trips = useStoredList<Trip>(KEYS.trips, []);
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  useDemoSeed();
+  const { data: trips, usingDemo: tripsAreDemo } = useBackendTrips();
+  const { data: routes } = useBackendRoutes();
+  const { data: bookings, usingDemo: bookingsAreDemo } = useMyBookings();
+  const backendDown = tripsAreDemo && bookingsAreDemo;
   const initialTrip = trips.find((trip) => trip.id === initialTripId);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
   const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));
@@ -78,6 +80,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [seatError, setSeatError] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [passengerPhone, setPassengerPhone] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [notificationError, setNotificationError] = useState("");
@@ -475,7 +478,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setError("");
     setNotificationError("");
     try {
-      const activeTrip = loadList<Trip>(KEYS.trips, []).find((trip) => trip.id === selectedTrip.id);
+      const activeTrip = trips.find((trip) => trip.id === selectedTrip.id);
       if (
         !activeTrip ||
         activeTrip.date !== travelDate ||
@@ -487,29 +490,77 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         return;
       }
 
-      const booking = await createBooking(
-        {
-          tripId: selectedTrip.id,
-          route: selectedTrip.route,
+      const seats = [...selectedSeats].sort((first, second) => first - second);
+      const cleanPhone = (passengerPhone || mobileNumber).replace(/[\s-]/g, "");
+      let booking: Booking | null;
+
+      if (tripsAreDemo) {
+        // Backend unreachable: fall back to the original browser-only reservation.
+        booking = await createBooking(
+          {
+            tripId: selectedTrip.id,
+            route: selectedTrip.route,
+            travelDate,
+            pickup,
+            dropoff,
+            passengers,
+            seats,
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            paymentStatus: "paid",
+            paymentMethod: paymentMethod === "bank" ? "bank" : mobileProvider,
+            paymentProvider: paymentLabel,
+            paymentReference,
+            paymentCode,
+            amountPaid: activeTrip.fare * passengers,
+            payerPhone: paymentMethod === "mobile" ? cleanPhone : undefined,
+            payerAccountLast4: paymentMethod === "bank" ? accountNumber.replace(/\D/g, "").slice(-4) : undefined,
+            paidAt: new Date().toISOString(),
+          },
+          activeTrip,
+        );
+      } else {
+        // Live backend: hold the seats, save the passenger, then pay.
+        const created = await apiBookings.create({
+          scheduleId: Number(selectedTrip.id),
           travelDate,
-          pickup,
-          dropoff,
-          passengers,
-          seats: [...selectedSeats].sort((first, second) => first - second),
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
+          seatNumbers: seats,
+        });
+
+        await apiBookings.updatePassenger(created.reference, {
+          passengerName: name.trim(),
+          passengerEmail: email.trim().toLowerCase(),
+          phoneNumber: cleanPhone,
+        });
+
+        await apiPayments.create(
+          created.reference,
+          paymentMethod === "bank" ? "bank_card" : "mobile_money",
+        );
+
+        booking = {
+          ...toBooking(
+            {
+              ...created,
+              status: "confirmed",
+              seatNumbers: seats,
+              travelDate,
+              passengerName: name.trim(),
+              passengerEmail: email.trim().toLowerCase(),
+            },
+            activeTrip,
+          ),
           paymentStatus: "paid",
           paymentMethod: paymentMethod === "bank" ? "bank" : mobileProvider,
           paymentProvider: paymentLabel,
           paymentReference,
           paymentCode,
           amountPaid: activeTrip.fare * passengers,
-          payerPhone: paymentMethod === "mobile" ? mobileNumber.replace(/[\s-]/g, "") : undefined,
+          payerPhone: paymentMethod === "mobile" ? cleanPhone : undefined,
           payerAccountLast4: paymentMethod === "bank" ? accountNumber.replace(/\D/g, "").slice(-4) : undefined,
           paidAt: new Date().toISOString(),
-        },
-        activeTrip,
-      );
+        };
+      }
 
       if (!booking) {
         setError("Not enough seats remain for this trip. Choose fewer passengers or another departure.");
@@ -1057,6 +1108,10 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
               <label>
                 Email address
                 <input type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
+              </label>
+              <label>
+                Phone number
+                <input type="tel" autoComplete="tel" maxLength={20} value={passengerPhone} onChange={(event) => setPassengerPhone(event.target.value)} placeholder="e.g. 0991234567" required />
               </label>
             </div>
 

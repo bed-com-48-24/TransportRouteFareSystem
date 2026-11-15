@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import DemoDataNotice from "@/components/DemoDataNotice";
 import { nearestTransportTown } from "@/lib/malawi-locations";
-import { KEYS, SEED_FARES, SEED_ROUTES } from "@/lib/seed";
 import { availableSeats, fmtDate } from "@/lib/booking-data";
-import { useDemoSeed } from "@/lib/demo-data";
-import { useStoredList } from "@/lib/storage";
-import type { Booking, FareItem, RouteItem, Trip } from "@/lib/types";
+import {
+  useBackendFares,
+  useBackendRoutes,
+  useBackendTrips,
+  useMyBookings,
+} from "@/lib/use-backend-data";
 
 const POPULAR_ROUTES = [
   { origin: "Blantyre", destination: "Lilongwe", defaultService: "Intercity coach", tag: "Most popular" },
@@ -19,11 +22,10 @@ const POPULAR_ROUTES = [
 
 export default function HomePage() {
   const router = useRouter();
-  const routes = useStoredList<RouteItem>(KEYS.routes, SEED_ROUTES);
-  const fares = useStoredList<FareItem>(KEYS.fares, SEED_FARES);
-  const trips = useStoredList<Trip>(KEYS.trips, []);
-  const bookings = useStoredList<Booking>(KEYS.bookings, []);
-  useDemoSeed();
+  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: fares } = useBackendFares();
+  const { data: trips, usingDemo: tripsAreDemo, error: tripsError } = useBackendTrips();
+  const { data: bookings } = useMyBookings();
   const towns = [...new Set(routes.flatMap((route) => [route.origin, route.destination]))].sort();
   const [todayValue, setTodayValue] = useState("");
   const bookableTrips = useMemo(
@@ -185,6 +187,15 @@ export default function HomePage() {
 
   return (
     <main className="home-shell">
+      <DemoDataNotice
+        show={routesAreDemo || tripsAreDemo}
+        what="routes and departures"
+      />
+      {tripsError && !tripsAreDemo && (
+        <p role="alert" className="home-search-error">
+          Could not load departures: {tripsError}
+        </p>
+      )}
       <div className="home-top-grid">
       <section className="home-hero">
         <div className="home-hero-content">
