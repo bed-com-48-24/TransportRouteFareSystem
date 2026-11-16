@@ -8,7 +8,10 @@ export type CreateStopInput = {
   description?: string;
 };
 
-export type UpdateStopInput = Partial<CreateStopInput>;
+export type UpdateStopInput = Partial<CreateStopInput> & {
+  /** Hide a stop without deleting it (it stays linked to historical routes/bookings). */
+  isActive?: boolean;
+};
 
 /**
  * GET /stops — paginated envelope ({ data, total, page, limit }).
@@ -18,8 +21,17 @@ export function list(page?: { page?: number; limit?: number }): Promise<Paginate
   return apiRequestPage<Stop>("/stops", { query: page });
 }
 
-export function listAll(): Promise<Stop[]> {
-  return apiRequestList<Stop>("/stops");
+/** Every active stop, following the backend's pages (default page size is 20). */
+export async function listAll(): Promise<Stop[]> {
+  const limit = 100;
+  const first = await list({ page: 1, limit });
+  const pageCount = Math.max(1, Math.ceil(first.total / limit));
+  if (pageCount === 1) return first.data;
+
+  const remaining = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) => list({ page: index + 2, limit })),
+  );
+  return [...first.data, ...remaining.flatMap((page) => page.data)];
 }
 
 export function nearby(lat: number, lng: number, radius: number): Promise<Stop[]> {

@@ -5,13 +5,26 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import DemoDataNotice from "@/components/DemoDataNotice";
 import { nearestTransportTown } from "@/lib/malawi-locations";
-import { availableSeats, fmtDate } from "@/lib/booking-data";
+import { adminReservedSeatNumbers, availableSeats, fmtDate } from "@/lib/booking-data";
+import type { Booking, Trip } from "@/lib/types";
 import {
   useBackendFares,
   useBackendRoutes,
   useBackendTrips,
   useMyBookings,
 } from "@/lib/use-backend-data";
+
+/** A weekly schedule repeats across dates, so include the date in the key. */
+function tripKey(trip: Pick<Trip, "id" | "date">) {
+  return `${trip.id}:${trip.date}`;
+}
+
+/** Prefer the live count from the schedule search; fall back to local bookings. */
+function seatsLeftFor(trip: Trip, bookings: Booking[]) {
+  return typeof trip.availableSeats === "number"
+    ? Math.min(trip.availableSeats, Math.max(0, trip.capacity - adminReservedSeatNumbers(trip).length))
+    : availableSeats(trip, bookings);
+}
 
 export default function HomePage() {
   const router = useRouter();
@@ -20,11 +33,12 @@ export default function HomePage() {
   const { data: trips, usingDemo: tripsAreDemo, error: tripsError, loading: tripsLoading } = useBackendTrips();
   const { data: bookings } = useMyBookings();
   const towns = [...new Set(routes.flatMap((route) => [route.origin, route.destination]))].sort();
+  const seatsLeft = (trip: Trip) => seatsLeftFor(trip, bookings);
   const [todayValue, setTodayValue] = useState("");
   const bookableTrips = useMemo(
     () =>
       trips
-        .filter((trip) => trip.date >= todayValue && availableSeats(trip, bookings) > 0)
+        .filter((trip) => trip.date >= todayValue && seatsLeftFor(trip, bookings) > 0)
         .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure)),
     [trips, bookings, todayValue],
   );
@@ -157,7 +171,7 @@ export default function HomePage() {
         return orig?.trim().toLowerCase() === knownOrigin.toLowerCase() && dest?.trim().toLowerCase() === knownDestination.toLowerCase();
       });
       if (match) {
-        router.push(`/transport-booking/details/${match.id}`);
+        router.push(`/transport-booking/details/${match.id}?date=${match.date}`);
         return;
       }
 
@@ -263,11 +277,11 @@ export default function HomePage() {
         <div className="home-popular-grid">
           {popularRoutes.map(({ route, routeTrips }) => {
             const routeKey = `${route.origin}-${route.destination}`;
-            const bookableRouteTrips = routeTrips.filter((trip) => availableSeats(trip, bookings) > 0);
-            const tripDef = bookableRouteTrips.find((trip) => trip.id === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
+            const bookableRouteTrips = routeTrips.filter((trip) => seatsLeft(trip) > 0);
+            const tripDef = bookableRouteTrips.find((trip) => tripKey(trip) === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
             const fareDef = fares.find((fare) => fare.routeId === route.id);
             const bookHref = tripDef
-              ? `/transport-booking/details/${tripDef.id}`
+              ? `/transport-booking/details/${tripDef.id}?date=${tripDef.date}`
               : `/transport-booking?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(route.destination)}`;
 
             return (
@@ -284,10 +298,10 @@ export default function HomePage() {
                   {bookableRouteTrips.length > 0 ? (
                     <label className="home-popular-choose">
                       <span>Choose a trip</span>
-                      <select value={tripDef?.id ?? ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
+                      <select value={tripDef ? tripKey(tripDef) : ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
                         {bookableRouteTrips.map((trip) => (
-                          <option key={trip.id} value={trip.id}>
-                            {fmtDate(trip.date)} · {trip.departure} · {availableSeats(trip, bookings)} seats left
+                          <option key={tripKey(trip)} value={tripKey(trip)}>
+                            {fmtDate(trip.date)} · {trip.departure} · {seatsLeft(trip)} seats left
                           </option>
                         ))}
                       </select>

@@ -139,7 +139,7 @@ export default function MyBookingsPage() {
                   <span>{booking.passengers} passenger(s) · {booking.name || "—"}</span>
                   {booking.seats?.length ? <span>Seats: {booking.seats.join(", ")}</span> : null}
                   <span>Reference: <b>{booking.reference}</b></span>
-                  <Link href={`/transport-booking/details/${booking.tripId}`}>View trip details →</Link>
+                  <Link href={`/transport-booking/details/${booking.tripId}?date=${booking.travelDate}`}>View trip details →</Link>
                 </div>
                 <div className="booking-record-actions">
                   <span className={`status-tag ${booking.status}`}>{booking.status}</span>

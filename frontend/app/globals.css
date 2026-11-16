@@ -903,6 +903,7 @@ body { background: var(--background); color: var(--foreground); }
 .module-feedback.success { color: var(--sb-success); background: var(--sb-success-bg); }
 .module-error,
 .module-feedback.error { color: var(--sb-danger); background: var(--sb-danger-bg); }
+.module-feedback.info { color: var(--sb-text-muted); background: var(--sb-surface-sunken); }
 .module-form { display: grid; gap: 15px; }
 .module-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .module-form label,
@@ -1100,6 +1101,8 @@ body { background: var(--background); color: var(--foreground); }
 .admin-demo-list small { color: var(--sb-text-quiet); font-size: 10px; overflow-wrap: anywhere; }
 .admin-demo-record { overflow: auto; border-radius: 8px; padding: 12px; color: var(--sb-text); background: var(--sb-surface-sunken); font-size: 11px; }
 .admin-data-form { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; margin-bottom: 20px; }
+.admin-vehicle-quick-add { margin: 14px 0 0; padding: 0; }
+.admin-vehicle-empty-copy { margin: 0 0 12px; color: var(--muted); }
 .admin-stop-picker { display: grid; max-height: 160px; gap: 6px; overflow-y: auto; margin: 0; border: 1px solid var(--sb-border); border-radius: 9px; padding: 10px; }
 .admin-stop-picker legend { padding: 0 4px; color: var(--sb-text); font-size: 11px; font-weight: 750; }
 .admin-stop-picker label { display: flex; align-items: center; gap: 7px; color: var(--sb-text-muted); font-size: 11px; }
@@ -1115,6 +1118,8 @@ body { background: var(--background); color: var(--foreground); }
 .admin-record-list > article small { display: block; }
 .admin-record-list > article strong { color: var(--navy); font-size: 12px; }
 .admin-record-list > article small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.admin-record-list > article small.admin-record-note { font-weight: 650; }
+.admin-record-list > article small.admin-record-note.error { color: var(--sb-danger); }
 .admin-record-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 11px; }
 .text-action { border: 0; padding: 5px; color: var(--navy-light); background: none; font-size: 10px; font-weight: 750; cursor: pointer; }
 .danger-action { color: var(--sb-danger); }

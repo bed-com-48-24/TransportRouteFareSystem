@@ -101,7 +101,7 @@ export default function TripMap({
           ];
           return (
             <Polyline
-              key={trip.id}
+              key={`${trip.id}:${trip.date}`}
               positions={positions}
               pathOptions={{
                 color: "#12304A",
@@ -121,7 +121,7 @@ export default function TripMap({
                     ? "Road data unavailable · showing a direct-line fallback"
                     : "Loading road geometry · direct-line fallback remains visible"}
                 <br />
-                <Link className="map-trip-select" href={`/transport-booking/details/${trip.id}`}>Choose this trip</Link>
+                <Link className="map-trip-select" href={`/transport-booking/details/${trip.id}?date=${trip.date}`}>Choose this trip</Link>
               </Popup>
             </Polyline>
           );

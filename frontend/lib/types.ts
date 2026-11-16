@@ -54,6 +54,8 @@ export type Trip = {
   arrival: string;
   capacity: number;
   fare: number;
+  /** Live seat count returned by the passenger schedule search. */
+  availableSeats?: number;
   daysOfWeek?: ("MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN")[];
 };
 

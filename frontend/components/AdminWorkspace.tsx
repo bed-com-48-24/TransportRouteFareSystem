@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   adminReservedSeatNumbers,
   availableSeatNumbers,
@@ -32,13 +32,14 @@ import {
   useBackendStops,
 } from "@/lib/use-backend-data";
 import { fromStopItem, weekdaysForDate } from "@/services/adapters";
+import { ApiError } from "@/services/http";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiFares from "@/services/fares.service";
 import * as apiRoutes from "@/services/routes.service";
 import * as apiSchedules from "@/services/schedules.service";
 import * as apiStops from "@/services/stops.service";
 import * as apiVehicles from "@/services/vehicles.service";
-import type { Vehicle, Weekday } from "@/services/types";
+import type { Booking as ApiBooking, Fare, Schedule, Vehicle, Weekday } from "@/services/types";
 import type {
   Booking,
   FareItem,
@@ -604,6 +605,12 @@ function TripScheduleManagement() {
   const { data: bookings } = useAdminBookings();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehiclesError, setVehiclesError] = useState("");
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [vehicleSaving, setVehicleSaving] = useState(false);
+  const [vehicleFeedback, setVehicleFeedback] = useState("");
+  const [newPlate, setNewPlate] = useState("");
+  const [newVehicleType, setNewVehicleType] = useState("Minibus");
+  const [newVehicleCapacity, setNewVehicleCapacity] = useState("15");
   const [routeId, setRouteId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [date, setDate] = useState("");
@@ -618,15 +625,79 @@ function TripScheduleManagement() {
   const [query, setQuery] = useState("");
   const [tripFilter, setTripFilter] = useState<"all" | "upcoming" | "past">("all");
   const [feedback, setFeedback] = useState("");
+  const loadVehicles = useCallback(async () => {
+    setVehiclesLoading(true);
+    try {
+      setVehicles((await apiVehicles.list()).filter((vehicle) => vehicle.isActive !== false));
+      setVehiclesError("");
+    } catch (reason) {
+      setVehiclesError(reason instanceof Error ? reason.message : "Vehicles could not be loaded.");
+    } finally {
+      setVehiclesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    apiVehicles.list().then((items) => {
-      if (!cancelled) { setVehicles(items); setVehiclesError(""); }
-    }).catch((reason: unknown) => {
-      if (!cancelled) setVehiclesError(reason instanceof Error ? reason.message : "Vehicles could not be loaded.");
-    });
+    apiVehicles.list()
+      .then((items) => {
+        if (cancelled) return;
+        setVehicles(items.filter((vehicle) => vehicle.isActive !== false));
+        setVehiclesError("");
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) setVehiclesError(reason instanceof Error ? reason.message : "Vehicles could not be loaded.");
+      })
+      .finally(() => {
+        if (!cancelled) setVehiclesLoading(false);
+      });
     return () => { cancelled = true; };
   }, []);
+
+  async function addVehicleToFleet(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const seatCapacity = Number(newVehicleCapacity);
+    if (newPlate.trim().length < 2) {
+      setVehicleFeedback("Enter the vehicle registration or plate number.");
+      return;
+    }
+    if (newVehicleType.trim().length < 2) {
+      setVehicleFeedback("Enter the type of vehicle.");
+      return;
+    }
+    if (!Number.isSafeInteger(seatCapacity) || seatCapacity < 1 || seatCapacity > 200) {
+      setVehicleFeedback("Seat capacity must be a whole number from 1 to 200.");
+      return;
+    }
+
+    setVehicleSaving(true);
+    setVehicleFeedback("");
+    try {
+      const plateNumber = newPlate.trim();
+      const created = await apiVehicles.create({
+        plateNumber,
+        vehicleType: newVehicleType.trim(),
+        capacity: seatCapacity,
+      });
+      const items = (await apiVehicles.list()).filter((vehicle) => vehicle.isActive !== false);
+      setVehicles(items);
+      setVehiclesError("");
+      const match = items.find((item) => item.id === created?.id)
+        ?? items.find((item) => item.plateNumber === plateNumber);
+      if (match) {
+        setVehicleId(String(match.id));
+        setCapacity(String(match.capacity));
+      }
+      setNewPlate("");
+      setNewVehicleType("Minibus");
+      setNewVehicleCapacity("15");
+      setVehicleFeedback(`Vehicle ${plateNumber} added to the fleet and selected for this departure.`);
+    } catch (reason) {
+      setVehicleFeedback(reason instanceof Error ? reason.message : "The vehicle could not be added.");
+    } finally {
+      setVehicleSaving(false);
+    }
+  }
   const route = routes.find((item) => item.id === routeId);
   const pickupOptions = route
     ? stops.filter((stop) => stop.city.toLowerCase() === route.origin.toLowerCase() && (stop.kind === "pickup" || stop.kind === "both"))
@@ -851,9 +922,39 @@ function TripScheduleManagement() {
       <h3>{editingTripId ? "Edit a scheduled departure" : "Schedule a departure"}</h3>
       <DemoDataNotice show={tripsAreDemo} what="scheduled departures" />
       {tripsError && <p className="module-error" role="alert">{tripsError}</p>}
-      {vehiclesError && <p className="module-error" role="alert">{vehiclesError}</p>}
+      {vehiclesError && (
+        <div className="module-error" role="alert">
+          <p>{vehiclesError}</p>
+          <button type="button" className="secondary-button" onClick={() => void loadVehicles()} disabled={vehiclesLoading}>
+            {vehiclesLoading ? "Retrying…" : "Retry loading fleet"}
+          </button>
+        </div>
+      )}
       <p className="module-copy">Only departures scheduled here can be booked by passengers. Choose a future travel date.</p>
-      {vehicles.length === 0 && !vehiclesError && <p className="module-empty">Add a vehicle in Drivers &amp; fleet before scheduling a departure.</p>}
+      {vehiclesLoading ? (
+        <p className="module-empty">Loading fleet vehicles…</p>
+      ) : vehicles.length === 0 && !vehiclesError ? (
+        <div className="module-empty">
+          <p className="admin-vehicle-empty-copy">Your fleet has no vehicles yet. Add one here, or manage the full fleet in Drivers &amp; fleet, before scheduling a departure.</p>
+          <form className="module-form admin-data-form admin-vehicle-quick-add" onSubmit={addVehicleToFleet}>
+            <label>Registration / plate
+              <input value={newPlate} onChange={(event) => setNewPlate(event.target.value)} maxLength={30} required />
+            </label>
+            <label>Vehicle type
+              <input value={newVehicleType} onChange={(event) => setNewVehicleType(event.target.value)} maxLength={60} required />
+            </label>
+            <label>Seat capacity
+              <input type="number" min="1" max="200" step="1" value={newVehicleCapacity} onChange={(event) => setNewVehicleCapacity(event.target.value)} required />
+            </label>
+            <button className="primary-button" type="submit" disabled={vehicleSaving}>
+              {vehicleSaving ? "Adding vehicle…" : "Add vehicle to fleet"}
+            </button>
+          </form>
+          {vehicleFeedback && <p className="module-feedback" role="status">{vehicleFeedback}</p>}
+        </div>
+      ) : (
+        vehicleFeedback && <p className="module-feedback" role="status">{vehicleFeedback}</p>
+      )}
       {routes.length === 0 ? (
         <p className="module-empty">Add a route and fare in Routes &amp; fares before scheduling a departure.</p>
       ) : (
@@ -870,8 +971,14 @@ function TripScheduleManagement() {
               setVehicleId(nextId);
               const selectedVehicle = vehicles.find((item) => String(item.id) === nextId);
               if (selectedVehicle) setCapacity(String(selectedVehicle.capacity));
-            }} required>
-              <option value="">Choose a fleet vehicle</option>
+            }} required disabled={vehiclesLoading || vehicles.length === 0}>
+              <option value="">
+                {vehiclesLoading
+                  ? "Loading fleet vehicles…"
+                  : vehicles.length === 0
+                    ? "No fleet vehicles available"
+                    : "Choose a fleet vehicle"}
+              </option>
               {vehicles.map((item) => <option key={item.id} value={item.id}>{item.plateNumber} · {item.vehicleType} · {item.capacity} seats</option>)}
             </select>
           </label>
@@ -903,7 +1010,7 @@ function TripScheduleManagement() {
               </select>
             </label>
           )}
-          <button className="primary-button" type="submit">{editingTripId ? "Save departure" : "Add scheduled trip"}</button>
+          <button className="primary-button" type="submit" disabled={vehiclesLoading || vehicles.length === 0}>{editingTripId ? "Save departure" : "Add scheduled trip"}</button>
           {editingTripId && <button className="secondary-button" type="button" onClick={() => { resetForm(); setFeedback(""); }}>Stop editing</button>}
         </form>
       )}
@@ -955,10 +1062,150 @@ function TripScheduleManagement() {
   );
 }
 
+type BackendRoute = Awaited<ReturnType<typeof apiRoutes.listForAdmin>>[number];
+
+type StopUsage = {
+  endpointRoutes: { route: BackendRoute; endpoint: "origin" | "destination" }[];
+  intermediateRoutes: { route: BackendRoute; stopIds: number[] }[];
+  fares: Fare[];
+  schedules: Schedule[];
+  bookings: ApiBooking[];
+};
+
+function sameStopName(left: string | null | undefined, right: string | null | undefined): boolean {
+  const first = (left ?? "").trim().toLowerCase();
+  return first.length > 0 && first === (right ?? "").trim().toLowerCase();
+}
+
+/** Ordered stop names from the backend's formatted `routeStops` labels. */
+function orderedRouteStopNames(route: BackendRoute): string[] {
+  const names: string[] = [];
+  for (const row of route.routeStops ?? []) {
+    for (const value of Object.values(row)) {
+      if (typeof value?.name === "string" && value.name.trim()) names.push(value.name.trim());
+    }
+  }
+  return names;
+}
+
+function routeLabel(route: BackendRoute): string {
+  const company = route.companyName?.trim();
+  return company ? `${route.name} (${company})` : route.name;
+}
+
+/** Every admin booking, following the backend's 100-row pages. */
+async function loadAllAdminBookings(): Promise<ApiBooking[]> {
+  const pageSize = 100;
+  const first = await apiBookings.listForAdminPage({ page: 1, pageSize });
+  const rows = [...first.data];
+  const pageCount = Math.max(1, Math.ceil(first.total / pageSize));
+  for (let page = 2; page <= pageCount; page += 1) {
+    const next = await apiBookings.listForAdminPage({ page, pageSize });
+    rows.push(...next.data);
+  }
+  return rows;
+}
+
+/**
+ * Finds every record that references a stop. Route endpoints cannot be detached,
+ * schedule/booking links must be preserved, but intermediate route stops can be
+ * removed from the route automatically.
+ */
+async function loadStopUsage(stop: StopItem, knownStops: StopItem[]): Promise<StopUsage> {
+  const [routes, schedules, bookings] = await Promise.all([
+    apiRoutes.listForAdmin(),
+    apiSchedules.listForAdmin().catch(() => [] as Schedule[]),
+    loadAllAdminBookings().catch(() => [] as ApiBooking[]),
+  ]);
+  const fareResults = await Promise.allSettled(
+    routes.map((route) => apiRoutes.listFares(route.id)),
+  );
+  const fares = fareResults.flatMap((result) =>
+    result.status === "fulfilled" ? result.value : [],
+  );
+
+  const endpointRoutes: StopUsage["endpointRoutes"] = [];
+  const intermediateRoutes: StopUsage["intermediateRoutes"] = [];
+
+  for (const route of routes) {
+    const names = orderedRouteStopNames(route);
+    const originName = route.originStop?.name ?? names[0];
+    const destinationName = route.destinationStop?.name ?? names[names.length - 1];
+
+    if (sameStopName(originName, stop.name)) {
+      endpointRoutes.push({ route, endpoint: "origin" });
+      continue;
+    }
+    if (sameStopName(destinationName, stop.name)) {
+      endpointRoutes.push({ route, endpoint: "destination" });
+      continue;
+    }
+    if (!names.some((name) => sameStopName(name, stop.name))) continue;
+
+    const ids = names.map((name) => {
+      const matches = knownStops.filter((candidate) => sameStopName(candidate.name, name));
+      return matches.length === 1 ? Number(matches[0].id) : null;
+    });
+    intermediateRoutes.push({
+      route,
+      stopIds: ids.filter((id): id is number => id !== null),
+    });
+  }
+
+  return { endpointRoutes, intermediateRoutes, fares, schedules, bookings };
+}
+
+/**
+ * The live backend rejects POST /routes/:id/stops (its DTO has no validators
+ * and the global pipe forbids the property). Recreate the route without the
+ * stop instead, carrying over its fares so passengers keep the same prices.
+ */
+async function rebuildRouteWithoutStop(
+  route: BackendRoute,
+  stopIds: number[],
+  stopId: number,
+  fares: Fare[],
+): Promise<void> {
+  const replacement = await apiRoutes.create({
+    name: route.name,
+    originStopId: stopIds[0],
+    destinationStopId: stopIds[stopIds.length - 1],
+    intermediateStopIds: stopIds.slice(1, -1),
+    distance: route.distance ?? undefined,
+    companyName: route.companyName ?? undefined,
+    pickupLocation: route.pickupLocation ?? undefined,
+    featured: route.featured ?? false,
+  });
+
+  if (route.isActive === false || route.active === false) {
+    await apiRoutes.update(replacement.id, { isActive: false }).catch(() => undefined);
+  }
+
+  const keptFares = fares.filter(
+    (fare) =>
+      fare.routeId === route.id &&
+      fare.originStopId !== stopId &&
+      fare.destinationStopId !== stopId,
+  );
+  for (const fare of keptFares) {
+    await apiFares.create(replacement.id, {
+      originStopId: fare.originStopId,
+      destinationStopId: fare.destinationStopId,
+      amount: Number(fare.amount),
+      currency: fare.currency,
+    });
+  }
+
+  const result = await apiRoutes.remove(route.id);
+  if (result && typeof result === "object" && "message" in result) {
+    const detail = (result as { message?: unknown }).message;
+    throw new Error(typeof detail === "string" ? detail : `${route.name} could not be replaced.`);
+  }
+}
+
 function StopManagement() {
   const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops, error: stopsError } = useBackendStops();
   const { data: trips } = useAdminTrips();
-  const { data: bookings } = useAdminBookings();
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [kind, setKind] = useState<StopKind>("pickup");
@@ -967,6 +1214,12 @@ function StopManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [stopNotice, setStopNotice] = useState<{
+    stopId: string;
+    tone: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+  const [busyStopId, setBusyStopId] = useState<string | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const shownStops = stops.filter((stop) =>
     !normalizedQuery || `${stop.name} ${stop.city} ${stopKindLabel(stop.kind)}`.toLowerCase().includes(normalizedQuery),
@@ -1070,29 +1323,179 @@ function StopManagement() {
     setFeedback("");
   }
 
-  async function deleteStop(stop: StopItem) {
-    const linkedTrips = tripsUsing(stop.name);
-    const linkedBookings = bookings.filter((booking) => booking.pickup === stop.name || booking.dropoff === stop.name);
-    if (linkedTrips.length > 0 || linkedBookings.length > 0) {
-      setFeedback(
-        `${stop.name} is used by ${linkedTrips.length} scheduled trip${linkedTrips.length === 1 ? "" : "s"} and ${linkedBookings.length} booking${linkedBookings.length === 1 ? "" : "s"}. Remove or update those first.`,
-      );
-      return;
+  async function hideStop(stop: StopItem, reason: string) {
+    try {
+      await apiStops.update(Number(stop.id), { isActive: false });
+      reloadStops();
+      setStopNotice({
+        stopId: stop.id,
+        tone: "success",
+        message: `${stop.name} is now hidden from passenger pickup and drop-off lists. ${reason}`,
+      });
+      setFeedback(`${stop.name} was hidden instead of deleted, so its existing records stay valid.`);
+    } catch (reasonError) {
+      setStopNotice({
+        stopId: stop.id,
+        tone: "error",
+        message:
+          reasonError instanceof Error && reasonError.message
+            ? reasonError.message
+            : "The stop could not be hidden. Please try again.",
+      });
     }
+  }
+
+  async function deleteStop(stop: StopItem) {
+    if (busyStopId) return;
+    setBusyStopId(stop.id);
+    setStopNotice(null);
+    setFeedback("");
+
     try {
       if (stopsAreDemo) {
         saveList(KEYS.stops, loadList<StopItem>(KEYS.stops, SEED_STOPS).filter((item) => item.id !== stop.id));
-      } else {
-        await apiStops.remove(Number(stop.id));
+        reloadStops();
+        setStopNotice({ stopId: stop.id, tone: "success", message: `${stop.name} removed.` });
+        return;
       }
-      reloadStops();
-      setFeedback("Stop removed.");
-    } catch (reason) {
-      setFeedback(
-        reason instanceof Error && reason.message
-          ? reason.message
-          : "The stop could not be removed. Please try again.",
+
+      const stopId = Number(stop.id);
+      if (!Number.isSafeInteger(stopId)) throw new Error("This stop has an invalid backend id.");
+
+      const usage = await loadStopUsage(stop, stops);
+      const detachedRoutes = usage.intermediateRoutes.filter(
+        ({ stopIds }) => stopIds.length >= 2 && stopIds.includes(stopId),
       );
+      const fallbackRoutes = usage.intermediateRoutes.filter(
+        ({ stopIds }) => stopIds.length < 2 || !stopIds.includes(stopId),
+      );
+      const routesToRemove = [
+        ...usage.endpointRoutes.map(({ route }) => route),
+        ...fallbackRoutes.map(({ route }) => route),
+      ];
+      const routeRemovalIds = new Set(routesToRemove.map((route) => route.id));
+      const schedulesAtStop = usage.schedules.filter((schedule) => schedule.departureStopId === stopId);
+      const blockedSchedules = usage.schedules.filter((schedule) => routeRemovalIds.has(schedule.routeId));
+      const bookingsAtStop = usage.bookings.filter(
+        (booking) => booking.originStopId === stopId || booking.destinationStopId === stopId,
+      );
+      const blockedScheduleIds = new Set(blockedSchedules.map((schedule) => schedule.id));
+      const bookingsOnRemovedRoutes = usage.bookings.filter((booking) =>
+        blockedScheduleIds.has(booking.scheduleId),
+      );
+
+      // Booking rows cannot be discarded: keep the stop and hide it instead.
+      if (bookingsAtStop.length > 0 || bookingsOnRemovedRoutes.length > 0) {
+        const parts = [
+          bookingsAtStop.length > 0
+            ? `${bookingsAtStop.length} booking${bookingsAtStop.length === 1 ? "" : "s"} start or end here`
+            : "",
+          bookingsOnRemovedRoutes.length > 0
+            ? `${bookingsOnRemovedRoutes.length} booking${bookingsOnRemovedRoutes.length === 1 ? "" : "s"} use trips on a route that would have to be removed`
+            : "",
+        ].filter(Boolean);
+        const confirmed = window.confirm(
+          `${stop.name} cannot be deleted because ${parts.join(" and ")}. Booking history must be kept, so the stop can only be hidden. Hide it from passenger pickup and drop-off lists instead?`,
+        );
+        if (confirmed) await hideStop(stop, "Existing bookings still reference it.");
+        else setStopNotice({ stopId: stop.id, tone: "info", message: "Deletion cancelled. The stop was not changed." });
+        return;
+      }
+
+      // Schedules must be reassigned or removed before a stop can go.
+      if (schedulesAtStop.length > 0 || blockedSchedules.length > 0) {
+        const parts = [
+          schedulesAtStop.length > 0
+            ? `${schedulesAtStop.length} scheduled trip${schedulesAtStop.length === 1 ? "" : "s"} depart from it`
+            : "",
+          blockedSchedules.length > 0
+            ? `${blockedSchedules.length} scheduled trip${blockedSchedules.length === 1 ? "" : "s"} still run on a route that would have to be removed`
+            : "",
+        ].filter(Boolean);
+        const confirmed = window.confirm(
+          `${stop.name} is still used by ${parts.join("; ")}. Delete or reassign those first. Hide the stop from passenger lists instead?`,
+        );
+        if (confirmed) await hideStop(stop, "Scheduled trips still reference it.");
+        else setStopNotice({ stopId: stop.id, tone: "info", message: "Deletion cancelled. The stop was not changed." });
+        return;
+      }
+
+      // Ask about route removal before touching anything, so declining the
+      // prompt leaves every record unchanged.
+      if (routesToRemove.length > 0) {
+        const routeNames = routesToRemove.map(routeLabel).join(", ");
+        const confirmed = window.confirm(
+          `${stop.name} is part of ${routeNames}. A route cannot keep running without all of its stops, so removing this stop will also remove ${routesToRemove.length === 1 ? "that route" : "those routes"} and their fare estimates. Continue?`,
+        );
+        if (!confirmed) {
+          setStopNotice({
+            stopId: stop.id,
+            tone: "info",
+            message: "Deletion cancelled. The stop and its routes were not changed.",
+          });
+          return;
+        }
+      }
+
+      // Intermediate stops can be detached. The live backend's route-stop
+      // endpoint rejects its own payload, so fall back to rebuilding the route.
+      // Run this before route removal so a guard failure changes nothing else.
+      for (const { route, stopIds } of detachedRoutes) {
+        const remaining = stopIds.filter((id) => id !== stopId);
+        try {
+          await apiRoutes.updateStops(route.id, remaining);
+        } catch (error) {
+          const routeHasSchedules = usage.schedules.some((schedule) => schedule.routeId === route.id);
+          if (routeHasSchedules) {
+            throw new Error(
+              `Route ${routeLabel(route)} could not be updated without this stop, and it has scheduled trips, so it cannot be rebuilt safely. Remove its scheduled trips first.`,
+            );
+          }
+          // Only rebuild when the backend rejected the payload itself. A
+          // network/auth failure would make the replacement route pointless.
+          const rejectedPayload =
+            error instanceof ApiError &&
+            (error.status === 400 || error.status === 404 || error.status === 500);
+          if (!rejectedPayload) throw error;
+          await rebuildRouteWithoutStop(route, remaining, stopId, usage.fares);
+        }
+      }
+
+      // Routes that cannot keep running without this stop must be removed.
+      for (const route of routesToRemove) {
+        const routeFares = await apiRoutes.listFares(route.id).catch(() => [] as Fare[]);
+        await Promise.allSettled(routeFares.map((fare) => apiFares.remove(fare.id)));
+        const result = await apiRoutes.remove(route.id);
+        if (result && typeof result === "object" && "message" in result) {
+          const detail = (result as { message?: unknown }).message;
+          throw new Error(typeof detail === "string" ? detail : `${route.name} could not be removed.`);
+        }
+      }
+
+      const blockingFares = usage.fares.filter(
+        (fare) => fare.originStopId === stopId || fare.destinationStopId === stopId,
+      );
+      await Promise.allSettled(blockingFares.map((fare) => apiFares.remove(fare.id)));
+
+      await apiStops.remove(stopId);
+      reloadStops();
+      const removedRoutes = routesToRemove.length;
+      setStopNotice({
+        stopId: stop.id,
+        tone: "success",
+        message: `${stop.name} was removed${removedRoutes > 0 ? ` together with ${removedRoutes} route${removedRoutes === 1 ? "" : "s"}` : ""}. Other admin lists refresh when you open them.`,
+      });
+      setFeedback(`${stop.name} is no longer offered to passengers.`);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message ? error.message : "The stop could not be removed.";
+      const confirmed = window.confirm(
+        `${message}\n\n${stop.name} is probably still linked to routes, trips, or bookings. Hide it from passenger pickup and drop-off lists instead?`,
+      );
+      if (confirmed) await hideStop(stop, "Other records still reference it.");
+      else setStopNotice({ stopId: stop.id, tone: "error", message });
+    } finally {
+      setBusyStopId(null);
     }
   }
 
@@ -1119,6 +1522,11 @@ function StopManagement() {
         </label>
         <span className="module-count">{shownStops.length} of {stops.length}</span>
       </div>
+      {stopNotice && (
+        <p className={`module-feedback ${stopNotice.tone}`} role={stopNotice.tone === "error" ? "alert" : "status"}>
+          {stopNotice.message}
+        </p>
+      )}
 
       {shownStops.length === 0 ? (
         <p className="module-empty">No stops match this search.</p>
@@ -1132,10 +1540,20 @@ function StopManagement() {
                   <strong>{stop.name}</strong>
                   <small>{stopKindLabel(stop.kind)} · {stop.city} · {hasCoords(stop) ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}` : "No map coordinates"}</small>
                   <small>{linkedTrips.length > 0 ? `Used by ${linkedTrips.length} scheduled trip${linkedTrips.length === 1 ? "" : "s"}` : "Not used by a scheduled trip yet"}</small>
+                  {stopNotice?.stopId === stop.id && stopNotice.tone === "error" && (
+                    <small className="admin-record-note error" role="alert">{stopNotice.message}</small>
+                  )}
                 </div>
                 <div className="admin-record-actions">
-                  <button type="button" className="text-action" onClick={() => editStop(stop)}>Edit</button>
-                  <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${stop.name}?`)) deleteStop(stop); }}>Remove</button>
+                  <button type="button" className="text-action" onClick={() => editStop(stop)} disabled={busyStopId === stop.id}>Edit</button>
+                  <button
+                    type="button"
+                    className="text-action danger-action"
+                    disabled={busyStopId === stop.id}
+                    onClick={() => { if (window.confirm(`Remove ${stop.name}?`)) deleteStop(stop); }}
+                  >
+                    {busyStopId === stop.id ? "Removing…" : "Remove"}
+                  </button>
                 </div>
               </article>
             );

@@ -142,7 +142,7 @@ async function fetchAdminTrips(): Promise<Trip[]> {
       {
         ...schedule,
         route: schedule.route ?? routeById.get(schedule.routeId),
-        vehicle: schedule.vehicle ?? vehicleById.get(schedule.vehicleId),
+        vehicle: schedule.vehicle ?? (schedule.vehicleId != null ? vehicleById.get(schedule.vehicleId) : undefined),
       },
       nextDateForWeekdays(schedule.daysOfWeek),
     ),

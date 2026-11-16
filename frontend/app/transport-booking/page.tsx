@@ -29,6 +29,11 @@ const TripMap = dynamic(() => import("@/components/TripMap"), {
 const MAX_PASSENGERS = 5;
 const SEAT_COLUMNS = [1, 2, 4, 5];
 
+/** A weekly schedule appears once per travel date, so its id alone is not unique. */
+function tripKey(trip: Pick<Trip, "id" | "date">) {
+  return `${trip.id}:${trip.date}`;
+}
+
 function paymentMethodLabel(method?: Booking["paymentMethod"]) {
   switch (method) {
     case "tnm": return "TNM Mpamba";
@@ -45,12 +50,14 @@ function readQueryParam(name: string): string {
   return new URLSearchParams(window.location.search).get(name)?.trim() ?? "";
 }
 
-export default function TransportBookingPage({ initialTripId }: { initialTripId?: string }) {
+export default function TransportBookingPage({ initialTripId, initialDate }: { initialTripId?: string; initialDate?: string }) {
   const session = useSession();
-  const { data: trips, usingDemo: tripsAreDemo } = useBackendTrips();
+  const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips } = useBackendTrips();
   const { data: routes } = useBackendRoutes();
-  const { data: bookings } = useMyBookings();
-  const initialTrip = trips.find((trip) => trip.id === initialTripId);
+  const { data: bookings, reload: reloadBookings } = useMyBookings();
+  const initialTrip =
+    trips.find((trip) => trip.id === initialTripId && (!initialDate || trip.date === initialDate)) ??
+    trips.find((trip) => trip.id === initialTripId);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
   const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));
   const [origin, setOrigin] = useState(initialTrip?.route.split(" → ")[0] ?? "");
@@ -72,7 +79,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [paymentResult, setPaymentResult] = useState<Payment | null>(null);
-  const [liveAvailableSeatNumbers, setLiveAvailableSeatNumbers] = useState<number[] | null>(null);
+  const [liveSeats, setLiveSeats] = useState<{ tripId: string; date: string; seats: number[] | null } | null>(null);
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
   const [showTicket, setShowTicket] = useState(false);
@@ -94,15 +101,19 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     });
     return () => { cancelled = true; };
   }, []);
-  const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
+  const selectedTrip = trips.find(
+    (trip) => trip.id === selectedTripId && (!travelDate || trip.date === travelDate),
+  );
+  // Only trust live seat numbers that belong to the currently selected trip.
+  const liveAvailableSeatNumbers =
+    selectedTrip && liveSeats?.tripId === selectedTrip.id && liveSeats.date === selectedTrip.date
+      ? liveSeats.seats
+      : null;
   useEffect(() => {
-    if (!selectedTrip) {
-      setLiveAvailableSeatNumbers(null);
-      return;
-    }
+    if (!selectedTrip) return;
+    const { id, date } = selectedTrip;
     let cancelled = false;
-    setLiveAvailableSeatNumbers(null);
-    apiSchedules.getSeats(Number(selectedTrip.id), selectedTrip.date).then((result) => {
+    apiSchedules.getSeats(Number(id), date).then((result) => {
       if (cancelled) return;
       let available: number[] | null = null;
       if (Array.isArray(result.seats)) {
@@ -115,13 +126,23 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
         const booked = new Set(result.bookedSeats.map(Number));
         available = Array.from({ length: result.capacity ?? selectedTrip.capacity }, (_, index) => index + 1)
           .filter((seat) => !booked.has(seat));
+      } else if (typeof result.availableSeats === "number") {
+        // The backend reports how many seats are free, not which ones. Show the
+        // same number the cards show so no passenger can pick more seats than
+        // the trip actually has left.
+        const capacity = Math.max(0, Number(result.capacity ?? selectedTrip.capacity) || 0);
+        const adminSeatsOnTrip = adminReservedSeatNumbers(selectedTrip);
+        const sellable = Math.max(0, Math.min(result.availableSeats, capacity - adminSeatsOnTrip.length));
+        available = Array.from({ length: capacity }, (_, index) => index + 1)
+          .filter((seat) => !adminSeatsOnTrip.includes(seat))
+          .slice(0, sellable);
       }
-      setLiveAvailableSeatNumbers(available);
+      setLiveSeats({ tripId: id, date, seats: available });
     }).catch(() => {
-      if (!cancelled) setLiveAvailableSeatNumbers(null);
+      if (!cancelled) setLiveSeats(null);
     });
     return () => { cancelled = true; };
-  }, [selectedTrip?.id, selectedTrip?.date, selectedTrip?.capacity]);
+  }, [selectedTrip]);
   const towns = [...new Set([
     ...routes.flatMap((route) => [route.origin, route.destination]),
     ...trips.flatMap((trip) => trip.route.split(" → ")),
@@ -185,7 +206,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const detailTrip = selectedTrip;
   const allMapTrips = useMemo(() => {
     const list = tripView === "map" ? [...displayedTrips] : [];
-    if (detailTrip && !list.some((t) => t.id === detailTrip.id)) {
+    if (detailTrip && !list.some((t) => tripKey(t) === tripKey(detailTrip))) {
       list.push(detailTrip);
     }
     return list;
@@ -207,7 +228,19 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   const isTripRouting = visibleTripGeometry.some((geometry) => !geometry || geometry.status === "loading");
   const tripFallbackCount = visibleTripGeometry.filter((geometry) => geometry?.status === "fallback").length;
   const seatsByTrip = useMemo(
-    () => new Map(trips.map((trip) => [trip.id, availableSeats(trip, bookings)])),
+    () =>
+      new Map(
+        trips.map((trip) => {
+          const adminSeatsOnTrip = adminReservedSeatNumbers(trip).length;
+          // The schedule search returns live availability for every passenger;
+          // local bookings only cover this browser account. Prefer the backend
+          // count, minus the seat the admin keeps for themselves.
+          if (typeof trip.availableSeats === "number") {
+            return [tripKey(trip), Math.min(trip.availableSeats, Math.max(0, trip.capacity - adminSeatsOnTrip))];
+          }
+          return [tripKey(trip), availableSeats(trip, bookings)];
+        }),
+      ),
     [trips, bookings],
   );
   const adminSeats = useMemo(
@@ -302,13 +335,16 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   useEffect(() => {
     if (!initialTrip || (selectedTripId && selectedTripId !== initialTrip.id)) return;
     const timer = window.setTimeout(() => {
+      const [tripOrigin, tripDestination] = initialTrip.route.split(" → ");
       setSelectedTripId(initialTrip.id);
-      setTravelDate((curr) => curr || initialTrip.date);
+      setTravelDate((curr) => curr || initialDate || initialTrip.date);
+      setOrigin((curr) => curr || tripOrigin?.trim() || "");
+      setDestination((curr) => curr || tripDestination?.trim() || "");
       setPickup((curr) => curr || initialTrip.pickup[0] || "");
       setDropoff((curr) => curr || initialTrip.dropoff[0] || "");
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialTrip, selectedTripId]);
+  }, [initialTrip, initialDate, selectedTripId]);
 
   function resetTripSelection() {
     setSelectedTripId("");
@@ -414,7 +450,7 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
   }
 
   function selectTripForBooking(trip: Trip) {
-    const seatsLeft = seatsByTrip.get(trip.id) ?? availableSeats(trip, bookings);
+    const seatsLeft = seatsByTrip.get(tripKey(trip)) ?? availableSeats(trip, bookings);
     if (seatsLeft === 0) return;
 
     setSelectedTripId(trip.id);
@@ -494,7 +530,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
     setError("");
     setNotificationError("");
     try {
-      const activeTrip = trips.find((trip) => trip.id === selectedTrip.id);
+      const activeTrip = trips.find(
+        (trip) => trip.id === selectedTrip.id && trip.date === selectedTrip.date,
+      );
       if (
         !activeTrip ||
         activeTrip.date !== travelDate ||
@@ -585,6 +623,9 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
       setName("");
       setEmail("");
       setPassengerPhone("");
+      // The booking just changed live seat counts, so refresh the trip list.
+      reloadTrips();
+      reloadBookings();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The reservation could not be saved. Please try again.");
     } finally {
@@ -807,15 +848,15 @@ export default function TransportBookingPage({ initialTripId }: { initialTripId?
           {displayedTrips.length > 0 && tripView === "cards" ? (
             <div className="module-card-grid">
               {displayedTrips.map((trip) => {
-                const seats = seatsByTrip.get(trip.id) ?? availableSeats(trip, bookings);
-                const isSelected = selectedTripId === trip.id;
+                const seats = seatsByTrip.get(tripKey(trip)) ?? availableSeats(trip, bookings);
+                const isSelected = selectedTrip ? tripKey(selectedTrip) === tripKey(trip) : false;
                 const departureTown = trip.route.split(" → ")[0] ?? "";
                 const departureCoordinates = TRANSPORT_TOWN_COORDINATES[departureTown];
                 const travelInfo = userPosition && departureCoordinates
                   ? travelEstimate(userPosition.lat, userPosition.lng, departureCoordinates.lat, departureCoordinates.lng)
                   : null;
                 return (
-                  <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={trip.id}>
+                  <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={tripKey(trip)}>
                     <div className="trip-choice-top">
                       <span className="trip-service">ADMIN SCHEDULED</span>
                       <div className="trip-choice-tools">

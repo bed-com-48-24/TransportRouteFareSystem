@@ -60,12 +60,19 @@ export type Route = {
   destinationStop?: Stop;
   intermediateStops?: RouteStop[];
   stops?: RouteStop[];
+  /**
+   * The backend's formatted route response lists stops by label, e.g.
+   * `[{ "origin stop": { name: "Blantyre" } }, { "in between stop": ... }]`.
+   */
+  routeStops?: Array<Record<string, { name?: string }>>;
   fares?: Fare[];
   distance?: number | null;
   companyName?: string | null;
   pickupLocation?: string | null;
   featured?: boolean;
   isActive?: boolean;
+  /** The formatted route response calls availability `active`. */
+  active?: boolean;
 };
 
 export type Vehicle = {
@@ -75,6 +82,7 @@ export type Vehicle = {
   capacity: number;
   description?: string | null;
   driverId?: number | null;
+  isActive?: boolean;
 };
 
 export type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -82,14 +90,24 @@ export type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 export type Schedule = {
   id: number;
   routeId: number;
-  vehicleId: number;
-  departureStopId: number;
-  departureTime: string;
+  vehicleId?: number;
+  departureStopId?: number;
+  departureTime?: string;
+  /** Search results use a full ISO date-time instead of departureTime. */
+  departureAt?: string;
   arrivalAt?: string | null;
-  fare?: number | null;
+  fare?: number | string | null;
   daysOfWeek?: Weekday[];
   route?: Route;
   vehicle?: Vehicle;
+  departureStop?: Stop | string | null;
+  /** Search results name the destination as a plain string. */
+  destination?: string | null;
+  routeName?: string | null;
+  transportMode?: string | null;
+  capacity?: number;
+  availableSeats?: number;
+  travelDate?: string | null;
   seatsAvailable?: number;
 };
 

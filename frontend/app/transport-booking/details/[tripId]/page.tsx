@@ -1,12 +1,18 @@
 "use client";
 
 import { Suspense } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import TransportBookingPage from "../../page";
 
 function TripDetails() {
   const { tripId } = useParams<{ tripId: string }>();
-  return <TransportBookingPage initialTripId={tripId} />;
+  const searchParams = useSearchParams();
+  return (
+    <TransportBookingPage
+      initialTripId={tripId}
+      initialDate={searchParams.get("date") ?? undefined}
+    />
+  );
 }
 
 export default function TripDetailsPage() {

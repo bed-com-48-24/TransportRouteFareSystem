@@ -179,13 +179,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T;
 }
 
-/** For endpoints that return either a bare array or a { data, total } envelope. */
+/** For endpoints that return either a bare array or a { data | items, total } envelope. */
 export async function apiRequestList<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T[]> {
-  const payload = await apiRequest<T[] | Paginated<T>>(path, options);
-  return Array.isArray(payload) ? payload : payload.data;
+  const payload = await apiRequest<T[] | { data?: T[]; items?: T[] }>(path, options);
+  return Array.isArray(payload) ? payload : payload.data ?? payload.items ?? [];
 }
 
 /** Same, but keeps the pagination metadata (both backend envelope styles). */
@@ -194,10 +194,12 @@ export async function apiRequestPage<T>(
   options: RequestOptions = {},
 ): Promise<Paginated<T>> {
   type Envelope = {
-    data: T[];
+    data?: T[];
+    items?: T[];
     total?: number;
     page?: number;
     limit?: number;
+    pageSize?: number;
     pagination?: {
       page?: number;
       pageSize?: number;
@@ -211,13 +213,15 @@ export async function apiRequestPage<T>(
     return { data: payload, total: payload.length, page: 1, limit: payload.length };
   }
 
-  // /stops returns { data, total, page, limit }; /schedules returns
-  // { data, pagination: { page, pageSize, total } }. Normalise both.
+  // /stops returns { data, total, page, limit }; /admin/bookings returns
+  // { items, page, pageSize, total }; /schedules adds a nested pagination.
+  // Normalise all three.
   const nested = payload.pagination;
+  const data = payload.data ?? payload.items ?? [];
   return {
-    data: payload.data ?? [],
-    total: payload.total ?? nested?.total ?? 0,
+    data,
+    total: payload.total ?? nested?.total ?? data.length,
     page: payload.page ?? nested?.page ?? 1,
-    limit: payload.limit ?? nested?.pageSize ?? 0,
+    limit: payload.limit ?? payload.pageSize ?? nested?.pageSize ?? 0,
   };
 }

@@ -1,5 +1,5 @@
-import { apiRequest, apiRequestList } from "./http";
-import type { Booking, BookingStatus } from "./types";
+import { apiRequest, apiRequestList, apiRequestPage } from "./http";
+import type { Booking, BookingStatus, Paginated } from "./types";
 
 export type CreateBookingInput = {
   scheduleId: number;
@@ -77,6 +77,11 @@ export function cancel(reference: string): Promise<unknown> {
 
 export function listForAdmin(filters: BookingFilters = {}): Promise<Booking[]> {
   return apiRequestList<Booking>("/admin/bookings", { query: filters });
+}
+
+/** Admin bookings plus the backend's page metadata (useful for exhaustive scans). */
+export function listForAdminPage(filters: BookingFilters = {}): Promise<Paginated<Booking>> {
+  return apiRequestPage<Booking>("/admin/bookings", { query: filters });
 }
 
 export function getForAdmin(reference: string): Promise<Booking> {

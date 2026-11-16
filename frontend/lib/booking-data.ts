@@ -226,6 +226,9 @@ export function reservedSeatNumbers(trip: Trip, bookings = readBookings()) {
 
   for (const booking of bookings) {
     if (booking.tripId !== trip.id || booking.status !== "confirmed") continue;
+    // A weekly schedule reuses one trip id for every travel date, so seats
+    // booked on another date must not reduce this date's availability.
+    if (booking.travelDate && booking.travelDate !== trip.date) continue;
 
     if (Array.isArray(booking.seats) && booking.seats.length > 0) {
       for (const seat of booking.seats) {

@@ -26,14 +26,20 @@ export type CreateScheduleInput = {
 
 export type UpdateScheduleInput = Partial<CreateScheduleInput>;
 
-/** Seat map for one trip on one date. Backend shape is not documented yet. */
+/**
+ * Seat map for one trip on one date. The live backend returns counts
+ * (`capacity`/`availableSeats`/`occupiedSeats`/`heldSeats`); an array of
+ * seat numbers or a per-seat list may appear on other builds.
+ */
 export type ScheduleSeats = {
   scheduleId?: number;
   date?: string;
   capacity?: number;
   seats?: SeatAvailability[];
   bookedSeats?: number[];
-  availableSeats?: number[];
+  availableSeats?: number[] | number;
+  occupiedSeats?: number;
+  heldSeats?: number;
   [key: string]: unknown;
 };
 

@@ -1,4 +1,4 @@
-/**
+  /**
  * Maps backend payloads onto the view models the pages already render.
  * Keeps UI components free of API-specific field names.
  */
@@ -105,7 +105,7 @@ export function toRouteItem(route: Route): RouteItem {
     origin,
     destination,
     service: route.companyName ?? "Bus",
-    isActive: route.isActive ?? true,
+    isActive: route.isActive ?? route.active ?? true,
     featured: route.featured ?? false,
     intermediateStopIds: (route.intermediateStops ?? []).map((item) => item.stopId),
     distance: route.distance,
@@ -126,29 +126,51 @@ function cheapestFare(route: Route | undefined): number | undefined {
   return amounts.length ? Math.min(...amounts) : undefined;
 }
 
+/** "08:00", "08:00:00", and "2026-11-16T08:00:00" all become "08:00". */
+function timePart(value?: string | null): string {
+  if (!value) return "";
+  const match = /(\d{2}:\d{2})/.exec(value);
+  return match?.[1] ?? value;
+}
+
 /**
  * A schedule is a recurring weekly departure, so the calendar date comes from
  * the search that produced it.
+ *
+ * Two backend shapes reach this adapter:
+ * - `/admin/schedules` returns schedule entities with `route` and `vehicle`
+ *   relations and separate `departureTime`/`arrivalAt` times.
+ * - `/schedules` returns formatted trip records with `routeName`,
+ *   `departureAt`, `departureStop`, `destination`, and `capacity`.
+ * Both must become the same bookable Trip.
  */
 export function toTrip(schedule: Schedule, date: string): Trip {
   const route = schedule.route;
+  const namedRoute = schedule.routeName ? splitRouteName(schedule.routeName) : null;
   const { origin, destination } = route
     ? routeEndpoints(route)
-    : { origin: `Route ${schedule.routeId}`, destination: "" };
-  const stops = routeStopNames(route);
+    : namedRoute ?? { origin: `Route ${schedule.routeId}`, destination: "" };
+
+  const departureStop = typeof schedule.departureStop === "string"
+    ? schedule.departureStop.trim()
+    : schedule.departureStop?.name?.trim() ?? "";
+  const destinationStop = typeof schedule.destination === "string"
+    ? schedule.destination.trim()
+    : "";
 
   return {
     id: String(schedule.id),
     routeId: String(schedule.routeId),
-    vehicleId: String(schedule.vehicleId),
+    vehicleId: String(schedule.vehicleId ?? schedule.vehicle?.id ?? ""),
     route: `${origin} → ${destination}`,
-    pickup: stops,
-    dropoff: stops,
+    pickup: [departureStop || origin],
+    dropoff: [destinationStop || destination],
     date,
-    departure: schedule.departureTime,
-    arrival: schedule.arrivalAt ?? "",
-    capacity: schedule.vehicle?.capacity ?? 0,
-    fare: schedule.fare ?? cheapestFare(route) ?? 0,
+    departure: timePart(schedule.departureTime ?? schedule.departureAt),
+    arrival: timePart(schedule.arrivalAt),
+    capacity: Number(schedule.capacity ?? schedule.vehicle?.capacity ?? 0),
+    fare: Number(schedule.fare ?? cheapestFare(route) ?? 0),
+    availableSeats: schedule.availableSeats,
     daysOfWeek: schedule.daysOfWeek,
   };
 }
