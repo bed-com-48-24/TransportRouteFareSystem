@@ -1,5 +1,5 @@
-import AccountAccessForm from "@/components/AccountAccessForm";
+import { redirect } from "next/navigation";
 
 export default function DriverLoginPage() {
-  return <AccountAccessForm role="driver" />;
+  redirect("/login");
 }

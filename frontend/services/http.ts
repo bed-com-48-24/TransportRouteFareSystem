@@ -176,6 +176,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   if (!response.ok) throw errorFromBody(payload, response.status);
+  if (method !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("backend-data-changed"));
+  }
   return payload as T;
 }
 

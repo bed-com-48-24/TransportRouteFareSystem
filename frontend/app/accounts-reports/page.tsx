@@ -164,13 +164,8 @@ export default function AccountsReportsPage() {
       <header className="module-intro">
         <p className="module-eyebrow">PASSENGER ACCOUNT · SUPPORT</p>
         <h1>Account and travel help</h1>
-        <p>
-          Sign in, create an account, update your profile, or tell us about
-          transport information that needs attention. You can browse as a guest.
-        </p>
         <div className="module-shortcuts">
-          <Link href="/transport-booking">Continue as a guest</Link>
-          <Link href="/transport-booking">View trips and bookings</Link>
+          <Link href="/transport-booking">Browse trips</Link>
         </div>
       </header>
 
@@ -222,7 +217,6 @@ export default function AccountsReportsPage() {
               <label>Confirm password<input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></label>
               <button className="primary-button form-submit" type="submit" disabled={busy}>{busy ? "Creating account…" : "Create account"}</button>
             </form>
-            <p className="module-footnote">Your account is created through the YendaRoute backend.</p>
           </>
         )}
 
@@ -250,9 +244,6 @@ export default function AccountsReportsPage() {
             <div className="module-section-heading">
               <div><p className="module-eyebrow">HELP IMPROVE TRAVEL INFORMATION</p><h2>Report an issue</h2></div>
             </div>
-            <p className="module-copy">
-              Use the browser-only report demo to record a sample issue. Reports and staff notes stay on this device and are not sent to the backend.
-            </p>
             <PassengerReportForm />
           </>
         )}

@@ -22,8 +22,7 @@ export default function DemoDataNotice({
         fontSize: "0.85rem",
       }}
     >
-      The backend is not reachable, so demo {what} are shown. Start the API on
-      port 3001 and reload to use live data.
+      Demo only: {what}. Saved in this browser; not shared with other devices.
     </p>
   );
 }

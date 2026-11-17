@@ -11,8 +11,8 @@ import {
 import { readAdminProfile, updateAdminCompanyName, useSession } from "@/lib/auth";
 import DemoDataNotice from "@/components/DemoDataNotice";
 import AdminOperations from "@/components/AdminOperations";
-import { hasCoords } from "@/lib/geo";
-import { MALAWI_LOCATIONS } from "@/lib/malawi-locations";
+import { hasCoords, travelEstimate } from "@/lib/geo";
+import { MALAWI_LOCATIONS, TRANSPORT_TOWN_COORDINATES } from "@/lib/malawi-locations";
 import {
   notifyBookingStatus,
   notifyCompanyUpdate,
@@ -22,6 +22,7 @@ import {
 import { ensureRouteStops, ensureStop, resolveStopId } from "@/lib/admin-api";
 import { KEYS, MOCK_REPORTS, SEED_FARES, SEED_ROUTES, SEED_STOPS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
+import { suggestedVehicleCapacity } from "@/lib/vehicle-capacity";
 import {
   useAdminBackendRoutes,
   useAdminBookings,
@@ -53,6 +54,7 @@ import type {
 
 export type AdminSection =
   | "overview"
+  | "management"
   | "routes"
   | "schedules"
   | "stops"
@@ -64,14 +66,7 @@ export type AdminSection =
 
 export const ADMIN_SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "routes", label: "Routes & fares" },
-  { id: "schedules", label: "Trip schedules" },
-  { id: "stops", label: "Pickup & drop-off points" },
-  { id: "bookings", label: "Bookings" },
-  { id: "reports", label: "Customer reports" },
-  { id: "passengers", label: "Passengers" },
-  { id: "company", label: "Company profile" },
-  { id: "operations", label: "Drivers & fleet" },
+  { id: "management", label: "Management" },
 ];
 
 export function isAdminSection(value: string | null): value is AdminSection {
@@ -128,7 +123,7 @@ export default function AdminWorkspace({
   const [section, setSection] = useState<AdminSection>(initialSection);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSection(initialSection), 0);
+    const timer = window.setTimeout(() => setSection(initialSection === "overview" ? "overview" : "management"), 0);
     return () => window.clearTimeout(timer);
   }, [initialSection]);
 
@@ -144,12 +139,7 @@ export default function AdminWorkspace({
     <section className="admin-workspace" aria-labelledby="admin-heading">
       <div className="admin-workspace-heading">
         <div>
-          <p className="module-eyebrow">AUTHORIZED ADMINISTRATORS</p>
           <h2 id="admin-heading">Company admin workspace</h2>
-          <p className="module-copy">
-            Routes, fares, departures, stops, and bookings are read from and saved to the YendaRoute
-            backend. Driver request approval and individual record lookups use the backend; announcements stay demo-only.
-          </p>
         </div>
         {onShowMap && (
           <button className="secondary-button" type="button" onClick={onShowMap}>
@@ -172,15 +162,22 @@ export default function AdminWorkspace({
         ))}
       </nav>
 
-      {section === "overview" && <OverviewPanel onNavigate={chooseSection} />}
-      {section === "routes" && <RouteFareManagement />}
-      {section === "schedules" && <TripScheduleManagement />}
-      {section === "stops" && <StopManagement />}
-      {section === "bookings" && <BookingManagement />}
-      {section === "reports" && <ReportManagement />}
-      {section === "passengers" && <PassengerManagement />}
-      {section === "company" && <CompanyProfileManagement />}
-      {section === "operations" && <AdminOperations />}
+      {section === "overview" && <OverviewPanel onNavigate={() => chooseSection("management")} />}
+      {section !== "overview" && <>
+        <div className="admin-overview-management" aria-label="Admin management forms">
+          <RouteFareManagement />
+          <TripScheduleManagement />
+          <StopManagement />
+          <BookingManagement />
+          <PassengerManagement />
+          <AdminOperations />
+          <div className="admin-management-lower" aria-label="Feedback, notifications, and company profile">
+            <h3>Feedback, notifications, and company profile</h3>
+            <ReportManagement />
+            <CompanyProfileManagement />
+          </div>
+        </div>
+      </>}
     </section>
   );
 }
@@ -231,7 +228,8 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
           {routesLoading || faresLoading ? "Refreshing…" : "Refresh routes & fares"}
         </button>
       </div>
-      <DemoDataNotice show={routesAreDemo || bookingsAreDemo} what="admin records" />
+      <DemoDataNotice show={routesAreDemo || bookingsAreDemo} what="routes and bookings" />
+      <DemoDataNotice show what="customer reports" />
       {(routesError || faresError || tripsError || bookingsError || usersError) && (
         <p className="module-error" role="alert">
           {routesError || faresError || tripsError || bookingsError || usersError}
@@ -323,7 +321,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
 function RouteFareManagement() {
   const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes, error: routesError } = useAdminBackendRoutes();
   const { data: fares, reload: reloadFares } = useBackendFares();
-  const { data: stops } = useBackendStops();
+  const { data: stops, loading: stopsLoading, error: stopsError, reload: reloadStops } = useBackendStops();
   const { data: trips } = useAdminTrips();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -342,6 +340,44 @@ function RouteFareManagement() {
     !normalizedQuery ||
     `${route.origin} ${route.destination} ${route.service}`.toLowerCase().includes(normalizedQuery),
   );
+  const availableIntermediateStops = stops.filter((stop) =>
+    ![origin.trim().toLowerCase(), destination.trim().toLowerCase()].includes(stop.city.trim().toLowerCase()),
+  );
+
+  function fillRouteDetails(nextOrigin: string, nextDestination: string) {
+    const start = nextOrigin.trim();
+    const end = nextDestination.trim();
+    if (!start || !end) return;
+
+    const matchingRoute = routes.find((route) =>
+      route.id !== editingId &&
+      route.origin.toLowerCase() === start.toLowerCase() &&
+      route.destination.toLowerCase() === end.toLowerCase(),
+    );
+    if (matchingRoute) {
+      setService(matchingRoute.service);
+      setPickupLocation(matchingRoute.pickupLocation || start);
+      setDistanceKm(matchingRoute.distance ? String(matchingRoute.distance / 1000) : "");
+      setFeatured(matchingRoute.featured ?? false);
+      setIntermediateStopIds((matchingRoute.intermediateStopIds ?? []).map(String));
+      setFare(String(fares.find((item) => item.routeId === matchingRoute.id)?.amount ?? ""));
+      return;
+    }
+
+    setPickupLocation(start);
+    const coordinateFor = (town: string) => Object.entries(TRANSPORT_TOWN_COORDINATES)
+      .find(([name]) => name.toLowerCase() === town.toLowerCase())?.[1];
+    const startCoords = coordinateFor(start);
+    const endCoords = coordinateFor(end);
+    if (startCoords && endCoords) {
+      const estimate = travelEstimate(startCoords.lat, startCoords.lng, endCoords.lat, endCoords.lng);
+      setDistanceKm(estimate.km > 0 ? String(estimate.km) : "");
+    } else {
+      setDistanceKm("");
+    }
+    setFare("");
+    setIntermediateStopIds([]);
+  }
 
   async function submitRoute(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -375,11 +411,13 @@ function RouteFareManagement() {
 
     setIsSavingRoute(true);
     setFeedback("Saving route and fare…");
+    let savedRouteId = editingId ?? "";
     try {
       if (routesAreDemo) {
         const currentRoutes = loadList<RouteItem>(KEYS.routes, SEED_ROUTES);
         const currentFares = loadList<FareItem>(KEYS.fares, SEED_FARES);
         const routeId = editingId ?? newId("route");
+        savedRouteId = routeId;
         const nextRoute = { id: routeId, origin: normalizedOrigin, destination: normalizedDestination, service: service.trim(), featured, pickupLocation: pickupLocation.trim() || null, distance };
         saveList(KEYS.routes, editingId
           ? currentRoutes.map((route) => route.id === routeId ? nextRoute : route)
@@ -415,6 +453,7 @@ function RouteFareManagement() {
           });
           routeId = created.id;
         }
+        savedRouteId = String(routeId);
 
         if (editingId) {
           await apiRoutes.updateStops(routeId, [stopIds.originStopId, ...intermediateStopIds.map(Number), stopIds.destinationStopId]);
@@ -429,6 +468,8 @@ function RouteFareManagement() {
         reloadRoutes();
         reloadFares();
       }
+
+      if (savedRouteId) window.dispatchEvent(new CustomEvent("admin-route-saved", { detail: { routeId: savedRouteId, fare: amount } }));
 
       try {
         notifyRouteUpdate(
@@ -530,8 +571,16 @@ function RouteFareManagement() {
       <DemoDataNotice show={routesAreDemo} what="routes and fares" />
       {routesError && <p className="module-error" role="alert">{routesError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitRoute}>
-        <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => setOrigin(event.target.value)} maxLength={60} required /></label>
-        <label>Destination town<input list="malawi-route-towns" value={destination} onChange={(event) => setDestination(event.target.value)} maxLength={60} required /></label>
+        <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => {
+          const value = event.target.value;
+          setOrigin(value);
+          fillRouteDetails(value, destination);
+        }} maxLength={60} required /></label>
+        <label>Destination town<input list="malawi-route-towns" value={destination} onChange={(event) => {
+          const value = event.target.value;
+          setDestination(value);
+          fillRouteDetails(origin, value);
+        }} maxLength={60} required /></label>
         <datalist id="malawi-route-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
         <label>Service type
           <select value={service} onChange={(event) => setService(event.target.value)} required>
@@ -541,14 +590,17 @@ function RouteFareManagement() {
             <option value="Shuttle">Shuttle</option>
           </select>
         </label>
+        <p className="module-footnote">Suggested capacity: {suggestedVehicleCapacity(service)} seats. The selected fleet vehicle sets the schedule capacity.</p>
         <label className="admin-feature-route"><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /> Feature this route on the home page</label>
         <label>Primary pickup location<input value={pickupLocation} onChange={(event) => setPickupLocation(event.target.value)} maxLength={120} /></label>
-        <label>Route distance (km)<input type="number" min="0.1" step="0.1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} /></label>
+        <label>Approx. route distance (km)<input type="number" min="0.1" step="0.1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} /></label>
         <fieldset className="admin-stop-picker">
           <legend>Intermediate stops (select in journey order)</legend>
-          {stops.filter((stop) => ![origin.trim().toLowerCase(), destination.trim().toLowerCase()].includes(stop.name.toLowerCase())).length === 0
-            ? <span className="module-copy">Add pickup/drop-off points first to use them between towns.</span>
-            : stops.filter((stop) => ![origin.trim().toLowerCase(), destination.trim().toLowerCase()].includes(stop.name.toLowerCase())).map((stop) => (
+          {stopsLoading ? <span className="module-copy">Loading stops…</span>
+            : stopsError ? <span className="module-error" role="alert">Stops could not be loaded. <button type="button" className="text-action" onClick={reloadStops}>Retry</button></span>
+            : availableIntermediateStops.length === 0
+              ? <span className="module-copy">No intermediate stops available. <a className="text-action" href="#admin-stop-management">Add pickup/drop-off points</a>.</span>
+              : availableIntermediateStops.map((stop) => (
               <label key={stop.id}><input type="checkbox" checked={intermediateStopIds.includes(stop.id)} onChange={(event) => setIntermediateStopIds((selected) => event.target.checked ? [...selected, stop.id] : selected.filter((id) => id !== stop.id))} />{stop.name} · {stop.city}</label>
             ))}
         </fieldset>
@@ -598,7 +650,7 @@ function RouteFareManagement() {
 }
 
 function TripScheduleManagement() {
-  const { data: routes } = useBackendRoutes();
+  const { data: routes, loading: routesLoading, error: routesError, reload: reloadRoutes } = useBackendRoutes();
   const { data: fares } = useBackendFares();
   const { data: stops } = useBackendStops();
   const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips, error: tripsError } = useAdminTrips();
@@ -625,6 +677,7 @@ function TripScheduleManagement() {
   const [query, setQuery] = useState("");
   const [tripFilter, setTripFilter] = useState<"all" | "upcoming" | "past">("all");
   const [feedback, setFeedback] = useState("");
+  const [removingScheduleId, setRemovingScheduleId] = useState<string | null>(null);
   const loadVehicles = useCallback(async () => {
     setVehiclesLoading(true);
     try {
@@ -638,21 +691,16 @@ function TripScheduleManagement() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    apiVehicles.list()
-      .then((items) => {
-        if (cancelled) return;
-        setVehicles(items.filter((vehicle) => vehicle.isActive !== false));
-        setVehiclesError("");
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) setVehiclesError(reason instanceof Error ? reason.message : "Vehicles could not be loaded.");
-      })
-      .finally(() => {
-        if (!cancelled) setVehiclesLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
+    const initialLoad = window.setTimeout(() => { void loadVehicles(); }, 0);
+    const refreshFleet = () => { void loadVehicles(); };
+    window.addEventListener("backend-data-changed", refreshFleet);
+    window.addEventListener("focus", refreshFleet);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.removeEventListener("backend-data-changed", refreshFleet);
+      window.removeEventListener("focus", refreshFleet);
+    };
+  }, [loadVehicles]);
 
   async function addVehicleToFleet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -712,13 +760,28 @@ function TripScheduleManagement() {
     .filter((trip) => tripFilter === "all" || (tripFilter === "upcoming" ? trip.date >= today : trip.date < today))
     .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
 
-  function chooseRoute(nextRouteId: string) {
+  const chooseRoute = useCallback((nextRouteId: string) => {
     setRouteId(nextRouteId);
     setFare(String(fares.find((item) => item.routeId === nextRouteId)?.amount ?? ""));
+    const selectedRoute = routes.find((item) => item.id === nextRouteId);
+    if (selectedRoute) setCapacity(String(suggestedVehicleCapacity(selectedRoute.service)));
     setPickup("");
     setDropoff("");
     setFeedback("");
-  }
+  }, [fares, routes]);
+
+  useEffect(() => {
+    function selectSavedRoute(event: Event) {
+      const detail = (event as CustomEvent<{ routeId?: unknown; fare?: unknown }>).detail;
+      if (typeof detail?.routeId === "string" && detail.routeId) {
+        chooseRoute(detail.routeId);
+        if (typeof detail.fare === "number") setFare(String(detail.fare));
+      }
+    }
+    window.addEventListener("admin-route-saved", selectSavedRoute);
+    return () => window.removeEventListener("admin-route-saved", selectSavedRoute);
+  }, [chooseRoute]);
+
 
   function resetForm() {
     setEditingTripId(null);
@@ -890,6 +953,8 @@ function TripScheduleManagement() {
       return;
     }
     if (!window.confirm(`Remove the ${trip.route} departure on ${fmtDate(trip.date)} at ${trip.departure}?`)) return;
+    setRemovingScheduleId(trip.id);
+    setFeedback("Removing scheduled trip…");
     try {
       if (tripsAreDemo) {
         saveList(KEYS.trips, loadList<Trip>(KEYS.trips, EMPTY_TRIPS).filter((item) => item.id !== trip.id));
@@ -914,6 +979,8 @@ function TripScheduleManagement() {
           ? reason.message
           : "The departure could not be removed. Please try again.",
       );
+    } finally {
+      setRemovingScheduleId(null);
     }
   }
 
@@ -931,6 +998,7 @@ function TripScheduleManagement() {
         </div>
       )}
       <p className="module-copy">Only departures scheduled here can be booked by passengers. Choose a future travel date.</p>
+      {routesError && <p className="module-error" role="alert">Routes could not be loaded. <button type="button" className="text-action" onClick={reloadRoutes}>Retry</button></p>}
       {vehiclesLoading ? (
         <p className="module-empty">Loading fleet vehicles…</p>
       ) : vehicles.length === 0 && !vehiclesError ? (
@@ -941,11 +1009,18 @@ function TripScheduleManagement() {
               <input value={newPlate} onChange={(event) => setNewPlate(event.target.value)} maxLength={30} required />
             </label>
             <label>Vehicle type
-              <input value={newVehicleType} onChange={(event) => setNewVehicleType(event.target.value)} maxLength={60} required />
+              <select value={newVehicleType} onChange={(event) => {
+                const type = event.target.value;
+                setNewVehicleType(type);
+                setNewVehicleCapacity(String(suggestedVehicleCapacity(type)));
+              }} required>
+                <option value="Minibus">Minibus</option><option value="Bus">Bus</option><option value="Coach">Coach</option><option value="Shuttle">Shuttle</option>
+              </select>
             </label>
-            <label>Seat capacity
+            <label>Passenger seats (suggested)
               <input type="number" min="1" max="200" step="1" value={newVehicleCapacity} onChange={(event) => setNewVehicleCapacity(event.target.value)} required />
             </label>
+            <p className="module-footnote">Capacity fills from vehicle type; adjust it to match the actual vehicle.</p>
             <button className="primary-button" type="submit" disabled={vehicleSaving}>
               {vehicleSaving ? "Adding vehicle…" : "Add vehicle to fleet"}
             </button>
@@ -960,9 +1035,9 @@ function TripScheduleManagement() {
       ) : (
         <form className="module-form admin-data-form" onSubmit={submitSchedule}>
           <label>Route
-            <select value={routeId} onChange={(event) => chooseRoute(event.target.value)} required>
-              <option value="">Choose a published route</option>
-              {routes.map((item) => <option key={item.id} value={item.id}>{item.origin} → {item.destination}</option>)}
+            <select value={routeId} onChange={(event) => chooseRoute(event.target.value)} required disabled={routesLoading || routes.length === 0}>
+              <option value="">{routesLoading ? "Loading routes…" : routes.length === 0 ? "No routes available" : "Choose a starting town and destination"}</option>
+              {routes.map((item) => <option key={item.id} value={item.id}>From {item.origin} to {item.destination}</option>)}
             </select>
           </label>
           <label>Vehicle
@@ -992,7 +1067,7 @@ function TripScheduleManagement() {
           </fieldset>
           <label>Departure time<input type="time" value={departure} onChange={(event) => setDeparture(event.target.value)} required /></label>
           <label>Arrival time<input type="time" value={arrival} onChange={(event) => setArrival(event.target.value)} required /></label>
-          <label>Vehicle seat capacity<input type="number" min="1" max="200" step="1" value={capacity} readOnly required /></label>
+          <label>Passenger seats<input type="number" min="1" max="200" step="1" value={capacity} readOnly required /></label>
           <label>Fare per passenger (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
           {route && pickupOptions.length > 0 && (
             <label>Boarding point
@@ -1051,7 +1126,7 @@ function TripScheduleManagement() {
                 <div className="admin-record-actions">
                   <span className={`admin-tag ${isPast ? "is-muted" : "is-upcoming"}`}>{isPast ? "Past" : "Upcoming"}</span>
                   <button type="button" className="text-action" onClick={() => startEdit(trip)}>Edit</button>
-                  <button type="button" className="text-action danger-action" onClick={() => removeSchedule(trip)}>Remove</button>
+                  <button type="button" className="text-action danger-action" disabled={removingScheduleId !== null} onClick={() => void removeSchedule(trip)}>{removingScheduleId === trip.id ? "Removing…" : "Remove"}</button>
                 </div>
               </article>
             );
@@ -1205,7 +1280,9 @@ async function rebuildRouteWithoutStop(
 
 function StopManagement() {
   const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops, error: stopsError } = useBackendStops();
+  const { data: routes } = useAdminBackendRoutes();
   const { data: trips } = useAdminTrips();
+  const [routeId, setRouteId] = useState("");
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [kind, setKind] = useState<StopKind>("pickup");
@@ -1224,6 +1301,19 @@ function StopManagement() {
   const shownStops = stops.filter((stop) =>
     !normalizedQuery || `${stop.name} ${stop.city} ${stopKindLabel(stop.kind)}`.toLowerCase().includes(normalizedQuery),
   );
+
+  function fillStopFromRoute(selectedRouteId: string, pointKind: StopKind) {
+    const route = routes.find((item) => item.id === selectedRouteId);
+    if (!route) return;
+    const town = pointKind === "dropoff" ? route.destination : route.origin;
+    const coords = Object.entries(TRANSPORT_TOWN_COORDINATES)
+      .find(([location]) => location.toLowerCase() === town.toLowerCase())?.[1];
+    const pointLabel = pointKind === "pickup" ? "Pickup" : pointKind === "dropoff" ? "Drop-off" : "Pickup & Drop-off";
+    setCity(town);
+    setName(`${town} ${pointLabel}`);
+    setLat(coords ? String(coords.lat) : "");
+    setLng(coords ? String(coords.lng) : "");
+  }
 
   function tripsUsing(nameToFind: string) {
     return trips.filter((trip) => trip.pickup.includes(nameToFind) || trip.dropoff.includes(nameToFind));
@@ -1294,6 +1384,7 @@ function StopManagement() {
 
       setName("");
       setCity("");
+      setRouteId("");
       setKind("pickup");
       setLat("");
       setLng("");
@@ -1500,15 +1591,29 @@ function StopManagement() {
   }
 
   return (
-    <div className="admin-section-content">
+    <div className="admin-section-content" id="admin-stop-management">
       <h3>{editingId ? "Edit pickup or drop-off point" : "Add a pickup or drop-off point"}</h3>
       <DemoDataNotice show={stopsAreDemo} what="stops" />
       {stopsError && <p className="module-error" role="alert">{stopsError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitStop}>
+        <label>Route
+          <select value={routeId} onChange={(event) => {
+            const nextRouteId = event.target.value;
+            setRouteId(nextRouteId);
+            fillStopFromRoute(nextRouteId, kind);
+          }}>
+            <option value="">Choose route to fill stop details</option>
+            {routes.map((route) => <option key={route.id} value={route.id}>{route.origin} → {route.destination}</option>)}
+          </select>
+        </label>
         <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
         <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
         <datalist id="malawi-stop-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
-        <label>Point type<select value={kind} onChange={(event) => setKind(event.target.value as StopKind)}><option value="pickup">Pickup only</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
+        <label>Point type<select value={kind} onChange={(event) => {
+          const nextKind = event.target.value as StopKind;
+          setKind(nextKind);
+          fillStopFromRoute(routeId, nextKind);
+        }}><option value="pickup">Pickup only</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
         <label>Latitude <span className="optional-label">Optional</span><input type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} /></label>
         <label>Longitude <span className="optional-label">Optional</span><input type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} /></label>
         <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add stop"}</button>
@@ -1572,6 +1677,7 @@ function BookingManagement() {
   const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "pending">("all");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [updatingReference, setUpdatingReference] = useState<string | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
 
   const confirmedCount = bookings.filter((booking) => booking.status === "confirmed").length;
@@ -1592,6 +1698,12 @@ function BookingManagement() {
   async function setStatus(reference: string, status: Booking["status"]) {
     const target = bookings.find((booking) => booking.reference === reference);
     if (!target || target.status === status) return;
+    if (updatingReference) return;
+    if (status === "cancelled" && !window.confirm(`Cancel booking ${reference} for ${target.name}?`)) return;
+    if (status === "cancelled" && target.travelDate < localDateValue()) {
+      setError(`Booking ${reference} is for a past trip and cannot be cancelled.`);
+      return;
+    }
 
     if (status === "confirmed" && !bookingsAreDemo) {
       setError(
@@ -1620,6 +1732,8 @@ function BookingManagement() {
     }
 
     setError("");
+    setUpdatingReference(reference);
+    setFeedback(status === "cancelled" ? `Cancelling booking ${reference}…` : `Updating booking ${reference}…`);
     const updatedBooking = { ...target, status };
     try {
       if (bookingsAreDemo) {
@@ -1635,7 +1749,10 @@ function BookingManagement() {
           ? reason.message
           : "The booking status could not be updated. Please try again.",
       );
+      setFeedback("");
       return;
+    } finally {
+      setUpdatingReference(null);
     }
 
     try {
@@ -1666,10 +1783,7 @@ function BookingManagement() {
       <h3>Passenger bookings</h3>
       <DemoDataNotice show={bookingsAreDemo} what="bookings" />
       {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
-      <p className="module-copy">
-        {bookings.length} reservation{bookings.length === 1 ? "" : "s"} {bookingsAreDemo ? "in this browser" : "from the backend"} · {confirmedCount} confirmed ·{" "}
-        {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")} collected.
-      </p>
+      <p className="module-copy">{bookings.length} total · {confirmedCount} confirmed · {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")}</p>
 
       <div className="admin-toolbar">
         <label>Search bookings
@@ -1726,9 +1840,9 @@ function BookingManagement() {
                     <span className={`booking-state ${booking.status}`}>{booking.status}</span>
                   </div>
                   {booking.status === "confirmed" ? (
-                    <button type="button" className="text-action danger-action" onClick={() => setStatus(booking.reference, "cancelled")}>Cancel booking</button>
+                    <button type="button" className="text-action danger-action" disabled={updatingReference !== null} onClick={() => void setStatus(booking.reference, "cancelled")}>{updatingReference === booking.reference ? "Cancelling…" : "Cancel booking"}</button>
                   ) : (
-                    <button type="button" className="text-action" onClick={() => setStatus(booking.reference, "confirmed")}>Re-confirm booking</button>
+                    <button type="button" className="text-action" disabled={updatingReference !== null} onClick={() => void setStatus(booking.reference, "confirmed")}>{updatingReference === booking.reference ? "Updating…" : "Re-confirm booking"}</button>
                   )}
                 </div>
               </article>
@@ -1736,10 +1850,6 @@ function BookingManagement() {
           })}
         </div>
       )}
-      <p className="module-footnote">
-        Cancelling a booking releases its seats immediately. Re-confirming checks the live seat map first,
-        including the seat reserved for the transport admin.
-      </p>
     </div>
   );
 }
@@ -1795,10 +1905,7 @@ function ReportManagement() {
   return (
     <div className="admin-section-content">
       <h3>Customer submitted reports</h3>
-      <p className="module-copy">
-        {reports.length} report{reports.length === 1 ? "" : "s"} in total. Reports and staff notes are
-        kept in this browser because the backend has no reports endpoint yet.
-      </p>
+      <DemoDataNotice show what="customer reports and staff notes" />
 
       <div className="admin-toolbar">
         <label>Show reports
@@ -1954,10 +2061,7 @@ function PassengerManagement() {
       <h3>Passengers and booking contacts</h3>
       <DemoDataNotice show={bookingsAreDemo} what="passengers and bookings" />
       {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
-      <p className="module-copy">
-        {registeredCount} registered passenger account{registeredCount === 1 ? "" : "s"} and {guestCount} guest
-        contact{guestCount === 1 ? "" : "s"} from the backend accounts, bookings, and local reports.
-      </p>
+      <p className="module-copy">{registeredCount} registered · {guestCount} guest contacts</p>
 
       <div className="admin-toolbar">
         <label>Find a passenger
@@ -2016,15 +2120,12 @@ function PassengerManagement() {
                 >
                   {messaging === person.key ? "Close" : "Message"}
                 </button>
+                {person.registered && <span className="module-footnote" title="The backend has no account deletion endpoint yet">Account removal unavailable</span>}
               </div>
             </article>
           ))}
         </div>
       )}
-      <p className="module-footnote">
-        Passenger accounts and bookings come from the backend. Reports and notification messages are
-        still stored in this browser because the backend has no reports endpoint yet.
-      </p>
     </div>
   );
 }
@@ -2093,10 +2194,7 @@ function CompanyProfileManagement() {
   return (
     <div className="admin-section-content">
       <h3>Company profile and announcements</h3>
-      <p className="module-copy">
-        This is the company identity used when you sign in and when passengers receive updates from your
-        transport company.
-      </p>
+      <DemoDataNotice show what="company profile settings and announcements" />
 
       {error && <p className="module-error" role="alert">{error}</p>}
       {feedback && <p className="module-feedback" role="status">{feedback}</p>}
@@ -2106,7 +2204,7 @@ function CompanyProfileManagement() {
           <h4>Company details</h4>
           <label>Company name<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} minLength={2} maxLength={100} required /></label>
           <label>Company email<input type="email" value={email} readOnly aria-describedby="company-email-note" /></label>
-          <p id="company-email-note" className="module-footnote">The company email is the administrator sign-in identity and cannot be changed here.</p>
+          <p id="company-email-note" className="module-footnote">Admin sign-in email cannot be changed.</p>
           <button className="primary-button" type="submit">Save company profile</button>
         </form>
 

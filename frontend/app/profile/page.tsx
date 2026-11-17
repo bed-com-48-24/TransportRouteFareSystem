@@ -16,6 +16,7 @@ import type { Booking } from "@/lib/types";
 import * as apiBookings from "@/services/bookings.service";
 import type { Notification } from "@/services/types";
 import * as authApi from "@/services/auth.service";
+import { readPaymentReceipts, type DemoPaymentReceipt } from "@/lib/payment-receipts";
 
 type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved" | "driver-access";
 type VisibleNotification = Notification | DemoNotification;
@@ -102,6 +103,7 @@ export default function ProfilePage() {
   const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useMyBookings();
   const [notifications, setNotifications] = useState<VisibleNotification[]>([]);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
+  const [paymentReceipts, setPaymentReceipts] = useState<DemoPaymentReceipt[]>([]);
   const [dataError, setDataError] = useState("");
   const [bookingNotice, setBookingNotice] = useState("");
   const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
@@ -124,6 +126,7 @@ export default function ProfilePage() {
 
         setDisplayName(storedName);
         setSavedRoutes(readSavedRoutes());
+        setPaymentReceipts(readPaymentReceipts());
       } catch {
         setDataError("Some of your profile details could not be loaded from this browser.");
       } finally {
@@ -180,9 +183,29 @@ export default function ProfilePage() {
   }, []);
 
   const email = session?.email?.trim().toLowerCase() ?? "";
-  const myBookings = bookingsAreDemo
+  const visibleBookings = bookingsAreDemo
     ? bookings.filter((booking) => booking.email.trim().toLowerCase() === email)
     : bookings;
+  const myBookings = visibleBookings.map((booking) => {
+    const receipt = paymentReceipts.find((item) => item.bookingReference === booking.reference);
+    if (!receipt) return booking;
+    return {
+      ...booking,
+      amountPaid: receipt.amount,
+      paymentMethod: receipt.method.toLowerCase().includes("airtel") ? "airtel" as const
+        : receipt.method.toLowerCase().includes("tnm") ? "tnm" as const
+          : receipt.method.toLowerCase().includes("bank") ? "bank" as const : "card" as const,
+      paymentProvider: `${receipt.method} · ${receipt.provider}`,
+      paymentReference: receipt.transactionReference ?? receipt.paymentId,
+      paymentCode: receipt.transactionReference,
+      paymentId: receipt.paymentId,
+      payerPhone: receipt.passengerPhone,
+      payerEmail: receipt.passengerEmail,
+      paidAt: receipt.createdAt,
+      name: booking.name || receipt.passengerName,
+      email: booking.email || receipt.passengerEmail,
+    };
+  });
   const sortedBookings = [...myBookings].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
   const recentJourneys = myBookings
     .filter((booking) => booking.travelDate < localToday())
@@ -308,10 +331,9 @@ export default function ProfilePage() {
           <span className="profile-avatar" aria-hidden="true">{initials}</span>
           <div>
             <h1>{displayName || (session ? "Your profile" : "Your travel profile")}</h1>
-            <p>{session ? `${session.email} · Passenger account` : "Tickets, journeys, notifications and saved routes in one place."}</p>
+            <p>{session ? session.email : "Tickets, journeys, and saved routes."}</p>
           </div>
         </div>
-        <p>Manage the details that follow you through planning, booking, and travelling.</p>
       </header>
 
       <DemoDataNotice show={bookingsAreDemo} what="bookings" />
@@ -443,15 +465,19 @@ export default function ProfilePage() {
                           <div className="profile-ticket-body">
                             <dl>
                               <div><dt>Passenger</dt><dd>{booking.name}</dd></div>
+                              <div><dt>Passenger email</dt><dd>{booking.email || "Not recorded"}</dd></div>
+                              <div><dt>Passenger phone</dt><dd>{booking.payerPhone ?? "Not recorded"}</dd></div>
                               <div><dt>Travel date</dt><dd>{fmtDate(booking.travelDate)}</dd></div>
                               <div><dt>Seats</dt><dd>{booking.seats?.length ? booking.seats.join(", ") : "Not recorded"}</dd></div>
                               <div><dt>Payment method</dt><dd>{paymentLabel(booking)}</dd></div>
                               <div><dt>Amount paid</dt><dd>MWK {(booking.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
                               <div><dt>Payment reference</dt><dd>{booking.paymentReference ?? "Not recorded"}</dd></div>
+                              <div><dt>Payment record ID</dt><dd>{booking.paymentId ?? "Not recorded"}</dd></div>
                               <div><dt>Confirmation code</dt><dd>{booking.paymentCode ?? "Not recorded"}</dd></div>
+                              {booking.paidAt && <div><dt>Paid at</dt><dd>{new Date(booking.paidAt).toLocaleString()}</dd></div>}
                               <div><dt>Status</dt><dd>{booking.status}</dd></div>
                             </dl>
-                            <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
+                            <p className="module-footnote">Payment receipts saved in this browser are demonstration records. The backend simulator does not provide a separate confirmation code or payment history endpoint.</p>
                           </div>
                         </details>
                       </article>
@@ -531,6 +557,7 @@ export default function ProfilePage() {
                   title="Saved routes"
                   description="View your saved routes."
                 />
+                <DemoDataNotice show what="saved routes (stored in this browser only; the backend has no saved-routes endpoint)" />
                 {savedRoutes.length === 0 ? (
                   <div className="module-empty">
                     <p>No saved routes yet. Use the bookmark on a departure card to save a route.</p>

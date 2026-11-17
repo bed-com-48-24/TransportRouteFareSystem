@@ -15,10 +15,7 @@ export default function MainNavigation() {
   const router = useRouter();
   const [error, setError] = useState("");
 
-  const adminNavItems: NavItem[] = [
-    { href: "/maps-admin-integration?panel=admin&section=overview", label: "Overview" },
-    { href: "/help", label: "Help" },
-  ];
+  const adminNavItems: NavItem[] = [];
 
   const passengerNavItems: NavItem[] = [
     { href: "/home", label: "Home" },
@@ -35,7 +32,7 @@ export default function MainNavigation() {
   const navItems = session?.role === "admin" ? adminNavItems : session?.role === "driver" ? driverNavItems : passengerNavItems;
 
   const profileHref = session?.role === "admin"
-    ? "/maps-admin-integration?panel=admin&section=company"
+    ? "/maps-admin-integration?panel=admin&section=management"
     : session?.role === "driver" ? "/driver/manifest" : "/profile";
 
   function isActive(href: string) {
@@ -85,33 +82,20 @@ export default function MainNavigation() {
         <>
           <nav className="site-nav" aria-label="Main navigation">
             {navItems.map(renderNavLink)}
-            <div className="site-nav-actions" role="group" aria-label="Account">
+            {session.role !== "admin" && <div className="site-nav-actions" role="group" aria-label="Account">
               <BookingNotificationCenter />
               <Link
                 href={profileHref}
                 className="site-profile-badge"
-                title={session.role === "admin" ? "SBUS company profile" : "SBUS profile"}
-                aria-label={
-                  session.role === "admin"
-                    ? "Open the SBUS company profile"
-                    : "Open your SBUS profile"
-                }
+                title={session.role === "driver" ? "SBUS driver profile" : "SBUS profile"}
+                aria-label="Open your SBUS profile"
               >
-                <svg
-                  className="site-profile-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg className="site-profile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="8" r="3.5" />
                   <path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" />
                 </svg>
               </Link>
-            </div>
+            </div>}
             <button type="button" className="site-nav-logout" onClick={handleLogout}>
               <svg
                 viewBox="0 0 24 24"

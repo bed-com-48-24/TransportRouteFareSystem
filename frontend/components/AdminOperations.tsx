@@ -5,6 +5,7 @@ import * as authApi from "@/services/auth.service";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiSchedules from "@/services/schedules.service";
 import * as apiUsers from "@/services/users.service";
+import { suggestedVehicleCapacity } from "@/lib/vehicle-capacity";
 import * as apiVehicles from "@/services/vehicles.service";
 import type { PendingRequest } from "@/services/auth.service";
 import type { BackendUser, Vehicle } from "@/services/types";
@@ -219,10 +220,16 @@ function VehicleFleet() {
       </div>
       <form className="module-form admin-data-form" onSubmit={saveVehicle}>
         <label>Registration / plate<input value={plateNumber} onChange={(event) => setPlateNumber(event.target.value)} maxLength={30} required /></label>
-        <label>Vehicle type<input value={vehicleType} onChange={(event) => setVehicleType(event.target.value)} maxLength={60} required /></label>
-        <label>Seat capacity<input type="number" min="1" max="200" step="1" value={capacity} onChange={(event) => setCapacity(event.target.value)} required /></label>
-        <label>Assigned driver<select value={driverId} onChange={(event) => setDriverId(event.target.value)}><option value="">Unassigned</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.fullName} · {driver.email ?? `ID ${driver.id}`}</option>)}</select></label>
-        <label>Description<input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={200} /></label>
+        <label>Vehicle type<select value={vehicleType} onChange={(event) => {
+          const type = event.target.value;
+          setVehicleType(type);
+          setCapacity(String(suggestedVehicleCapacity(type)));
+        }} required><option value="Minibus">Minibus</option><option value="Bus">Bus</option><option value="Coach">Coach</option><option value="Shuttle">Shuttle</option></select></label>
+        <label>Passenger seats (suggested)<input type="number" min="1" max="200" step="1" value={capacity} onChange={(event) => setCapacity(event.target.value)} required /></label>
+        <p className="module-footnote">Capacity fills from vehicle type; adjust it to match the actual vehicle.</p>
+        <label>Assigned driver <span className="optional-label">Optional</span><select value={driverId} onChange={(event) => setDriverId(event.target.value)}><option value="">{drivers.length ? "Unassigned" : "No approved drivers available"}</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.fullName} · {driver.email ?? `ID ${driver.id}`}</option>)}</select></label>
+        {drivers.length === 0 && <p className="module-footnote">Approve a driver access request above to add names to this list.</p>}
+        <label>Description <span className="optional-label">Optional</span><input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={200} placeholder="e.g. white Toyota Coaster, air-conditioned" /></label>
         <button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving vehicle..." : editingId !== null ? "Save vehicle" : "Add vehicle"}</button>
         {editingId !== null && <button className="secondary-button" type="button" onClick={resetForm}>Cancel edit</button>}
       </form>

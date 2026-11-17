@@ -19,7 +19,10 @@ import * as apiBookings from "@/services/bookings.service";
 import * as apiPayments from "@/services/payments.service";
 import * as apiSchedules from "@/services/schedules.service";
 import type { Payment, PaymentMethod } from "@/services/types";
+import { savePaymentReceipt } from "@/lib/payment-receipts";
 import { useSession } from "@/lib/auth";
+import { readPassengerSession } from "@/lib/passenger-auth";
+import * as apiMe from "@/services/me.service";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), {
   ssr: false,
@@ -28,6 +31,7 @@ const TripMap = dynamic(() => import("@/components/TripMap"), {
 
 const MAX_PASSENGERS = 5;
 const SEAT_COLUMNS = [1, 2, 4, 5];
+const MALAWI_BANKS = ["CDH Investment Bank", "Centenary Bank", "Ecobank", "FDH Bank", "First Capital Bank", "National Bank of Malawi", "NBS Bank", "Standard Bank Malawi"];
 
 /** A weekly schedule appears once per travel date, so its id alone is not unique. */
 function tripKey(trip: Pick<Trip, "id" | "date">) {
@@ -77,7 +81,14 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   const [saving, setSaving] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [paymentMethodsError, setPaymentMethodsError] = useState("");
+  const [paymentMethodLoadAttempt, setPaymentMethodLoadAttempt] = useState(0);
   const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [paymentAccountName, setPaymentAccountName] = useState("");
+  const [paymentAccountNumber, setPaymentAccountNumber] = useState("");
+  const [paymentPhone, setPaymentPhone] = useState("");
   const [paymentResult, setPaymentResult] = useState<Payment | null>(null);
   const [liveSeats, setLiveSeats] = useState<{ tripId: string; date: string; seats: number[] | null } | null>(null);
   const [ticket, setTicket] = useState<Booking | null>(null);
@@ -94,13 +105,44 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     apiPayments.listMethods().then((methods) => {
       if (cancelled) return;
       const supported = methods.filter((method) => method.id === "mobile_money" || method.id === "bank_card");
-      setPaymentMethods(supported);
+      const demoMethods: PaymentMethod[] = [
+        { id: "airtel_demo", name: "Airtel Money (demo)", provider: "demo", description: "Mobile money demo" },
+        { id: "tnm_demo", name: "TNM Mpamba (demo)", provider: "demo", description: "Mobile money demo" },
+        { id: "paychangu_demo", name: "PayChangu (demo)", provider: "demo", description: "Payment gateway demo" },
+        { id: "bank_demo", name: "Malawi bank transfer (demo)", provider: "demo", description: "Bank transfer demo" },
+      ];
+      setPaymentMethods([...supported, ...demoMethods]);
       setPaymentMethodId((current) => current || supported[0]?.id || "");
+      setPaymentMethodsLoading(false);
     }).catch((reason: unknown) => {
-      if (!cancelled) setError(reason instanceof Error ? reason.message : "Payment methods could not be loaded.");
+      if (!cancelled) {
+        setPaymentMethodsError(reason instanceof Error ? reason.message : "Payment methods could not be loaded.");
+        setPaymentMethodsLoading(false);
+      }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [paymentMethodLoadAttempt]);
+
+  const sessionEmail = session?.email;
+  useEffect(() => {
+    if (!sessionEmail) return;
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      const passenger = readPassengerSession();
+      setName((current) => current || passenger?.fullName || "");
+      setEmail((current) => current || passenger?.email || sessionEmail);
+      void apiMe.getPassengerProfile().then((profile) => {
+        if (cancelled || !profile) return;
+        setName((current) => current || profile.name || "");
+        setEmail((current) => current || profile.email || sessionEmail);
+        setPassengerPhone((current) => current || profile.phone || "");
+      }).catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [sessionEmail]);
   const selectedTrip = trips.find(
     (trip) => trip.id === selectedTripId && (!travelDate || trip.date === travelDate),
   );
@@ -525,6 +567,22 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       setError("Choose an available payment method.");
       return;
     }
+    if (["airtel_demo", "tnm_demo", "paychangu_demo", "bank_demo"].includes(paymentMethodId)) {
+      if ((paymentMethodId === "airtel_demo" || paymentMethodId === "tnm_demo") && !paymentPhone.trim()) {
+        setError("Enter the mobile money phone number for this demonstration.");
+        return;
+      }
+      if (paymentMethodId === "bank_demo" && (!bankName || !paymentAccountName.trim() || !paymentAccountNumber.trim())) {
+        setError("Select a bank and enter the account name and number for this demonstration.");
+        return;
+      }
+      if (paymentMethodId === "paychangu_demo" && (!paymentAccountName.trim() || !paymentPhone.trim())) {
+        setError("Enter the payer name and phone number for this PayChangu demonstration.");
+        return;
+      }
+      setError("These provider choices are demonstration only. Choose Mobile Money or Bank Card for the backend simulator.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -565,12 +623,28 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         );
         setPaymentResult(payment);
         const paymentStatus = payment.status?.toLowerCase() ?? "pending";
-        const paymentConfirmed = ["succeeded", "paid", "completed", "success"].includes(paymentStatus);
+        const paymentConfirmed = ["succeeded", "paid", "completed", "success", "successful"].includes(paymentStatus);
         if (!paymentConfirmed) {
           setPaymentPending(false);
           setNotice(`Payment ${payment.status ?? "initiated"}. Booking reference: ${created.reference}.`);
           return;
         }
+
+        const paidAmount = Number(payment.amount ?? activeTrip.fare * passengers);
+        savePaymentReceipt({
+          bookingReference: created.reference,
+          paymentId: payment.id,
+          amount: paidAmount,
+          currency: payment.currency ?? "MWK",
+          method: selectedMethod.name,
+          provider: payment.provider ?? selectedMethod.provider,
+          status: payment.status ?? "successful",
+          passengerName: name.trim(),
+          passengerEmail: email.trim().toLowerCase(),
+          passengerPhone: cleanPhone,
+          ...(payment.transactionReference ? { transactionReference: payment.transactionReference } : {}),
+          createdAt: payment.createdAt ?? new Date().toISOString(),
+        });
 
         const booking: Booking = {
           ...toBooking(
@@ -587,7 +661,11 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
           paymentStatus: "paid",
           paymentMethod: paymentMethodId === "bank_card" ? "bank" : undefined,
           paymentProvider: selectedMethod.name,
-          amountPaid: activeTrip.fare * passengers,
+          amountPaid: paidAmount,
+          paymentReference: payment.transactionReference ?? payment.id,
+          paymentCode: payment.transactionReference,
+          payerPhone: cleanPhone,
+          paidAt: payment.createdAt ?? new Date().toISOString(),
         };
 
       const qr = await QRCode.toDataURL(JSON.stringify({
@@ -603,7 +681,13 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
 
       setTicket(booking);
       setTicketQr(qr);
-      setShowTicket(false);
+      setShowTicket(true);
+      window.setTimeout(() => {
+        document.getElementById("ticket-heading")?.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start",
+        });
+      }, 50);
       setPaymentPending(false);
       setNotice(paymentConfirmed
         ? "Payment confirmed. Your bus ticket is ready."
@@ -726,15 +810,15 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             {paymentResult.bookingReference && <div><dt>Booking reference</dt><dd>{paymentResult.bookingReference}</dd></div>}
             {paymentResult.amount !== undefined && <div><dt>Amount</dt><dd>{paymentResult.currency ?? "MWK"} {paymentResult.amount.toLocaleString("en-MW")}</dd></div>}
             {paymentResult.method && <div><dt>Method</dt><dd>{paymentResult.method}</dd></div>}
+            {paymentResult.transactionReference && <div><dt>Confirmation code</dt><dd>{paymentResult.transactionReference}</dd></div>}
             {paymentResult.createdAt && <div><dt>Created</dt><dd>{new Date(paymentResult.createdAt).toLocaleString()}</dd></div>}
+            {!paymentResult.transactionReference && <p className="module-footnote">The payment simulator did not return a separate confirmation code. Use the payment ID above as the record ID.</p>}
           </dl>
         </section>
       )}
       <header className="module-intro">
         <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
-        <p>
-          Enter your departure location and destination, then choose one of the trips scheduled by the transport admin. After selecting a trip, pick your seats, add passenger details, and send a payment request to the backend.
-        </p>
+        <p>Choose a departure, select seats, and enter passenger details.</p>
         <div className="module-shortcuts">
           <a href="#trips-heading">Scheduled departures</a>
           {selectedTrip && <a href="#reservation-heading">Pick your seats</a>}
@@ -744,7 +828,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       </header>
 
       {notice && <p className="module-notice" role="status">{notice}</p>}
-      {error && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login/user">Sign in</Link></>}</p>}
+      {error && !paymentPending && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login/user">Sign in</Link></>}</p>}
       {notificationError && <p className="module-error" role="alert">{notificationError}</p>}
       {((initialTripId && !initialTrip) || (selectedTripId && !selectedTrip)) && (
         <p className="module-error" role="alert">
@@ -858,7 +942,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
                 return (
                   <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={tripKey(trip)}>
                     <div className="trip-choice-top">
-                      <span className="trip-service">ADMIN SCHEDULED</span>
+                      <span className="trip-service">{trip.vehicleType || "Scheduled trip"}</span>
                       <div className="trip-choice-tools">
                         <span className={`seat-status${seats === 0 ? " is-full" : ""}`}>
                           {seats === 0 ? "Full" : `${seats} seats left`}
@@ -887,6 +971,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
                       {travelInfo && <div><dt>From your position</dt><dd>{travelInfo.label}</dd></div>}
                       <div><dt>Departure</dt><dd>{trip.departure}</dd></div>
                       <div><dt>Arrival estimate</dt><dd>{trip.arrival}</dd></div>
+                      <div><dt>Passenger seats</dt><dd>{trip.capacity}</dd></div>
                       <div><dt>Fare</dt><dd>MWK {trip.fare.toLocaleString("en-MW")} <small>per passenger</small></dd></div>
                     </dl>
                     <div className="trip-stops">
@@ -950,10 +1035,26 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
                 {paymentMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}
               </select>
             </label>
-            {paymentMethods.length === 0 && <p className="module-error" role="alert">No supported payment methods are available from the backend.</p>}
+            {paymentMethodId.endsWith("_demo") && <div className="payment-provider-fields">
+              <p className="module-footnote">Demonstration form only. Details are not sent to a provider or stored.</p>
+              {(paymentMethodId === "airtel_demo" || paymentMethodId === "tnm_demo" || paymentMethodId === "paychangu_demo") && <label className="map-route-filter">{paymentMethodId === "paychangu_demo" ? "Payer phone number" : "Mobile money phone number"}<input value={paymentPhone} onChange={(event) => setPaymentPhone(event.target.value)} inputMode="tel" placeholder="e.g. 0991 234 567" /></label>}
+              {(paymentMethodId === "bank_demo" || paymentMethodId === "paychangu_demo") && <label className="map-route-filter">Account or payer name<input value={paymentAccountName} onChange={(event) => setPaymentAccountName(event.target.value)} placeholder="Name on account" /></label>}
+              {paymentMethodId === "bank_demo" && <>
+                <label className="map-route-filter">Bank<select value={bankName} onChange={(event) => setBankName(event.target.value)}><option value="">Choose a Malawi bank</option>{MALAWI_BANKS.map((bank) => <option key={bank}>{bank}</option>)}</select></label>
+                <label className="map-route-filter">Account number<input value={paymentAccountNumber} onChange={(event) => setPaymentAccountNumber(event.target.value)} inputMode="numeric" /></label>
+              </>}
+            </div>}
+            {paymentMethodsLoading && <p className="module-copy" role="status">Loading payment methods…</p>}
+            {paymentMethodsError && <p className="module-error" role="alert">{paymentMethodsError} <button type="button" className="text-action" onClick={() => {
+              setPaymentMethodsLoading(true);
+              setPaymentMethodsError("");
+              setPaymentMethodLoadAttempt((attempt) => attempt + 1);
+            }}>Retry</button></p>}
+            {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="module-error" role="alert">No supported payment methods are available.</p>}
+            {error && <p className="module-error" role="alert">{error}</p>}
             <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
             <div className="payment-actions">
-              <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethods.length === 0}>
+              <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethodsLoading || paymentMethods.length === 0}>
                 {saving ? "Sending payment request…" : `Pay · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
@@ -1044,6 +1145,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
           </div>
         ) : (
           <form className="module-form" onSubmit={submitBooking} noValidate>
+            {!session && <p className="module-notice" role="status">Sign in as a passenger to reserve seats and pay. <Link href="/login/user">Sign in</Link></p>}
             <div className="reservation-summary">
               <div>
                 <span>Your trip</span>
@@ -1108,8 +1210,8 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
 
             <div className="reservation-actions">
               <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-              <button className="primary-button form-submit" type="submit" disabled={saving || available === 0 || passengers > available}>
-                Continue to payment
+              <button className="primary-button form-submit" type="submit" disabled={saving || !session || available === 0 || passengers > available}>
+                {session ? "Continue to payment" : "Sign in to continue"}
               </button>
             </div>
           </form>

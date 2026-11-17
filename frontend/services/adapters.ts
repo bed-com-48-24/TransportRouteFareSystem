@@ -162,6 +162,7 @@ export function toTrip(schedule: Schedule, date: string): Trip {
     id: String(schedule.id),
     routeId: String(schedule.routeId),
     vehicleId: String(schedule.vehicleId ?? schedule.vehicle?.id ?? ""),
+    vehicleType: schedule.vehicle?.vehicleType ?? schedule.transportMode ?? undefined,
     route: `${origin} → ${destination}`,
     pickup: [departureStop || origin],
     dropoff: [destinationStop || destination],

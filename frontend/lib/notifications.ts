@@ -58,9 +58,13 @@ function addDemoNotification(title: string, message: string): void {
 /** Backend-generated events are retrieved from the API after each action. */
 export function notifyBookingStatus(
   _booking: Booking,
-  _type: BookingNotificationType,
-  _message: string,
+  type: BookingNotificationType,
+  message: string,
 ): void {
+  if (type === "payment-complete") {
+    addDemoNotification("Payment successful", message);
+    return;
+  }
   requestRefresh();
 }
 

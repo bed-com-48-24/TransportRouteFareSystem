@@ -103,8 +103,14 @@ export function useBackendTrips(days: number = SCHEDULE_DAYS): ApiList<Trip> {
         throw firstRejected?.reason ?? new Error("Could not load schedules.");
       }
 
+      const vehicles = await apiVehicles.list().catch(() => []);
+      const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
+
       return fulfilled.flatMap(({ date, schedules }) =>
-        schedules.map((schedule) => toTrip(schedule, date)),
+        schedules.map((schedule) => toTrip({
+          ...schedule,
+          vehicle: schedule.vehicle ?? (schedule.vehicleId != null ? vehicleById.get(schedule.vehicleId) : undefined),
+        }, date)),
       );
     },
     () => [],

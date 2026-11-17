@@ -301,7 +301,7 @@ export default function HomePage() {
                       <select value={tripDef ? tripKey(tripDef) : ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
                         {bookableRouteTrips.map((trip) => (
                           <option key={tripKey(trip)} value={tripKey(trip)}>
-                            {fmtDate(trip.date)} · {trip.departure} · {seatsLeft(trip)} seats left
+                            {fmtDate(trip.date)} · {trip.departure} · {trip.vehicleType ? `${trip.vehicleType} · ` : ""}{trip.capacity} passenger seats · {seatsLeft(trip)} available
                           </option>
                         ))}
                       </select>

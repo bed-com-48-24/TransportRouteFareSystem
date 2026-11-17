@@ -36,7 +36,7 @@ export default function DriverManifestPage() {
           <p className="module-eyebrow">DRIVER ACCESS</p>
           <h1>Driver sign in required</h1>
           <p className="module-copy">The manifest endpoint requires an approved driver account.</p>
-          <Link className="primary-button" href="/login/driver">Sign in as driver</Link>
+          <Link className="primary-button" href="/login">Return to sign in</Link>
         </section>
       </main>
     );

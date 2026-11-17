@@ -54,7 +54,6 @@ export default function HelpPage() {
               </li>
             ))}
           </ol>
-          <p className="module-footnote">Departures, bookings, and payment requests are loaded from the YendaRoute backend.</p>
         </section>
 
         <section className="module-section help-report" aria-labelledby="report-heading">
@@ -64,9 +63,6 @@ export default function HelpPage() {
               <h2 id="report-heading">Report an issue</h2>
             </div>
           </div>
-          <p className="module-copy">
-            Try the browser-only report demo. Submissions and admin notes stay on this device and are not sent to the backend.
-          </p>
           <PassengerReportForm />
         </section>
       </div>

@@ -46,6 +46,7 @@ export type Trip = {
   id: string;
   routeId?: string;
   vehicleId?: string;
+  vehicleType?: string;
   route: string;
   pickup: string[];
   dropoff: string[];
@@ -81,4 +82,6 @@ export type Booking = {
   payerPhone?: string;
   payerAccountLast4?: string;
   paidAt?: string;
+  paymentId?: string;
+  payerEmail?: string;
 };

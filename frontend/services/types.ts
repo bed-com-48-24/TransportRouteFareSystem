@@ -149,7 +149,9 @@ export type Payment = {
   amount?: number;
   currency?: string;
   method?: string;
+  provider?: string;
   status?: string;
+  transactionReference?: string;
   createdAt?: string;
 };
 

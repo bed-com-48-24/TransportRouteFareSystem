@@ -36,6 +36,7 @@ export function useApiData<T>(
 
   useEffect(() => {
     let cancelled = false;
+    const refresh = () => setAttempt((value) => value + 1);
 
     async function run() {
       try {
@@ -48,8 +49,16 @@ export function useApiData<T>(
     }
 
     void run();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 30_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("backend-data-changed", refresh);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("backend-data-changed", refresh);
     };
     // load/fallback/initial are intentionally excluded: `key` captures the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps

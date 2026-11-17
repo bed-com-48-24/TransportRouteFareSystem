@@ -8,3 +8,4 @@ export function list(role?: BackendRole): Promise<BackendUser[]> {
 export function get(id: number): Promise<BackendUser> {
   return apiRequest<BackendUser>(`/users/${id}`);
 }
+
