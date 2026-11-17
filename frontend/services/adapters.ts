@@ -183,7 +183,7 @@ export function toBooking(booking: ApiBooking, trip?: Trip): Booking {
   return {
     reference: booking.reference,
     tripId: String(booking.scheduleId),
-    route: trip?.route ?? "",
+    route: trip?.route ?? `Schedule ${booking.scheduleId}`,
     travelDate: booking.travelDate,
     pickup: trip?.pickup[0] ?? "",
     dropoff: trip?.dropoff[trip.dropoff.length - 1] ?? "",
@@ -193,9 +193,10 @@ export function toBooking(booking: ApiBooking, trip?: Trip): Booking {
     email: booking.passengerEmail ?? "",
     status: CANCELLED_STATUSES.has(booking.status) ? "cancelled" : "confirmed",
     createdAt: booking.createdAt ?? new Date().toISOString(),
-    paymentStatus:
-      booking.status === "paid" || booking.status === "confirmed" ? "paid" : "pending",
-    amountPaid: booking.amount,
+    paymentStatus: booking.status === "paid" ? "paid" : "pending",
+    amountPaid: booking.status === "paid" ? booking.amount : undefined,
+    payerPhone: booking.phoneNumber,
+    payerEmail: booking.passengerEmail,
   };
 }
 

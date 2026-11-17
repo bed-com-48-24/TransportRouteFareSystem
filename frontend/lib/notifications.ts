@@ -18,6 +18,7 @@ export type DemoNotification = {
   read: boolean;
   createdAt: string;
   source: "demo";
+  recipientEmail?: string;
 };
 
 function readDemoNotifications(): DemoNotification[] {
@@ -35,7 +36,7 @@ function requestRefresh(): void {
   }
 }
 
-function addDemoNotification(title: string, message: string): void {
+function addDemoNotification(title: string, message: string, recipientEmail?: string): void {
   try {
     const notification: DemoNotification = {
       id: `demo-${crypto.randomUUID()}`,
@@ -44,6 +45,7 @@ function addDemoNotification(title: string, message: string): void {
       read: false,
       createdAt: new Date().toISOString(),
       source: "demo",
+      ...(recipientEmail?.trim() ? { recipientEmail: recipientEmail.trim().toLowerCase() } : {}),
     };
     localStorage.setItem(
       DEMO_NOTIFICATIONS_KEY,
@@ -61,11 +63,19 @@ export function notifyBookingStatus(
   type: BookingNotificationType,
   message: string,
 ): void {
-  if (type === "payment-complete") {
-    addDemoNotification("Payment successful", message);
-    return;
+  const title = type === "payment-complete"
+    ? "Payment successful"
+    : type === "booking-cancelled"
+      ? "Booking cancelled"
+      : type === "booking-reconfirmed" || type === "booking-confirmed"
+        ? "Booking update"
+        : type === "route-update"
+          ? "Route update"
+          : "Booking update";
+  addDemoNotification(title, message, _booking.email);
+  if (type === "booking-cancelled" || type === "booking-reconfirmed" || type === "booking-confirmed") {
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("backend-bookings-changed"));
   }
-  requestRefresh();
 }
 
 export function notifyRouteUpdate(_message: string, _reference = "Route schedule"): void {
@@ -73,16 +83,17 @@ export function notifyRouteUpdate(_message: string, _reference = "Route schedule
 }
 
 /** Reports and company announcements have no backend create endpoint yet. */
-export function notifyReportUpdate(message: string, reference: string): void {
-  addDemoNotification("Demo report update", `${reference}: ${message}`);
+export function notifyReportUpdate(message: string, reference: string, recipientEmail?: string): void {
+  addDemoNotification("Report update", `${reference}: ${message}`, recipientEmail);
 }
 
-export function notifyCompanyUpdate(message: string, reference = "Company announcement"): void {
-  addDemoNotification("Demo company update", `${reference}: ${message}`);
+export function notifyCompanyUpdate(message: string, reference = "Company announcement", recipientEmail?: string): void {
+  addDemoNotification("Company update", `${reference}: ${message}`, recipientEmail);
 }
 
-export function readBookingNotifications(): DemoNotification[] {
-  return readDemoNotifications();
+export function readBookingNotifications(recipientEmail?: string): DemoNotification[] {
+  const email = recipientEmail?.trim().toLowerCase();
+  return readDemoNotifications().filter((item) => !item.recipientEmail || item.recipientEmail === email);
 }
 
 export function markBookingNotificationRead(id: string): void {

@@ -14,12 +14,13 @@ import { notifyBookingStatus } from "@/lib/notifications";
 import { readSavedRoutes, savedRouteId, toggleSavedRoute } from "@/lib/saved-routes";
 import { useBackendRoutes, useBackendTrips, useMyBookings } from "@/lib/use-backend-data";
 import type { Booking, Trip } from "@/lib/types";
-import { toBooking } from "@/services/adapters";
+import { toBooking, toTrip } from "@/services/adapters";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiPayments from "@/services/payments.service";
 import * as apiSchedules from "@/services/schedules.service";
-import type { Payment, PaymentMethod } from "@/services/types";
+import type { Booking as ApiBooking, Payment, PaymentMethod } from "@/services/types";
 import { savePaymentReceipt } from "@/lib/payment-receipts";
+import { savePassengerBookingDetails } from "@/lib/passenger-booking-details";
 import { useSession } from "@/lib/auth";
 import { readPassengerSession } from "@/lib/passenger-auth";
 import * as apiMe from "@/services/me.service";
@@ -63,6 +64,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     trips.find((trip) => trip.id === initialTripId && (!initialDate || trip.date === initialDate)) ??
     trips.find((trip) => trip.id === initialTripId);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
+  const [recoveryTrip, setRecoveryTrip] = useState<Trip | null>(null);
   const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));
   const [origin, setOrigin] = useState(initialTrip?.route.split(" → ")[0] ?? "");
   const [destination, setDestination] = useState(initialTrip?.route.split(" → ")[1] ?? "");
@@ -85,11 +87,13 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentMethodLoadAttempt, setPaymentMethodLoadAttempt] = useState(0);
   const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [pendingBookingReference, setPendingBookingReference] = useState("");
   const [bankName, setBankName] = useState("");
   const [paymentAccountName, setPaymentAccountName] = useState("");
   const [paymentAccountNumber, setPaymentAccountNumber] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
   const [paymentResult, setPaymentResult] = useState<Payment | null>(null);
+  const [demoPaymentConfirmation, setDemoPaymentConfirmation] = useState(false);
   const [liveSeats, setLiveSeats] = useState<{ tripId: string; date: string; seats: number[] | null } | null>(null);
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
@@ -125,6 +129,40 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
 
   const sessionEmail = session?.email;
   useEffect(() => {
+    const reference = readQueryParam("bookingReference");
+    if (!reference || !sessionEmail) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const booking = await apiBookings.get(reference);
+        if (booking.status === "cancelled" || booking.status === "expired" || booking.status === "paid") {
+          throw new Error("This booking is already cancelled or paid. Check your profile for its latest status.");
+        }
+        const schedule = await apiSchedules.get(booking.scheduleId, booking.travelDate);
+        if (cancelled) return;
+        const trip = toTrip(schedule, booking.travelDate);
+        setRecoveryTrip(trip);
+        setSelectedTripId(trip.id);
+        setTravelDate(booking.travelDate);
+        setPickup(trip.pickup[0] ?? "");
+        setDropoff(trip.dropoff[0] ?? "");
+        setSelectedSeats(booking.seatNumbers);
+        const passenger = readPassengerSession();
+        setName(booking.passengerName ?? passenger?.fullName ?? "");
+        setEmail(booking.passengerEmail ?? passenger?.email ?? sessionEmail);
+        setPassengerPhone(booking.phoneNumber ?? "");
+        setPendingBookingReference(booking.reference);
+        setBookingStage("details");
+        setPaymentPending(true);
+        setNotice(`Continue payment for booking ${booking.reference}. This will reuse the seats already reserved.`);
+      } catch (reason) {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : "This booking could not be reopened for payment.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sessionEmail]);
+
+  useEffect(() => {
     if (!sessionEmail) return;
     let cancelled = false;
     const frame = window.requestAnimationFrame(() => {
@@ -145,7 +183,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   }, [sessionEmail]);
   const selectedTrip = trips.find(
     (trip) => trip.id === selectedTripId && (!travelDate || trip.date === travelDate),
-  );
+  ) ?? (recoveryTrip?.id === selectedTripId && recoveryTrip.date === travelDate ? recoveryTrip : undefined);
   // Only trust live seat numbers that belong to the currently selected trip.
   const liveAvailableSeatNumbers =
     selectedTrip && liveSeats?.tripId === selectedTrip.id && liveSeats.date === selectedTrip.date
@@ -391,6 +429,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   function resetTripSelection() {
     setSelectedTripId("");
     setSelectedSeats([]);
+    setPendingBookingReference("");
     setBookingStage("seats");
     setSeatError("");
     setPaymentPending(false);
@@ -551,7 +590,13 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       return;
     }
 
-    if (selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
+    const phoneDigits = passengerPhone.replace(/\D/g, "");
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      setError("Enter a valid phone number with at least 7 digits before continuing to payment.");
+      return;
+    }
+
+    if (!pendingBookingReference && selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
       setError("One of your seats is no longer available. Go back and choose another seat.");
       return;
     }
@@ -561,6 +606,13 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
 
   async function completePayment() {
     if (!selectedTrip) return;
+
+    const cleanPhone = passengerPhone.replace(/[\s-]/g, "");
+    const phoneDigits = cleanPhone.replace(/\D/g, "");
+    if (name.trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || phoneDigits.length < 7 || phoneDigits.length > 15) {
+      setError("Check the passenger name, email, and phone number. The phone number must contain at least 7 digits.");
+      return;
+    }
 
     const selectedMethod = paymentMethods.find((method) => method.id === paymentMethodId);
     if (!selectedMethod) {
@@ -587,10 +639,13 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     setSaving(true);
     setError("");
     setNotificationError("");
+    let createdReference: string | undefined = pendingBookingReference || undefined;
+    let shouldCancelCreatedBooking = false;
+    let paymentRequestStarted = false;
     try {
       const activeTrip = trips.find(
         (trip) => trip.id === selectedTrip.id && trip.date === selectedTrip.date,
-      );
+      ) ?? (recoveryTrip?.id === selectedTrip.id && recoveryTrip.date === selectedTrip.date ? recoveryTrip : undefined);
       if (
         !activeTrip ||
         activeTrip.date !== travelDate ||
@@ -603,33 +658,58 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       }
 
       const seats = [...selectedSeats].sort((first, second) => first - second);
-      const cleanPhone = passengerPhone.replace(/[\s-]/g, "");
       // Hold seats, save the passenger details, then initiate payment through the API.
-      const created = await apiBookings.create({
+      const previousHold = pendingBookingReference ? undefined : bookings.find((booking) =>
+        booking.tripId === selectedTrip.id &&
+        booking.travelDate === travelDate &&
+        booking.status === "confirmed" &&
+        booking.paymentStatus !== "paid" &&
+        booking.seats?.length === seats.length &&
+        booking.seats.every((seat, index) => seat === seats[index]),
+      );
+      let created: ApiBooking;
+      if (pendingBookingReference) {
+        created = await apiBookings.get(pendingBookingReference);
+      } else if (previousHold) {
+        created = await apiBookings.get(previousHold.reference);
+      } else {
+        created = await apiBookings.create({
           scheduleId: Number(selectedTrip.id),
           travelDate,
           seatNumbers: seats,
         });
+        shouldCancelCreatedBooking = true;
+      }
+      createdReference = created.reference;
+      setPendingBookingReference(created.reference);
 
         await apiBookings.updatePassenger(created.reference, {
           passengerName: name.trim(),
           passengerEmail: email.trim().toLowerCase(),
           phoneNumber: cleanPhone,
         });
+        try {
+          savePassengerBookingDetails({
+            bookingReference: created.reference,
+            passengerName: name.trim(),
+            passengerEmail: email.trim().toLowerCase(),
+            passengerPhone: cleanPhone,
+          });
+        } catch {
+          // The backend passenger update succeeded; browser storage is only a profile fallback.
+        }
 
+        paymentRequestStarted = true;
         const payment = await apiPayments.create(
           created.reference,
           paymentMethodId as "mobile_money" | "bank_card",
         );
-        setPaymentResult(payment);
-        const paymentStatus = payment.status?.toLowerCase() ?? "pending";
-        const paymentConfirmed = ["succeeded", "paid", "completed", "success", "successful"].includes(paymentStatus);
-        if (!paymentConfirmed) {
-          setPaymentPending(false);
-          setNotice(`Payment ${payment.status ?? "initiated"}. Booking reference: ${created.reference}.`);
-          return;
-        }
-
+        const backendPaymentStatus = payment.status?.toLowerCase() ?? "pending";
+        const demoSuccess = backendPaymentStatus === "pending" && selectedMethod.provider === "simulated";
+        const paymentStatus = demoSuccess ? "successful" : backendPaymentStatus;
+        const paymentConfirmed = demoSuccess || ["succeeded", "paid", "completed", "success", "successful"].includes(paymentStatus);
+        setDemoPaymentConfirmation(demoSuccess);
+        setPaymentResult({ ...payment, status: paymentStatus });
         const paidAmount = Number(payment.amount ?? activeTrip.fare * passengers);
         try {
           savePaymentReceipt({
@@ -639,7 +719,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             currency: payment.currency ?? "MWK",
             method: selectedMethod.name,
             provider: payment.provider ?? selectedMethod.provider,
-            status: payment.status ?? "successful",
+            status: paymentStatus,
             passengerName: name.trim(),
             passengerEmail: email.trim().toLowerCase(),
             passengerPhone: cleanPhone,
@@ -647,7 +727,14 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             createdAt: payment.createdAt ?? new Date().toISOString(),
           });
         } catch {
-          setNotice("Payment was confirmed, but this browser could not save a local receipt. Keep your payment ID.");
+          // The backend payment response remains authoritative if local storage is unavailable.
+        }
+        if (!paymentConfirmed) {
+          setPaymentPending(true);
+          setNotice(`Payment is ${payment.status ?? "pending"}. The booking is reserved, but it is not marked paid. Booking reference: ${created.reference}.`);
+          reloadBookings();
+          reloadTrips();
+          return;
         }
 
         const booking: Booking = {
@@ -693,14 +780,29 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         });
       }, 50);
       setPaymentPending(false);
+      setPendingBookingReference("");
       setNotice(paymentConfirmed
-        ? "Payment confirmed. Your bus ticket is ready."
+        ? demoSuccess
+          ? "Demo payment successful. Your ticket is ready. The backend payment record still shows pending."
+          : "Payment confirmed. Your bus ticket is ready."
         : `Payment ${payment.status ?? "initiated"}. Your booking reference is ${booking.reference}.`);
       try {
+        const paymentDetails = [
+          `Passenger: ${name.trim()}`,
+          `Route: ${booking.route}`,
+          `Amount paid: ${payment.currency ?? "MWK"} ${paidAmount.toLocaleString("en-MW")}`,
+          `Method: ${selectedMethod.name}`,
+          `Payment record ID: ${payment.id}`,
+          ...(demoSuccess ? ["Demo confirmation only; backend payment status remains pending"] : []),
+          payment.transactionReference
+            ? `Confirmation code: ${payment.transactionReference}`
+            : "Confirmation code: Not provided by the payment simulator",
+          `Booking reference: ${booking.reference}`,
+        ].join(" · ");
         notifyBookingStatus(
           booking,
           "payment-complete",
-          `Payment for ${booking.route} is ${payment.status ?? "in progress"}. Booking reference ${booking.reference}.`,
+          `Payment ${payment.status ?? "successful"}. ${paymentDetails}`,
         );
       } catch {
         setNotificationError("Your booking and ticket are ready, but the in-app notification could not be saved.");
@@ -715,6 +817,17 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       reloadTrips();
       reloadBookings();
     } catch (reason) {
+      if (createdReference && shouldCancelCreatedBooking && !paymentRequestStarted) {
+        try {
+          await apiBookings.cancel(createdReference);
+          setPendingBookingReference("");
+          setPaymentPending(false);
+          reloadTrips();
+          reloadBookings();
+        } catch {
+          // Keep the original passenger or booking error visible if cleanup is unavailable.
+        }
+      }
       setError(reason instanceof Error ? reason.message : "The reservation could not be saved. Please try again.");
     } finally {
       setSaving(false);
@@ -807,8 +920,9 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       {paymentResult && (
         <section className="module-section" aria-label="Backend payment result" aria-live="polite">
           <div className="module-section-heading">
-            <div><p className="module-eyebrow">BACKEND PAYMENT RESULT</p><h2>{paymentResult.status ?? "Response received"}</h2></div>
+            <div><p className="module-eyebrow">{demoPaymentConfirmation ? "DEMO PAYMENT RESULT" : "BACKEND PAYMENT RESULT"}</p><h2>{paymentResult.status ?? "Response received"}</h2></div>
           </div>
+          {demoPaymentConfirmation && <p className="module-footnote">This is a local demonstration confirmation. The backend payment record remains pending; no real payment provider has confirmed a charge.</p>}
           <dl className="payment-success-list">
             <div><dt>Payment ID</dt><dd>{paymentResult.id}</dd></div>
             {paymentResult.bookingReference && <div><dt>Booking reference</dt><dd>{paymentResult.bookingReference}</dd></div>}
@@ -1059,7 +1173,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
             <div className="payment-actions">
               <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethodsLoading || paymentMethods.length === 0}>
-                {saving ? "Sending payment request…" : `Pay · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
+                {saving ? "Sending payment request…" : `${pendingBookingReference ? "Retry payment for this booking" : "Pay"} · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
             </div>
@@ -1209,6 +1323,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
               <label>
                 Phone number
                 <input type="tel" autoComplete="tel" maxLength={20} value={passengerPhone} onChange={(event) => setPassengerPhone(event.target.value)} placeholder="e.g. 0991234567" required />
+                <small>Enter at least 7 digits, including country code if needed.</small>
               </label>
             </div>
 

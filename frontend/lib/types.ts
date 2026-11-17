@@ -73,7 +73,7 @@ export type Booking = {
   email: string;
   status: "confirmed" | "cancelled";
   createdAt: string;
-  paymentStatus?: "paid" | "pending";
+  paymentStatus?: "paid" | "pending" | "failed";
   paymentMethod?: "card" | "tnm" | "airtel" | "bank";
   paymentProvider?: string;
   paymentReference?: string;

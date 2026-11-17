@@ -12,13 +12,16 @@ import { markBookingNotificationRead, notifyBookingStatus, readBookingNotificati
 import { logoutPassenger, readPassengerSession } from "@/lib/passenger-auth";
 import { readSavedRoutes, removeSavedRoute, type SavedRoute } from "@/lib/saved-routes";
 import { useMyBookings } from "@/lib/use-backend-data";
-import type { Booking } from "@/lib/types";
+import type { Booking, ReportItem } from "@/lib/types";
 import * as apiBookings from "@/services/bookings.service";
 import type { Notification } from "@/services/types";
 import * as authApi from "@/services/auth.service";
 import { readPaymentReceipts, type DemoPaymentReceipt } from "@/lib/payment-receipts";
+import { readPassengerBookingDetails, type PassengerBookingDetails } from "@/lib/passenger-booking-details";
+import { KEYS, MOCK_REPORTS } from "@/lib/seed";
+import { useStoredList } from "@/lib/storage";
 
-type ProfileTab = "location" | "bookings" | "journeys" | "notifications" | "saved" | "driver-access";
+type ProfileTab = "location" | "bookings" | "journeys" | "reports" | "notifications" | "saved" | "driver-access";
 type VisibleNotification = Notification | DemoNotification;
 
 const PROFILE_KEY = "routewise-profile-v1";
@@ -89,6 +92,7 @@ const TABS: { id: ProfileTab; label: string; hint: string; icon: ReactNode }[] =
   { id: "location", label: "Current location", hint: "Where you are now", icon: <LocationIcon /> },
   { id: "bookings", label: "My bookings", hint: "View your ticket and booking history", icon: <TicketIcon /> },
   { id: "journeys", label: "Recent journeys", hint: "View your travel history", icon: <HistoryIcon /> },
+  { id: "reports", label: "My reports", hint: "View report status and staff notes", icon: <TicketIcon /> },
   { id: "notifications", label: "Notifications", hint: "View notifications", icon: <BellIcon /> },
   { id: "saved", label: "Saved routes", hint: "View your saved routes", icon: <BookmarkIcon /> },
   { id: "driver-access", label: "Driver access", hint: "Request a driver role", icon: <TicketIcon /> },
@@ -101,9 +105,11 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<ProfileTab>("bookings");
   const [displayName, setDisplayName] = useState("");
   const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings } = useMyBookings();
+  const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const [notifications, setNotifications] = useState<VisibleNotification[]>([]);
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const [paymentReceipts, setPaymentReceipts] = useState<DemoPaymentReceipt[]>([]);
+  const [passengerBookingDetails, setPassengerBookingDetails] = useState<PassengerBookingDetails[]>([]);
   const [dataError, setDataError] = useState("");
   const [bookingNotice, setBookingNotice] = useState("");
   const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
@@ -127,6 +133,7 @@ export default function ProfilePage() {
         setDisplayName(storedName);
         setSavedRoutes(readSavedRoutes());
         setPaymentReceipts(readPaymentReceipts());
+        setPassengerBookingDetails(readPassengerBookingDetails());
       } catch {
         setDataError("Some of your profile details could not be loaded from this browser.");
       } finally {
@@ -138,18 +145,40 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (!session) {
-      setNotifications([]);
-      return;
+    if (!session?.email) {
+      let cancelled = false;
+      const timer = window.setTimeout(() => {
+        if (!cancelled) setNotifications([]);
+      }, 0);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
     }
     let cancelled = false;
-    apiNotifications.list().then((items) => {
-      if (!cancelled) setNotifications([...items, ...readBookingNotifications()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    }).catch((reason: unknown) => {
-      if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
-    });
-    return () => { cancelled = true; };
-  }, [session?.email]);
+    const refreshNotifications = () => {
+      apiNotifications.list().catch(() => []).then((items) => {
+        if (!cancelled) setNotifications([...items, ...readBookingNotifications(session.email)].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      });
+    };
+    const refreshStoredNotifications = (event: StorageEvent) => {
+      if (event.key === "routewise-demo-notifications-v1" || event.key === null) {
+        refreshNotifications();
+        reloadBookings();
+      }
+    };
+    const refreshBookings = () => reloadBookings();
+    refreshNotifications();
+    window.addEventListener("backend-notifications-changed", refreshNotifications);
+    window.addEventListener("backend-bookings-changed", refreshBookings);
+    window.addEventListener("storage", refreshStoredNotifications);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("backend-notifications-changed", refreshNotifications);
+      window.removeEventListener("backend-bookings-changed", refreshBookings);
+      window.removeEventListener("storage", refreshStoredNotifications);
+    };
+  }, [session?.email, reloadBookings]);
 
   function locate() {
     if (!navigator.geolocation) {
@@ -188,24 +217,30 @@ export default function ProfilePage() {
     : bookings;
   const myBookings = visibleBookings.map((booking) => {
     const receipt = paymentReceipts.find((item) => item.bookingReference === booking.reference);
-    if (!receipt) return booking;
+    const passengerDetails = passengerBookingDetails.find((item) => item.bookingReference === booking.reference);
+    if (!receipt && !passengerDetails) return booking;
+    const paymentPaid = receipt ? ["paid", "successful", "success", "completed", "succeeded"].includes(receipt.status) : booking.paymentStatus === "paid";
     return {
       ...booking,
-      amountPaid: receipt.amount,
-      paymentMethod: receipt.method.toLowerCase().includes("airtel") ? "airtel" as const
-        : receipt.method.toLowerCase().includes("tnm") ? "tnm" as const
-          : receipt.method.toLowerCase().includes("bank") ? "bank" as const : "card" as const,
-      paymentProvider: `${receipt.method} · ${receipt.provider}`,
-      paymentReference: receipt.transactionReference ?? receipt.paymentId,
-      paymentCode: receipt.transactionReference,
-      paymentId: receipt.paymentId,
-      payerPhone: receipt.passengerPhone,
-      payerEmail: receipt.passengerEmail,
-      paidAt: receipt.createdAt,
-      name: booking.name || receipt.passengerName,
-      email: booking.email || receipt.passengerEmail,
+      paymentStatus: paymentPaid ? "paid" as const : receipt?.status === "failed" ? "failed" as const : "pending" as const,
+      amountPaid: paymentPaid ? (receipt?.amount ?? booking.amountPaid) : undefined,
+      paymentMethod: receipt?.method.toLowerCase().includes("airtel") ? "airtel" as const
+        : receipt?.method.toLowerCase().includes("tnm") ? "tnm" as const
+          : receipt?.method.toLowerCase().includes("bank") ? "bank" as const : receipt ? "card" as const : booking.paymentMethod,
+      paymentProvider: receipt ? `${receipt.method} · ${receipt.provider}` : booking.paymentProvider,
+      paymentReference: receipt?.transactionReference ?? receipt?.paymentId ?? booking.paymentReference,
+      paymentCode: receipt?.transactionReference,
+      paymentId: receipt?.paymentId,
+      payerPhone: booking.payerPhone || receipt?.passengerPhone || passengerDetails?.passengerPhone,
+      payerEmail: booking.payerEmail || receipt?.passengerEmail || passengerDetails?.passengerEmail,
+      paidAt: paymentPaid ? receipt?.createdAt : undefined,
+      name: booking.name || receipt?.passengerName || passengerDetails?.passengerName || "",
+      email: booking.email || receipt?.passengerEmail || passengerDetails?.passengerEmail || "",
     };
   });
+  const myReports = reports
+    .filter((report) => report.reporterEmail?.trim().toLowerCase() === email)
+    .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
   const sortedBookings = [...myBookings].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
   const recentJourneys = myBookings
     .filter((booking) => booking.travelDate < localToday())
@@ -278,7 +313,7 @@ export default function ProfilePage() {
         `You cancelled your booking for ${target.route || `trip ${target.tripId}`} on ${fmtDate(target.travelDate)}. The seats have been released for other passengers.`,
       );
       void apiNotifications.list().then((items) => {
-        setNotifications([...items, ...readBookingNotifications()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+        setNotifications([...items, ...readBookingNotifications(session?.email)].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       }).catch(() => undefined);
     } catch {
       // The cancellation is saved even if the notification store is blocked.
@@ -444,13 +479,16 @@ export default function ProfilePage() {
                           <div className="profile-booking-actions">
                             <span className={`status-tag ${booking.status}`}>{booking.status}</span>
                             {booking.status === "confirmed" && (
-                              <button
-                                type="button"
-                                className="text-action danger-action"
-                                onClick={() => cancelBooking(booking.reference)}
-                              >
-                                Cancel booking
-                              </button>
+                              <>
+                                {booking.paymentStatus !== "paid" && <Link className="text-action" href={`/transport-booking?bookingReference=${encodeURIComponent(booking.reference)}`}>Continue payment</Link>}
+                                <button
+                                  type="button"
+                                  className="text-action danger-action"
+                                  onClick={() => cancelBooking(booking.reference)}
+                                >
+                                  Cancel booking
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -470,14 +508,15 @@ export default function ProfilePage() {
                               <div><dt>Travel date</dt><dd>{fmtDate(booking.travelDate)}</dd></div>
                               <div><dt>Seats</dt><dd>{booking.seats?.length ? booking.seats.join(", ") : "Not recorded"}</dd></div>
                               <div><dt>Payment method</dt><dd>{paymentLabel(booking)}</dd></div>
-                              <div><dt>Amount paid</dt><dd>MWK {(booking.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
+                              <div><dt>Payment status</dt><dd>{booking.paymentStatus === "paid" ? "Paid" : booking.paymentStatus === "failed" ? "Failed" : "Not paid"}</dd></div>
+                              <div><dt>Amount paid</dt><dd>{booking.paymentStatus === "paid" && booking.amountPaid !== undefined ? `MWK ${booking.amountPaid.toLocaleString("en-MW")}` : "Not paid"}</dd></div>
                               <div><dt>Payment reference</dt><dd>{booking.paymentReference ?? "Not recorded"}</dd></div>
                               <div><dt>Payment record ID</dt><dd>{booking.paymentId ?? "Not recorded"}</dd></div>
                               <div><dt>Confirmation code</dt><dd>{booking.paymentCode ?? "Not recorded"}</dd></div>
                               {booking.paidAt && <div><dt>Paid at</dt><dd>{new Date(booking.paidAt).toLocaleString()}</dd></div>}
                               <div><dt>Status</dt><dd>{booking.status}</dd></div>
                             </dl>
-                            <p className="module-footnote">Payment receipts saved in this browser are demonstration records. The backend simulator does not provide a separate confirmation code or payment history endpoint.</p>
+                            <p className="module-footnote">Payment status comes from the payment response. Passenger details and payment IDs saved in this browser are available on this device; the backend does not provide payment history for older bookings.</p>
                           </div>
                         </details>
                       </article>
@@ -519,6 +558,37 @@ export default function ProfilePage() {
               </>
             )}
 
+            {tab === "reports" && (
+              <>
+                <PanelHeading
+                  icon={<TicketIcon />}
+                  title="My reports"
+                  description="See the reports you submitted and the company response."
+                />
+                {myReports.length === 0 ? (
+                  <div className="module-empty">
+                    <p>No reports are linked to your account yet.</p>
+                    <Link className="secondary-button" href="/help#report-heading">Report a route or stop issue</Link>
+                  </div>
+                ) : (
+                  <div className="report-update-list">
+                    {myReports.map((report) => (
+                      <article className="report-update-card" key={report.id}>
+                        <div className="report-update-heading">
+                          <div><strong>{report.type}: {report.itemName}</strong><small>Reference {report.id.toUpperCase()} · {new Date(report.createdAt).toLocaleString()}</small></div>
+                          <span className={`report-status-badge is-${report.status}`}>{report.status === "open" ? "Awaiting review" : report.status === "reviewing" ? "Being considered" : report.status === "resolved" ? "Resolved" : "Closed"}</span>
+                        </div>
+                        {report.location && <p><strong>Location:</strong> {report.location}</p>}
+                        <p>{report.description}</p>
+                        {report.adminNote.trim() && <div className="report-staff-note"><strong>Company response</strong><p>{report.adminNote}</p></div>}
+                      </article>
+                    ))}
+                  </div>
+                )}
+                <p className="module-footnote">Reports and company responses are demonstration records saved in this browser.</p>
+              </>
+            )}
+
             {tab === "notifications" && (
               <>
                 <PanelHeading
@@ -546,7 +616,7 @@ export default function ProfilePage() {
                     ))}
                   </ul>
                 )}
-                <p className="module-footnote">Notifications are loaded from your YendaRoute account.</p>
+                <p className="module-footnote">Account notices come from the backend. Booking, report, and company demo updates are saved in this browser and shown in the bell and profile.</p>
               </>
             )}
 

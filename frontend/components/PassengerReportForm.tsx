@@ -5,6 +5,7 @@ import { readPassengerSession } from "@/lib/passenger-auth";
 import { KEYS, MOCK_REPORTS } from "@/lib/seed";
 import { loadList, newId, saveList, useStoredList } from "@/lib/storage";
 import type { ReportItem } from "@/lib/types";
+import { notifyReportUpdate } from "@/lib/notifications";
 
 const STATUS_LABELS: Record<ReportItem["status"], string> = {
   open: "Awaiting review",
@@ -24,15 +25,18 @@ export default function PassengerReportForm() {
   const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
-    try {
-      const passenger = readPassengerSession();
-      if (passenger) {
-        setReporterName(passenger.fullName);
-        setReporterEmail(passenger.email);
+    const timer = window.setTimeout(() => {
+      try {
+        const passenger = readPassengerSession();
+        if (passenger) {
+          setReporterName(passenger.fullName);
+          setReporterEmail(passenger.email);
+        }
+      } catch {
+        // Reporting remains available to guests as a browser-only demo.
       }
-    } catch {
-      // Reporting remains available to guests as a browser-only demo.
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const matchingReports = reports
@@ -60,6 +64,7 @@ export default function PassengerReportForm() {
     };
     try {
       saveList(KEYS.reports, [report, ...loadList<ReportItem>(KEYS.reports, MOCK_REPORTS)]);
+      notifyReportUpdate("Your report was received and is awaiting company review.", report.id, report.reporterEmail);
       setItemName("");
       setLocation("");
       setDescription("");

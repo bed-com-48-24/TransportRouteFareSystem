@@ -123,7 +123,15 @@ export function useMyBookings(): ApiList<Booking> {
   return useApiList<Booking>(
     async () => {
       const mine = await apiBookings.listMine({ pageSize: 50 });
-      return mine.map((booking) => toBooking(booking));
+      return Promise.all(mine.map(async (booking) => {
+        const needsPassengerDetails = !booking.passengerName || !booking.passengerEmail || !booking.phoneNumber;
+        const [details, schedule] = await Promise.all([
+          needsPassengerDetails ? apiBookings.get(booking.reference).catch(() => booking) : Promise.resolve(booking),
+          apiSchedules.get(booking.scheduleId, booking.travelDate).catch(() => undefined),
+        ]);
+        const trip = schedule ? toTrip(schedule, booking.travelDate) : undefined;
+        return toBooking({ ...booking, ...details }, trip);
+      }));
     },
     () => [],
     "my-bookings",

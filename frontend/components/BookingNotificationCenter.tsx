@@ -26,29 +26,41 @@ export default function BookingNotificationCenter() {
       return;
     }
     try {
-      const [items, count] = await Promise.all([
+      const [itemsResult, countResult] = await Promise.allSettled([
         apiNotifications.list(),
         apiNotifications.unreadCount(),
       ]);
-      const demoItems = readBookingNotifications();
+      const items = itemsResult.status === "fulfilled" ? itemsResult.value : [];
+      const count = countResult.status === "fulfilled" ? countResult.value : 0;
+      const demoItems = readBookingNotifications(session.email);
       setNotifications([...items, ...demoItems].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       setUnreadCount(count + demoItems.filter((item) => !item.read).length);
-      setError("");
+      setError(itemsResult.status === "rejected" && countResult.status === "rejected"
+        ? "Account notifications are unavailable. Browser demo updates are still shown."
+        : "");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
     }
   }
 
   useEffect(() => {
-    void loadNotifications();
+    const timer = window.setTimeout(() => { void loadNotifications(); }, 0);
+    return () => window.clearTimeout(timer);
     // Session email changes when the user signs in or out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.email]);
 
   useEffect(() => {
     const refresh = () => { void loadNotifications(); };
+    const refreshStoredNotifications = (event: StorageEvent) => {
+      if (event.key === "routewise-demo-notifications-v1" || event.key === null) refresh();
+    };
     window.addEventListener("backend-notifications-changed", refresh);
-    return () => window.removeEventListener("backend-notifications-changed", refresh);
+    window.addEventListener("storage", refreshStoredNotifications);
+    return () => {
+      window.removeEventListener("backend-notifications-changed", refresh);
+      window.removeEventListener("storage", refreshStoredNotifications);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.email]);
 

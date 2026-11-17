@@ -1877,6 +1877,7 @@ function ReportManagement() {
         notifyReportUpdate(
           `Report ${report.id.toUpperCase()} (${report.type}: ${report.itemName}) is now ${statusLabel.toLowerCase()}.${note ? ` Staff note: ${note}` : ""}`,
           report.id,
+          report.reporterEmail,
         );
       } catch {
         // The report is saved; a blocked notification store must not undo it.
@@ -2047,7 +2048,7 @@ function PassengerManagement() {
       return;
     }
     try {
-      notifyCompanyUpdate(`Update for ${person.name}: ${text}`, "Passenger update");
+      notifyCompanyUpdate(`Update for ${person.name}: ${text}`, "Passenger update", person.email);
       setMessage("");
       setMessaging(null);
       setFeedback(`Demo update saved for ${person.name} in this browser. It was not sent to the backend.`);
