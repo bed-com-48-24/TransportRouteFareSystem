@@ -631,20 +631,24 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         }
 
         const paidAmount = Number(payment.amount ?? activeTrip.fare * passengers);
-        savePaymentReceipt({
-          bookingReference: created.reference,
-          paymentId: payment.id,
-          amount: paidAmount,
-          currency: payment.currency ?? "MWK",
-          method: selectedMethod.name,
-          provider: payment.provider ?? selectedMethod.provider,
-          status: payment.status ?? "successful",
-          passengerName: name.trim(),
-          passengerEmail: email.trim().toLowerCase(),
-          passengerPhone: cleanPhone,
-          ...(payment.transactionReference ? { transactionReference: payment.transactionReference } : {}),
-          createdAt: payment.createdAt ?? new Date().toISOString(),
-        });
+        try {
+          savePaymentReceipt({
+            bookingReference: created.reference,
+            paymentId: payment.id,
+            amount: paidAmount,
+            currency: payment.currency ?? "MWK",
+            method: selectedMethod.name,
+            provider: payment.provider ?? selectedMethod.provider,
+            status: payment.status ?? "successful",
+            passengerName: name.trim(),
+            passengerEmail: email.trim().toLowerCase(),
+            passengerPhone: cleanPhone,
+            ...(payment.transactionReference ? { transactionReference: payment.transactionReference } : {}),
+            createdAt: payment.createdAt ?? new Date().toISOString(),
+          });
+        } catch {
+          setNotice("Payment was confirmed, but this browser could not save a local receipt. Keep your payment ID.");
+        }
 
         const booking: Booking = {
           ...toBooking(
