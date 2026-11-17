@@ -198,7 +198,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   return (
     <main className="account-page">
       <section className="account-card" aria-labelledby="login-title">
-        <Link className="account-back" href="/login">← Choose account type</Link>
+        <Link className="account-back" href="/">← Back to welcome</Link>
         <h1 id="login-title" className="account-title-centered">
           {creating
             ? isAdmin
@@ -386,6 +386,12 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
             </>
           )}
         </p>}
+        {!isAdmin && !isDriver && !creating && (
+          <p className="account-footnote">
+            Signing in as a company administrator?{" "}
+            <Link href="/login/admin">Use the company sign in</Link>.
+          </p>
+        )}
       </section>
     </main>
   );

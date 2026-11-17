@@ -15,31 +15,24 @@ export default function BookingNotificationCenter() {
   const [error, setError] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
   const unread = notifications.filter((notification) => !notification.read);
+  // Keep the badge and the panel in sync by counting the same loaded items.
+  const unreadCount = unread.length;
   const toggleLabel = unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications";
 
   async function loadNotifications() {
     if (!session) {
       setNotifications([]);
-      setUnreadCount(0);
       return;
     }
+    const demoItems = readBookingNotifications(session.email);
     try {
-      const [itemsResult, countResult] = await Promise.allSettled([
-        apiNotifications.list(),
-        apiNotifications.unreadCount(),
-      ]);
-      const items = itemsResult.status === "fulfilled" ? itemsResult.value : [];
-      const count = countResult.status === "fulfilled" ? countResult.value : 0;
-      const demoItems = readBookingNotifications(session.email);
+      const items = await apiNotifications.list();
       setNotifications([...items, ...demoItems].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-      setUnreadCount(count + demoItems.filter((item) => !item.read).length);
-      setError(itemsResult.status === "rejected" && countResult.status === "rejected"
-        ? "Account notifications are unavailable. Browser demo updates are still shown."
-        : "");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Notifications could not be loaded.");
+      setError("");
+    } catch {
+      setNotifications(demoItems);
+      setError("Account notifications are unavailable. Browser demo updates are still shown.");
     }
   }
 
@@ -136,7 +129,11 @@ export default function BookingNotificationCenter() {
           <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
           <path d="M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
-        {unreadCount > 0 && <span className="booking-notification-count">{unreadCount}</span>}
+        {unreadCount > 0 && (
+          <span className="booking-notification-count" aria-hidden="true" key={unreadCount}>
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </button>
       {open && (
         <section

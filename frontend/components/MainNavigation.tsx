@@ -15,7 +15,12 @@ export default function MainNavigation() {
   const router = useRouter();
   const [error, setError] = useState("");
 
-  const adminNavItems: NavItem[] = [];
+  const adminNavItems: NavItem[] = [
+    { href: "/home", label: "Home" },
+    { href: "/maps-admin-integration?panel=admin&section=overview", label: "Overview" },
+    { href: "/maps-admin-integration?panel=admin&section=management", label: "Management" },
+    { href: "/help", label: "Help" },
+  ];
 
   const passengerNavItems: NavItem[] = [
     { href: "/home", label: "Home" },

@@ -22,9 +22,9 @@ npm run dev
 
 ## Passenger pages
 
-- `/` — opens the login and account-choice screen.
-- `/login` — choose between the separate user and company-admin sign-in pages.
-- `/login/user` — sign in or register with a passenger Gmail address.
+- `/` — welcome page linking straight to sign-in and trip exploration.
+- `/login` — sign in or create a passenger account directly; there is no account-type chooser step.
+- `/login/user` — the same passenger sign-in / registration form, linked from booking and profile pages.
 - `/login/admin` — sign in or register with a company name and company email.
 - `/home` — the travel homepage shown after successful sign-in. It detects the nearest supported town (with permission), lets the passenger enter a destination, and checks for a direct or connecting admin-defined route before showing results.
 - `/routes-fares` — public route discovery and autocomplete journey search; see direct or connecting results, route details, estimated fares, and pickup/drop-off points without signing in.
