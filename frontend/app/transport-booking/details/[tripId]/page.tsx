@@ -1,12 +1,24 @@
-import { notFound } from "next/navigation";
-import { TRIPS } from "../../booking-data";
-import BookingDetailsForm from "./form";
+"use client";
 
-export const instant = false;
+import { Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import TransportBookingPage from "../../page";
 
-export default async function BookingDetailsPage({ params }: PageProps<"/transport-booking/details/[tripId]">) {
-  const { tripId } = await params;
-  const trip = TRIPS.find((item) => item.id === tripId);
-  if (!trip) notFound();
-  return <BookingDetailsForm trip={trip} />;
+function TripDetails() {
+  const { tripId } = useParams<{ tripId: string }>();
+  const searchParams = useSearchParams();
+  return (
+    <TransportBookingPage
+      initialTripId={tripId}
+      initialDate={searchParams.get("date") ?? undefined}
+    />
+  );
+}
+
+export default function TripDetailsPage() {
+  return (
+    <Suspense fallback={<main className="module-shell" aria-busy="true" />}>
+      <TripDetails />
+    </Suspense>
+  );
 }

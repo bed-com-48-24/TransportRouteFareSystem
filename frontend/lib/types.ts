@@ -1,10 +1,15 @@
-export type StopKind = "pickup" | "dropoff";
+export type StopKind = "pickup" | "dropoff" | "both";
 
 export type RouteItem = {
   id: string;
   origin: string;
   destination: string;
   service: string; 
+  isActive?: boolean;
+  featured?: boolean;
+  intermediateStopIds?: number[];
+  distance?: number | null;
+  pickupLocation?: string | null;
 };
 
 export type FareItem = {
@@ -30,6 +35,8 @@ export type ReportItem = {
   itemName: string;
   description: string;
   location: string;
+  reporterName?: string;
+  reporterEmail?: string;
   status: ReportStatus;
   adminNote: string;
   createdAt: string;
@@ -37,6 +44,9 @@ export type ReportItem = {
 
 export type Trip = {
   id: string;
+  routeId?: string;
+  vehicleId?: string;
+  vehicleType?: string;
   route: string;
   pickup: string[];
   dropoff: string[];
@@ -45,6 +55,9 @@ export type Trip = {
   arrival: string;
   capacity: number;
   fare: number;
+  /** Live seat count returned by the passenger schedule search. */
+  availableSeats?: number;
+  daysOfWeek?: ("MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN")[];
 };
 
 export type Booking = {
@@ -55,8 +68,20 @@ export type Booking = {
   pickup: string;
   dropoff: string;
   passengers: number;
+  seats?: number[];
   name: string;
   email: string;
   status: "confirmed" | "cancelled";
   createdAt: string;
+  paymentStatus?: "paid" | "pending" | "failed";
+  paymentMethod?: "card" | "tnm" | "airtel" | "bank";
+  paymentProvider?: string;
+  paymentReference?: string;
+  paymentCode?: string;
+  amountPaid?: number;
+  payerPhone?: string;
+  payerAccountLast4?: string;
+  paidAt?: string;
+  paymentId?: string;
+  payerEmail?: string;
 };

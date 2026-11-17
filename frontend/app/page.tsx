@@ -1,52 +1,30 @@
 import Link from "next/link";
 
-export default function Home() {
+export default function WelcomePage() {
   return (
-    <main className="home-shell">
-      <nav className="home-nav">
-        <Link className="brand" href="/">
-          <span className="brand-mark">S</span> SBUS
+    <main className="welcome-page">
+      <header className="welcome-nav">
+        <Link className="welcome-brand" href="/" aria-label="SBUS welcome page">
+          <span className="welcome-brand-mark" aria-hidden="true">S</span>
+          <span>SBUS</span>
         </Link>
-        <div className="home-nav-links">
-          <Link className="home-nav-link" href="/routes-fares">Routes & fares</Link>
-          <Link className="home-nav-link" href="/transport-booking">Bookings</Link>
-          <Link className="home-nav-link" href="/accounts-reports/login">Account</Link>
-        </div>
-      </nav>
+      </header>
 
-      <section className="home-hero">
-        <span className="eyebrow">PUBLIC TRANSPORT, MADE CLEAR</span>
-        <h1>
-          Know your route.
-          <br />
-          <span>Plan your journey.</span>
-        </h1>
-        <p>
-          Find transport trips, compare estimated fares and reserve a seat
-          before you travel.
-        </p>
-        <Link className="confirm-button home-cta" href="/transport-booking">
-          Explore trips and book <span aria-hidden="true">→</span>
-        </Link>
-        <small>Seat reservations only. No online payment.</small>
+      <section className="welcome-hero" aria-labelledby="welcome-title">
+        <h1 id="welcome-title">Plan your <span>journey.</span></h1>
+        <div className="welcome-actions">
+          <Link className="primary-button welcome-primary" href="/login">Log in <span aria-hidden="true">→</span></Link>
+        </div>
       </section>
 
-      <section className="home-feature-row">
-        <article>
-          <span>01</span>
-          <strong>Find routes and fares</strong>
-          <p>Search popular destinations and compare estimated fares.</p>
-        </article>
-        <article>
-          <span>02</span>
-          <strong>Choose a trip</strong>
-          <p>See departure details and demo seat availability.</p>
-        </article>
-        <article>
-          <span>03</span>
-          <strong>Manage your account</strong>
-          <p>Register, update your profile, and view support reports.</p>
-        </article>
+      <section className="welcome-info" aria-labelledby="welcome-info-title">
+        <h2 id="welcome-info-title">What you can do with SBUS</h2>
+        <ul>
+          <li><span aria-hidden="true">✓</span> Find routes, fares, and departure times</li>
+          <li><span aria-hidden="true">✓</span> See stops and available seats</li>
+          <li><span aria-hidden="true">✓</span> Book a trip and keep your bookings together</li>
+          <li><span aria-hidden="true">✓</span> Check updates, reports, and payment records</li>
+        </ul>
       </section>
     </main>
   );

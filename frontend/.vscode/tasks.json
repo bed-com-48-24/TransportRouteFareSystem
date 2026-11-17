@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Inspect Help page changes",
+			"type": "shell",
+			"command": "git --no-pager diff -- app/help/page.tsx app/globals.css",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Typecheck Help page changes",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
