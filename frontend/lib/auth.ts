@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import { KEYS } from "./seed";
-import { loginPassenger } from "./passenger-auth";
+import { loginPassengerWithRole } from "./passenger-auth";
 import {
   clearAuth,
   loginAccount,
@@ -184,19 +184,27 @@ export async function loginUser(
   email: string,
   password: string,
   remember = false,
-): Promise<boolean> {
+): Promise<SessionRole | null> {
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail || !password) {
-    return false;
+    return null;
   }
 
-  const account = await loginPassenger(normalizedEmail, password, remember);
+  const account = await loginPassengerWithRole(normalizedEmail, password, remember);
   if (!account) {
-    return false;
+    return null;
   }
 
-  startSession(account.email.trim().toLowerCase(), "passenger", remember);
-  return true;
+  const sessionEmail = account.session.email.trim().toLowerCase();
+  if (account.role === "admin" && !readAdminProfiles()[sessionEmail]) {
+    saveAdminProfile(
+      sessionEmail,
+      account.session.fullName || demoDisplayName(sessionEmail),
+    );
+  }
+
+  startSession(sessionEmail, account.role, remember);
+  return account.role;
 }
 
 export async function loginDriver(email: string, password: string, remember = false): Promise<boolean> {

@@ -1,12 +1,21 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { loginAdmin, loginDriver, loginUser, registerAdmin, useSession } from "@/lib/auth";
+import { loginAdmin, loginDriver, loginUser, registerAdmin, useSession, type SessionRole } from "@/lib/auth";
 import { registerPassenger } from "@/lib/passenger-auth";
 
 type AccountRole = "user" | "admin" | "driver";
+
+function destinationForRole(role: SessionRole): string {
+  if (role === "admin") {
+    return "/maps-admin-integration?panel=admin&section=overview";
+  }
+  if (role === "driver") {
+    return "/driver/manifest";
+  }
+  return "/home";
+}
 
 function MailIcon() {
   return (
@@ -66,18 +75,22 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   const [busy, setBusy] = useState(false);
   const isAdmin = role === "admin";
   const isDriver = role === "driver";
-  // Company admins land in the staff workspace; passengers land on their home page.
+  // Each role lands in its own workspace. The unified sign-in form learns the
+  // role from the backend response instead of asking visitors to pick one.
   const redirectPath = isAdmin
-    ? "/maps-admin-integration?panel=admin&section=overview"
-    : isDriver ? "/driver/manifest" : "/home";
+    ? destinationForRole("admin")
+    : isDriver ? destinationForRole("driver") : "/home";
   const rememberKey = isAdmin ? "sbus-remembered-admin-email" : isDriver ? "sbus-remembered-driver-email" : "sbus-remembered-user-email";
-  const alreadySignedIn = session?.role === (isAdmin ? "admin" : isDriver ? "driver" : "passenger");
+  const alreadySignedIn = isAdmin
+    ? session?.role === "admin"
+    : isDriver ? session?.role === "driver" : session !== null;
+  const signedInDestination = session ? destinationForRole(session.role) : redirectPath;
 
   useEffect(() => {
     if (alreadySignedIn) {
-      router.replace(redirectPath);
+      router.replace(signedInDestination);
     }
-  }, [alreadySignedIn, redirectPath, router]);
+  }, [alreadySignedIn, signedInDestination, router]);
 
   useEffect(() => {
     let saved = "";
@@ -146,28 +159,29 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
         }
 
         await registerPassenger(fullName, email, password, remember, phone);
-        if (!(await loginUser(email, password, remember))) {
+        const createdAccountRole = await loginUser(email, password, remember);
+        if (!createdAccountRole) {
           throw new Error("Your account was created, but sign-in failed. Please sign in with your new account.");
         }
         setPassword("");
         setConfirmPassword("");
-        router.push(redirectPath);
+        router.push(destinationForRole(createdAccountRole));
         return;
       }
 
-      const signedIn = isAdmin
-        ? await loginAdmin(email, password, remember)
+      const signedInRole: SessionRole | null = isAdmin
+        ? (await loginAdmin(email, password, remember)) ? "admin" : null
         : isDriver
-          ? await loginDriver(email, password, remember)
+          ? (await loginDriver(email, password, remember)) ? "driver" : null
           : await loginUser(email, password, remember);
 
-      if (!signedIn) {
+      if (!signedInRole) {
         setError(
           isAdmin
             ? "Company email or password is not correct. Create a company account first if you do not have one."
             : isDriver
               ? "Driver email or password is not correct. A driver account must be approved first."
-              : "Email or password is not correct. Create a user account first if you do not have one.",
+              : "Email or password is not correct. Please try again.",
         );
         return;
       }
@@ -183,7 +197,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
       }
 
       setPassword("");
-      router.push(redirectPath);
+      router.push(destinationForRole(signedInRole));
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -198,7 +212,6 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   return (
     <main className="account-page">
       <section className="account-card" aria-labelledby="login-title">
-        <Link className="account-back" href="/">← Back to welcome</Link>
         <h1 id="login-title" className="account-title-centered">
           {creating
             ? isAdmin
@@ -206,7 +219,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               : "Create a user account"
               : isAdmin
               ? "Company admin sign in"
-              : isDriver ? "Driver sign in" : "User sign in"}
+              : isDriver ? "Driver sign in" : "Sign in"}
         </h1>
 
         <form className="account-form" onSubmit={submit}>
@@ -361,7 +374,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               ? creating
                 ? isAdmin ? "Submitting request…" : "Creating account…"
                 : "Signing in…"
-              : creating ? (isAdmin ? "Request company account" : "Create account") : isAdmin ? "Sign in as company admin" : isDriver ? "Sign in as driver" : "Sign in as user"}
+              : creating ? (isAdmin ? "Request company account" : "Create account") : isAdmin ? "Sign in as company admin" : isDriver ? "Sign in as driver" : "Sign in"}
             <span aria-hidden="true">→</span>
           </button>
           {error && <p className="account-message" role="alert">{error}</p>}
@@ -386,12 +399,6 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
             </>
           )}
         </p>}
-        {!isAdmin && !isDriver && !creating && (
-          <p className="account-footnote">
-            Signing in as a company administrator?{" "}
-            <Link href="/login/admin">Use the company sign in</Link>.
-          </p>
-        )}
       </section>
     </main>
   );

@@ -37,16 +37,17 @@ Stops can be pickup points, drop-off points, or both. Route and stop information
 
 ## Company admin workspace
 
-Sign in at `/login/admin`, then open **Overview** or **Management** in the site navigation. The workspace sections are deep-linkable:
+Sign in at `/login` to open the company workspace. Its tabs cover each task separately and are deep-linkable. Saving a new route and fare starts a guided setup flow through **Stops → Schedules → Bookings → Passengers → Fleet & access → Reports → Company**. Adding a new stop advances to Schedules, and scheduling a new departure advances to Bookings. Every step also has a **Continue** button, and the last one returns to Overview:
 
 - **Overview** — live counts for routes, upcoming departures, seats sold and available, paid demo revenue, bookings, reports, passengers, and stops, plus the latest passenger bookings and reports.
 - **Routes & fares** — add, edit, or remove a route and its estimated fare. Changes immediately affect passenger route search, fare estimates, and saved routes.
-- **Trip schedules** — add or edit future departures with date, times, seat capacity, fare, and pickup/drop-off points. Only these departures can be booked by passengers.
-- **Pickup & drop-off points** — add, edit, or remove stops and map coordinates. Renaming a stop updates the scheduled trips and existing bookings that use it.
+- **Stops** — add, edit, or remove pickup/drop-off points and map coordinates. Renaming a stop updates the scheduled trips and existing bookings that use it.
+- **Schedules** — add or edit future departures with date, times, seat capacity, fare, and pickup/drop-off points. Only these departures can be booked by passengers.
 - **Bookings** — search, filter, cancel, and re-confirm passenger bookings. Seat availability is checked against the live seat map, including seat 1 reserved for the transport admin, and the passenger receives an in-app notification.
-- **Customer reports** — filter by status, save a staff note, change the report status, or delete a report. Status changes and notes appear in the passenger's report updates and notification feed.
 - **Passengers** — see registered passenger accounts and guest contacts from bookings and reports, then send an in-app update to a passenger.
-- **Company profile** — update the company name or send an announcement to the passenger notification feed.
+- **Fleet & access** — approve driver/admin access requests, manage vehicles and assigned drivers, and look up individual backend records.
+- **Reports** — filter by status, save a staff note, change the report status, or delete a report. Status changes and notes appear in the passenger's report updates and notification feed.
+- **Company** — update the company name or send an announcement to the passenger notification feed.
 
 Administrator actions use the same browser data as passenger pages, so route, fare, schedule, stop, booking, report, and notification changes stay aligned. The old `/maps-admin-integration/admin/bookings` and `/maps-admin-integration/admin/reports` URLs redirect to the matching workspace section.
 

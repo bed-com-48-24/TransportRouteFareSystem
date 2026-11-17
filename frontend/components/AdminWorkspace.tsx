@@ -54,23 +54,46 @@ import type {
 
 export type AdminSection =
   | "overview"
-  | "management"
   | "routes"
-  | "schedules"
   | "stops"
-  | "reports"
+  | "schedules"
   | "bookings"
   | "passengers"
+  | "operations"
+  | "reports"
   | "company"
-  | "operations";
+  | "management"; // Legacy deep links open "routes".
 
 export const ADMIN_SECTIONS: { id: AdminSection; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "management", label: "Management" },
+  { id: "routes", label: "Routes & fares" },
+  { id: "stops", label: "Stops" },
+  { id: "schedules", label: "Schedules" },
+  { id: "bookings", label: "Bookings" },
+  { id: "passengers", label: "Passengers" },
+  { id: "operations", label: "Fleet & access" },
+  { id: "reports", label: "Reports" },
+  { id: "company", label: "Company" },
 ];
 
 export function isAdminSection(value: string | null): value is AdminSection {
-  return ADMIN_SECTIONS.some((section) => section.id === value);
+  return value === "management" || ADMIN_SECTIONS.some((section) => section.id === value);
+}
+
+/** Guided order shown after a new route and fare are saved. */
+const SETUP_FLOW: AdminSection[] = [
+  "routes",
+  "stops",
+  "schedules",
+  "bookings",
+  "passengers",
+  "operations",
+  "reports",
+  "company",
+];
+
+function adminSectionLabel(section: AdminSection): string {
+  return ADMIN_SECTIONS.find((item) => item.id === section)?.label ?? "Administration";
 }
 
 const EMPTY_TRIPS: Trip[] = [];
@@ -120,12 +143,13 @@ export default function AdminWorkspace({
   onShowMap?: () => void;
 }) {
   const router = useRouter();
-  const [section, setSection] = useState<AdminSection>(initialSection);
+  const activeSection: AdminSection = initialSection === "management" ? "routes" : initialSection;
+  const [section, setSection] = useState<AdminSection>(activeSection);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSection(initialSection === "overview" ? "overview" : "management"), 0);
+    const timer = window.setTimeout(() => setSection(activeSection), 0);
     return () => window.clearTimeout(timer);
-  }, [initialSection]);
+  }, [activeSection]);
 
   function chooseSection(next: AdminSection) {
     setSection(next);
@@ -134,6 +158,11 @@ export default function AdminWorkspace({
       { scroll: false },
     );
   }
+
+  const setupStep = SETUP_FLOW.indexOf(section);
+  const nextSetupSection = setupStep >= 0 && setupStep < SETUP_FLOW.length - 1
+    ? SETUP_FLOW[setupStep + 1]
+    : null;
 
   return (
     <section className="admin-workspace" aria-labelledby="admin-heading">
@@ -162,22 +191,30 @@ export default function AdminWorkspace({
         ))}
       </nav>
 
-      {section === "overview" && <OverviewPanel onNavigate={() => chooseSection("management")} />}
-      {section !== "overview" && <>
-        <div className="admin-overview-management" aria-label="Admin management forms">
-          <RouteFareManagement />
-          <TripScheduleManagement />
-          <StopManagement />
-          <BookingManagement />
-          <PassengerManagement />
-          <AdminOperations />
-          <div className="admin-management-lower" aria-label="Feedback, notifications, and company profile">
-            <h3>Feedback, notifications, and company profile</h3>
-            <ReportManagement />
-            <CompanyProfileManagement />
-          </div>
+      {setupStep >= 0 && (
+        <div className="admin-flow" aria-label="Route setup progress">
+          <span>Step {setupStep + 1} of {SETUP_FLOW.length}: {adminSectionLabel(section)}</span>
+          {nextSetupSection ? (
+            <button className="primary-button" type="button" onClick={() => chooseSection(nextSetupSection)}>
+              Continue to {adminSectionLabel(nextSetupSection)} <span aria-hidden="true">→</span>
+            </button>
+          ) : (
+            <button className="primary-button" type="button" onClick={() => chooseSection("overview")}>
+              Finish setup <span aria-hidden="true">→</span>
+            </button>
+          )}
         </div>
-      </>}
+      )}
+
+      {section === "overview" && <OverviewPanel onNavigate={chooseSection} />}
+      {section === "routes" && <RouteFareManagement onNavigate={chooseSection} />}
+      {section === "stops" && <StopManagement onNavigate={chooseSection} />}
+      {section === "schedules" && <TripScheduleManagement onNavigate={chooseSection} />}
+      {section === "bookings" && <BookingManagement />}
+      {section === "passengers" && <PassengerManagement />}
+      {section === "operations" && <AdminOperations />}
+      {section === "reports" && <ReportManagement />}
+      {section === "company" && <CompanyProfileManagement />}
     </section>
   );
 }
@@ -318,7 +355,7 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
   );
 }
 
-function RouteFareManagement() {
+function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
   const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes, error: routesError } = useAdminBackendRoutes();
   const { data: fares, reload: reloadFares } = useBackendFares();
   const { data: stops, loading: stopsLoading, error: stopsError, reload: reloadStops } = useBackendStops();
@@ -489,6 +526,9 @@ function RouteFareManagement() {
       setIntermediateStopIds([]);
       setEditingId(null);
       setFeedback(editingId ? "Route and fare updated for passenger search." : "Route and fare added for passenger search.");
+      if (!editingId) {
+        onNavigate("stops");
+      }
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message
@@ -599,7 +639,7 @@ function RouteFareManagement() {
           {stopsLoading ? <span className="module-copy">Loading stops…</span>
             : stopsError ? <span className="module-error" role="alert">Stops could not be loaded. <button type="button" className="text-action" onClick={reloadStops}>Retry</button></span>
             : availableIntermediateStops.length === 0
-              ? <span className="module-copy">No intermediate stops available. <a className="text-action" href="#admin-stop-management">Add pickup/drop-off points</a>.</span>
+              ? <span className="module-copy">No intermediate stops available. <button type="button" className="text-action" onClick={() => onNavigate("stops")}>Add pickup/drop-off points</button>.</span>
               : availableIntermediateStops.map((stop) => (
               <label key={stop.id}><input type="checkbox" checked={intermediateStopIds.includes(stop.id)} onChange={(event) => setIntermediateStopIds((selected) => event.target.checked ? [...selected, stop.id] : selected.filter((id) => id !== stop.id))} />{stop.name} · {stop.city}</label>
             ))}
@@ -649,7 +689,7 @@ function RouteFareManagement() {
   );
 }
 
-function TripScheduleManagement() {
+function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
   const { data: routes, loading: routesLoading, error: routesError, reload: reloadRoutes } = useBackendRoutes();
   const { data: fares } = useBackendFares();
   const { data: stops } = useBackendStops();
@@ -938,6 +978,9 @@ function TripScheduleManagement() {
       }
       resetForm();
       setFeedback(editingTripId ? "Scheduled departure updated for passengers." : "Trip scheduled. Passengers can now book this departure.");
+      if (!editingTripId) {
+        onNavigate("bookings");
+      }
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message
@@ -1278,7 +1321,7 @@ async function rebuildRouteWithoutStop(
   }
 }
 
-function StopManagement() {
+function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
   const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops, error: stopsError } = useBackendStops();
   const { data: routes } = useAdminBackendRoutes();
   const { data: trips } = useAdminTrips();
@@ -1395,6 +1438,9 @@ function StopManagement() {
       setFeedback(
         (editingId ? "Stop updated." : "Stop added.") + (extra ? ` ${extra}.` : ""),
       );
+      if (!editingId) {
+        onNavigate("schedules");
+      }
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message

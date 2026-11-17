@@ -1,9 +1,14 @@
-import { ApiError, clearAuth, loginAccount, registerAccount, saveAuth } from "./backend-api";
+import { ApiError, clearAuth, loginAccount, registerAccount, saveAuth, type BackendRole } from "./backend-api";
 import * as authApi from "@/services/auth.service";
 
 export type PassengerSession = {
   fullName: string;
   email: string;
+};
+
+export type AuthenticatedAccount = {
+  session: PassengerSession;
+  role: BackendRole;
 };
 
 /** Kept for the admin workspace's local passenger list. */
@@ -54,11 +59,11 @@ export async function registerPassenger(
   return session;
 }
 
-export async function loginPassenger(
+export async function loginPassengerWithRole(
   email: string,
   password: string,
   remember = false,
-): Promise<PassengerSession | null> {
+): Promise<AuthenticatedAccount | null> {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
@@ -70,13 +75,22 @@ export async function loginPassenger(
     };
     saveAuth(auth, remember);
     saveSession(session, remember);
-    return session;
+    return { session, role: auth.user.role };
   } catch (reason) {
     if (reason instanceof ApiError && (reason.status === 401 || reason.status === 403)) {
       return null;
     }
     throw reason;
   }
+}
+
+export async function loginPassenger(
+  email: string,
+  password: string,
+  remember = false,
+): Promise<PassengerSession | null> {
+  const account = await loginPassengerWithRole(email, password, remember);
+  return account?.session ?? null;
 }
 
 export function readPassengerSession(): PassengerSession | null {
