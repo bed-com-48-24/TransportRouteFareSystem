@@ -946,7 +946,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       </header>
 
       {notice && <p className="module-notice" role="status">{notice}</p>}
-      {error && !paymentPending && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login/user">Sign in</Link></>}</p>}
+      {error && !paymentPending && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login">Sign in</Link></>}</p>}
       {notificationError && <p className="module-error" role="alert">{notificationError}</p>}
       {((initialTripId && !initialTrip) || (selectedTripId && !selectedTrip)) && (
         <p className="module-error" role="alert">
@@ -1263,7 +1263,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
           </div>
         ) : (
           <form className="module-form" onSubmit={submitBooking} noValidate>
-            {!session && <p className="module-notice" role="status">Sign in as a passenger to reserve seats and pay. <Link href="/login/user">Sign in</Link></p>}
+            {!session && <p className="module-notice" role="status">Sign in as a passenger to reserve seats and pay. <Link href="/login">Sign in</Link></p>}
             <div className="reservation-summary">
               <div>
                 <span>Your trip</span>

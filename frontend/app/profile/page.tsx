@@ -382,7 +382,7 @@ export default function ProfilePage() {
           <h2>Sign in to view your profile</h2>
           <p>Your tickets, journeys, notifications, and saved routes are linked to your passenger account.</p>
           <div className="module-actions">
-            <Link className="primary-button" href="/login/user">Sign in</Link>
+            <Link className="primary-button" href="/login">Sign in</Link>
             <Link className="secondary-button" href="/transport-booking">Browse trips</Link>
           </div>
         </section>

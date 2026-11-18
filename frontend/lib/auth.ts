@@ -136,9 +136,12 @@ export async function loginAdmin(
     return false;
   }
 
-  // Passengers and admins share the same /auth/login endpoint. The admin role
-  // is applied here because the visitor used the company-admin form.
-  const auth = await loginAccount(normalizedEmail, password);
+   const auth = await loginAccount(normalizedEmail, password);
+
+  if (auth.user.role !== "admin") {
+    clearAuth();
+    throw new Error("This account does not have administrator access.");
+  }
 
   saveAuth(auth, remember);
   if (!readAdminProfiles()[normalizedEmail]) {
@@ -147,6 +150,7 @@ export async function loginAdmin(
   startAdminSession(normalizedEmail, remember);
   return true;
 }
+
 
 export type { AdminProfile };
 
