@@ -5,5 +5,5 @@ import AccountAccessForm from "@/components/AccountAccessForm";
  * directly so visitors do not have to pick an account type first.
  */
 export default function LoginPage() {
-  return <AccountAccessForm role="user" />;
+  return <AccountAccessForm />;
 }

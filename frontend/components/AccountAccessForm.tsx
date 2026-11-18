@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { loginAdmin, loginDriver, loginUser, registerAdmin, useSession, type SessionRole } from "@/lib/auth";
+import { loginUser, useSession, type SessionRole } from "@/lib/auth";
 import { registerPassenger } from "@/lib/passenger-auth";
 
-type AccountRole = "user" | "admin" | "driver";
+const REMEMBER_KEY = "sbus-remembered-email";
 
 function destinationForRole(role: SessionRole): string {
   if (role === "admin") {
@@ -57,12 +57,11 @@ function KeyIcon() {
   );
 }
 
-export default function AccountAccessForm({ role }: { role: AccountRole }) {
+export default function AccountAccessForm() {
   const router = useRouter();
   const session = useSession();
   const [creating, setCreating] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -73,29 +72,18 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const isAdmin = role === "admin";
-  const isDriver = role === "driver";
-  // Each role lands in its own workspace. The unified sign-in form learns the
-  // role from the backend response instead of asking visitors to pick one.
-  const redirectPath = isAdmin
-    ? destinationForRole("admin")
-    : isDriver ? destinationForRole("driver") : "/home";
-  const rememberKey = isAdmin ? "sbus-remembered-admin-email" : isDriver ? "sbus-remembered-driver-email" : "sbus-remembered-user-email";
-  const alreadySignedIn = isAdmin
-    ? session?.role === "admin"
-    : isDriver ? session?.role === "driver" : session !== null;
-  const signedInDestination = session ? destinationForRole(session.role) : redirectPath;
 
+  // Already signed in: go straight to the right view.
   useEffect(() => {
-    if (alreadySignedIn) {
-      router.replace(signedInDestination);
+    if (session) {
+      router.replace(destinationForRole(session.role));
     }
-  }, [alreadySignedIn, signedInDestination, router]);
+  }, [session, router]);
 
   useEffect(() => {
     let saved = "";
     try {
-      saved = localStorage.getItem(rememberKey) ?? "";
+      saved = localStorage.getItem(REMEMBER_KEY) ?? "";
     } catch {
       saved = "";
     }
@@ -106,7 +94,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
       setRemember(true);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [rememberKey]);
+  }, []);
 
   function handleForgotPassword() {
     setError("");
@@ -120,16 +108,8 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
     setBusy(true);
 
     try {
-      if (isDriver && creating) {
-        setError("Driver accounts sign in after an administrator approves their driver request.");
-        return;
-      }
       if (creating) {
-        if (isAdmin && (companyName.trim().length < 2 || companyName.trim().length > 100)) {
-          setError("Enter a company name between 2 and 100 characters.");
-          return;
-        }
-        if (!isAdmin && (fullName.trim().length < 2 || fullName.trim().length > 100)) {
+        if (fullName.trim().length < 2 || fullName.trim().length > 100) {
           setError("Enter a name between 2 and 100 characters.");
           return;
         }
@@ -146,51 +126,28 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
           return;
         }
 
-        if (isAdmin) {
-          await registerAdmin(companyName, email, password, phone);
-          setPassword("");
-          setConfirmPassword("");
-          setPhone("");
-          setCreating(false);
-          setInfo(
-            "Company account request submitted. An existing administrator must approve it before you can sign in here.",
-          );
-          return;
-        }
-
         await registerPassenger(fullName, email, password, remember, phone);
-        const createdAccountRole = await loginUser(email, password, remember);
-        if (!createdAccountRole) {
+        const createdRole = await loginUser(email, password, remember);
+        if (!createdRole) {
           throw new Error("Your account was created, but sign-in failed. Please sign in with your new account.");
         }
         setPassword("");
         setConfirmPassword("");
-        router.push(destinationForRole(createdAccountRole));
+        router.push(destinationForRole(createdRole));
         return;
       }
 
-      const signedInRole: SessionRole | null = isAdmin
-        ? (await loginAdmin(email, password, remember)) ? "admin" : null
-        : isDriver
-          ? (await loginDriver(email, password, remember)) ? "driver" : null
-          : await loginUser(email, password, remember);
-
+      const signedInRole = await loginUser(email, password, remember);
       if (!signedInRole) {
-        setError(
-          isAdmin
-            ? "Company email or password is not correct. Create a company account first if you do not have one."
-            : isDriver
-              ? "Driver email or password is not correct. A driver account must be approved first."
-              : "Email or password is not correct. Please try again.",
-        );
+        setError("Email or password is not correct. Create an account first if you do not have one.");
         return;
       }
 
       try {
         if (remember) {
-          localStorage.setItem(rememberKey, email.trim().toLowerCase());
+          localStorage.setItem(REMEMBER_KEY, email.trim().toLowerCase());
         } else {
-          localStorage.removeItem(rememberKey);
+          localStorage.removeItem(REMEMBER_KEY);
         }
       } catch {
         // Remember-me is optional; ignore blocked storage.
@@ -213,17 +170,11 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
     <main className="account-page">
       <section className="account-card" aria-labelledby="login-title">
         <h1 id="login-title" className="account-title-centered">
-          {creating
-            ? isAdmin
-              ? "Request a company account"
-              : "Create a user account"
-              : isAdmin
-              ? "Company admin sign in"
-              : isDriver ? "Driver sign in" : "Sign in"}
+          {creating ? "Create an account" : "Sign in"}
         </h1>
 
         <form className="account-form" onSubmit={submit}>
-          {creating && !isAdmin && (
+          {creating && (
             <>
               <label htmlFor="login-full-name">Full name</label>
               <input
@@ -238,23 +189,8 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               />
             </>
           )}
-          {creating && isAdmin && (
-            <>
-              <label htmlFor="login-company-name">Company name</label>
-              <input
-                id="login-company-name"
-                autoComplete="organization"
-                minLength={2}
-                maxLength={100}
-                placeholder="Your transport company"
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-                required
-              />
-            </>
-          )}
 
-          <label htmlFor="login-email">{isAdmin ? "Company email address" : "Email"}</label>
+          <label htmlFor="login-email">Email</label>
           <div className="account-input-wrap">
             <span className="account-input-icon" aria-hidden="true"><MailIcon /></span>
             <input
@@ -262,19 +198,12 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               type="email"
               className="has-icon"
               autoComplete={creating ? "email" : "username"}
-              placeholder={isAdmin ? "name@yourcompany.com" : "you@example.com"}
+              placeholder="you@example.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
             />
           </div>
-          {creating && (
-            <p className="account-footnote">
-              {isAdmin
-                ? "Use an email address belonging to your company. Requests are reviewed by an existing administrator."
-                : "Use your email address."}
-            </p>
-          )}
 
           {creating && (
             <>
@@ -371,16 +300,14 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
 
           <button className="account-submit" type="submit" disabled={busy}>
             {busy
-              ? creating
-                ? isAdmin ? "Submitting request…" : "Creating account…"
-                : "Signing in…"
-              : creating ? (isAdmin ? "Request company account" : "Create account") : isAdmin ? "Sign in as company admin" : isDriver ? "Sign in as driver" : "Sign in"}
+              ? creating ? "Creating account…" : "Signing in…"
+              : creating ? "Create account" : "Sign in"}
             <span aria-hidden="true">→</span>
           </button>
           {error && <p className="account-message" role="alert">{error}</p>}
         </form>
 
-        {!isDriver && <p className="account-footnote">
+        <p className="account-footnote">
           {creating ? (
             <>
               Already have an account?{" "}
@@ -398,7 +325,7 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
               .
             </>
           )}
-        </p>}
+        </p>
       </section>
     </main>
   );
