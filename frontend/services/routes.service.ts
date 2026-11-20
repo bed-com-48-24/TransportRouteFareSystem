@@ -54,13 +54,6 @@ export function listForAdmin(): Promise<Route[]> {
   return apiRequestList<Route>("/routes/admin/list");
 }
 
-export function updateStops(id: number, stopIds: number[]): Promise<Route> {
-  return apiRequest<Route>(`/routes/${id}/stops`, {
-    method: "POST",
-    body: { stopIds },
-  });
-}
-
 export function updateFare(id: number, amount: number): Promise<Route> {
   return apiRequest<Route>(`/routes/${id}/fare`, {
     method: "PATCH",

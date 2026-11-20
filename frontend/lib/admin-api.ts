@@ -54,8 +54,9 @@ export async function ensureStop(
 export async function ensureRouteStops(
   origin: string,
   destination: string,
+  existing?: Stop[],
 ): Promise<{ originStopId: number; destinationStopId: number }> {
-  const stops = await apiStops.listAll();
+  const stops = existing ?? (await apiStops.listAll());
   const originStop = await ensureStop(origin, origin, "both", stops);
   const destinationStop = await ensureStop(destination, destination, "both", stops);
   return { originStopId: originStop.id, destinationStopId: destinationStop.id };

@@ -47,7 +47,7 @@ export default function HomePage() {
       .filter((trip) => trip.routeId === route.id && trip.date >= todayValue)
       .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
     return routeTrips.length ? [{ route, routeTrips }] : [];
-  }).sort((first, second) => Number(Boolean(second.route.featured)) - Number(Boolean(first.route.featured))), [routes, trips, todayValue]);
+  }).sort((first, second) => Number(Boolean(second.route.featured)) - Number(Boolean(first.route.featured))).slice(0, 2), [routes, trips, todayValue]);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [selectedTrips, setSelectedTrips] = useState<Record<string, string>>({});
@@ -185,17 +185,7 @@ export default function HomePage() {
   }
 
   function selectPopularRoute(fromTown: string, toTown: string) {
-    // Keep the live-tracked current location as the origin and only set the destination.
-    const goingToCurrentTown = origin.trim().toLowerCase() === toTown.trim().toLowerCase();
-    setDestination(goingToCurrentTown ? fromTown : toTown);
-    if (!origin) setOrigin(fromTown);
-    setError("");
-    window.requestAnimationFrame(() => {
-      document.getElementById("home-destination")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "center",
-      });
-    });
+    router.push(`/transport-booking?origin=${encodeURIComponent(fromTown)}&destination=${encodeURIComponent(toTown)}`);
   }
 
   return (
@@ -210,118 +200,118 @@ export default function HomePage() {
         </p>
       )}
       <div className="home-top-grid">
-      <section className="home-hero">
-        <div className="home-hero-content">
-          <h1>Where would you like to go?</h1>
-          <form className="home-destination-search" onSubmit={search}>
-            <p className="home-location-hint">
-              We use your device location to suggest a starting town. If location access is unavailable, enter your starting town below.
-            </p>
-            {!tracking && <p className="home-location-status" role="status">{locationStatus}</p>}
-            {origin ? (
-              <div className="home-current-origin">
-                <span className="home-current-origin-icon" role="img" aria-label="Current location">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-                    <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
-                    <circle cx="12" cy="12" r="2.5" fill="currentColor" />
-                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <strong>{origin}</strong>
+        <section className="home-hero">
+          <div className="home-hero-content">
+            <h1>Where would you like to go?</h1>
+            <form className="home-destination-search" onSubmit={search}>
+              <p className="home-location-hint">
+                We use your device location to suggest a starting town. If location access is unavailable, enter your starting town below.
+              </p>
+              {!tracking && <p className="home-location-status" role="status">{locationStatus}</p>}
+              {origin ? (
+                <div className="home-current-origin">
+                  <span className="home-current-origin-icon" role="img" aria-label="Current location">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                  <strong>{origin}</strong>
+                </div>
+              ) : (
+                <>
+                  <label htmlFor="home-origin">Starting town</label>
+                  <input
+                    id="home-origin"
+                    type="text"
+                    list="home-route-towns"
+                    value={origin}
+                    onChange={(event) => setOrigin(event.target.value)}
+                    placeholder="Choose or enter your starting town"
+                    autoComplete="off"
+                    required
+                  />
+                </>
+              )}
+              <label htmlFor="home-destination">Destination</label>
+              <input
+                id="home-destination"
+                type="text"
+                list="home-route-towns"
+                value={destination}
+                onChange={(event) => {
+                  setDestination(event.target.value);
+                  setError("");
+                }}
+                placeholder="Start typing a destination"
+                autoComplete="off"
+                required
+              />
+              <datalist id="home-route-towns">
+                {towns.map((town) => <option key={town} value={town} />)}
+              </datalist>
+              <div className="home-search-buttons">
+                <button type="button" className="primary-button home-book-button" onClick={handleBookDirect}>Book now <span aria-hidden="true">&rarr;</span></button>
               </div>
-            ) : (
-              <>
-                <label htmlFor="home-origin">Starting town</label>
-                <input
-                  id="home-origin"
-                  type="text"
-                  list="home-route-towns"
-                  value={origin}
-                  onChange={(event) => setOrigin(event.target.value)}
-                  placeholder="Choose or enter your starting town"
-                  autoComplete="off"
-                  required
-                />
-              </>
-            )}
-            <label htmlFor="home-destination">Destination</label>
-            <input
-              id="home-destination"
-              type="text"
-              list="home-route-towns"
-              value={destination}
-              onChange={(event) => {
-                setDestination(event.target.value);
-                setError("");
-              }}
-              placeholder="Start typing a destination"
-              autoComplete="off"
-              required
-            />
-            <datalist id="home-route-towns">
-              {towns.map((town) => <option key={town} value={town} />)}
-            </datalist>
-            <div className="home-search-buttons">
-              <button type="button" className="primary-button home-book-button" onClick={handleBookDirect}>Book now <span aria-hidden="true">&rarr;</span></button>
-            </div>
-            {error && <p className="home-search-error" role="alert">{error}</p>}
-          </form>
-        </div>
-      </section>
-
-      <section className="home-popular-panel" aria-labelledby="popular-routes-heading">
-        <div className="home-section-heading">
-          <h2 id="popular-routes-heading">Popular travel routes</h2>
-          <p>Routes appear here when an admin has scheduled an upcoming departure.</p>
-        </div>
-        <div className="home-popular-grid">
-          {popularRoutes.map(({ route, routeTrips }) => {
-            const routeKey = `${route.origin}-${route.destination}`;
-            const bookableRouteTrips = routeTrips.filter((trip) => seatsLeft(trip) > 0);
-            const tripDef = bookableRouteTrips.find((trip) => tripKey(trip) === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
-            const fareDef = fares.find((fare) => fare.routeId === route.id);
-            const bookHref = tripDef
-              ? `/transport-booking/details/${tripDef.id}?date=${tripDef.date}`
-              : `/transport-booking?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(route.destination)}`;
-
-            return (
-              <article className="home-popular-card" key={routeKey}>
-                <div>
-                  <div className="home-popular-top">
-                    <span className="home-popular-tag">{route.featured ? "Featured route" : "Upcoming departure"}</span>
-                    <span className="home-popular-service">{route.service}</span>
+              {error && <p className="home-search-error" role="alert">{error}</p>}
+            </form>
+          </div>
+        </section>
+  
+        <section className="home-popular-panel" aria-labelledby="popular-routes-heading">
+          <div className="home-section-heading">
+            <h2 id="popular-routes-heading">Popular travel routes</h2>
+            <p>Routes appear here when an admin has scheduled an upcoming departure.</p>
+          </div>
+          <div className="home-popular-grid">
+            {popularRoutes.map(({ route, routeTrips }) => {
+              const routeKey = `${route.origin}-${route.destination}`;
+              const bookableRouteTrips = routeTrips.filter((trip) => seatsLeft(trip) > 0);
+              const tripDef = bookableRouteTrips.find((trip) => tripKey(trip) === selectedTrips[routeKey]) ?? bookableRouteTrips[0];
+              const fareDef = fares.find((fare) => fare.routeId === route.id);
+              const bookHref = tripDef
+                ? `/transport-booking/details/${tripDef.id}?date=${tripDef.date}`
+                : `/transport-booking?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(route.destination)}`;
+  
+              return (
+                <article className="home-popular-card" key={routeKey}>
+                  <div>
+                    <div className="home-popular-top">
+                      <span className="home-popular-tag">{route.featured ? "Featured route" : "Upcoming departure"}</span>
+                      <span className="home-popular-service">{route.service}</span>
+                    </div>
+                    <h3>{route.origin} &rarr; {route.destination}</h3>
+                    <p className="home-popular-fare">
+                      {fareDef ? <>From <strong>MWK {fareDef.amount.toLocaleString("en-MW")}</strong></> : "Fare not listed"}
+                    </p>
+                    {bookableRouteTrips.length > 0 ? (
+                      <label className="home-popular-choose">
+                        <span>Choose a trip</span>
+                        <select value={tripDef ? tripKey(tripDef) : ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
+                          {bookableRouteTrips.map((trip) => (
+                            <option key={tripKey(trip)} value={tripKey(trip)}>
+                              {fmtDate(trip.date)} · {trip.departure} · {trip.vehicleType ? `${trip.vehicleType} · ` : ""}{trip.capacity} passenger seats · {seatsLeft(trip)} available
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <p className="home-popular-schedule">Scheduled departures are full. Check the trip page for details.</p>
+                    )}
                   </div>
-                  <h3>{route.origin} &rarr; {route.destination}</h3>
-                  <p className="home-popular-fare">
-                    {fareDef ? <>From <strong>MWK {fareDef.amount.toLocaleString("en-MW")}</strong></> : "Fare not listed"}
-                  </p>
-                  {bookableRouteTrips.length > 0 ? (
-                    <label className="home-popular-choose">
-                      <span>Choose a trip</span>
-                      <select value={tripDef ? tripKey(tripDef) : ""} onChange={(event) => setSelectedTrips((current) => ({ ...current, [routeKey]: event.target.value }))}>
-                        {bookableRouteTrips.map((trip) => (
-                          <option key={tripKey(trip)} value={tripKey(trip)}>
-                            {fmtDate(trip.date)} · {trip.departure} · {trip.vehicleType ? `${trip.vehicleType} · ` : ""}{trip.capacity} passenger seats · {seatsLeft(trip)} available
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : (
-                    <p className="home-popular-schedule">Scheduled departures are full. Check the trip page for details.</p>
-                  )}
-                </div>
-                <div className="home-popular-actions">
-                  <Link className="primary-button" href={bookHref}>{tripDef ? "Book this trip" : "Check schedule"}</Link>
-                  <button type="button" className="secondary-button" onClick={() => selectPopularRoute(route.origin, route.destination)}>Select route</button>
-                </div>
-              </article>
-            );
-          })}
-          {!routesLoading && !tripsLoading && popularRoutes.length === 0 && (
-            <p className="module-empty">No upcoming admin-scheduled departures yet. Routes will appear here after an admin schedules a trip.</p>
-          )}
-        </div>
-      </section>
+                  <div className="home-popular-actions">
+                    <Link className="primary-button" href={bookHref}>{tripDef ? "Book this trip" : "Check schedule"}</Link>
+                    <button type="button" className="secondary-button" onClick={() => selectPopularRoute(route.origin, route.destination)}>Select route</button>
+                  </div>
+                </article>
+              );
+            })}
+            {!routesLoading && !tripsLoading && popularRoutes.length === 0 && (
+              <p className="module-empty">No upcoming admin-scheduled departures yet. Routes will appear here after an admin schedules a trip.</p>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   );

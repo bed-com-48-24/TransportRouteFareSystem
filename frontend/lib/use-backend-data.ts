@@ -55,12 +55,8 @@ export function useBackendFares(): ApiList<FareItem> {
     async () => {
       const routes = await apiRoutes.list();
 
-      // Fares usually travel with the route record; fetch per route otherwise.
-      const nested = routes.flatMap((route) =>
-        (route.fares ?? []).map((fare) => toFareItem({ ...fare, routeId: route.id })),
-      );
-      if (nested.length) return nested;
-
+      // The route response only contains display labels for fares. The fare
+      // endpoint returns the real records (including ids) needed by admin edits.
       const perRoute = await Promise.all(
         routes.map(async (route) => {
           try {

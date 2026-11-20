@@ -98,7 +98,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   const [ticket, setTicket] = useState<Booking | null>(null);
   const [ticketQr, setTicketQr] = useState("");
   const [showTicket, setShowTicket] = useState(false);
-  const [tripView, setTripView] = useState<"cards" | "map">("cards");
   const [searchError, setSearchError] = useState("");
   const [savedRouteIds, setSavedRouteIds] = useState<string[]>([]);
   const [saveRouteError, setSaveRouteError] = useState("");
@@ -284,14 +283,8 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   }, [hasRouteSelection, routeTrips, travelDate, upcomingTrips]);
 
   const detailTrip = selectedTrip;
-  const allMapTrips = useMemo(() => {
-    const list = tripView === "map" ? [...displayedTrips] : [];
-    if (detailTrip && !list.some((t) => tripKey(t) === tripKey(detailTrip))) {
-      list.push(detailTrip);
-    }
-    return list;
-  }, [tripView, displayedTrips, detailTrip]);
-  const tripRoadRoutes = useRoadRoutes(allMapTrips.flatMap((trip) => {
+  const mapTrips = detailTrip ? [detailTrip] : [];
+  const tripRoadRoutes = useRoadRoutes(mapTrips.flatMap((trip) => {
     const [origin, destination] = trip.route.split(" → ");
     const originCoordinates = TRANSPORT_TOWN_COORDINATES[origin];
     const destinationCoordinates = TRANSPORT_TOWN_COORDINATES[destination];
@@ -299,7 +292,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       ? [{ id: trip.id, origin: originCoordinates, destination: destinationCoordinates }]
       : [];
   }));
-  const visibleTripGeometry = (tripView === "map" ? displayedTrips : detailTrip ? [detailTrip] : [])
+  const visibleTripGeometry = mapTrips
     .filter((trip) => {
       const [origin, destination] = trip.route.split(" → ");
       return TRANSPORT_TOWN_COORDINATES[origin] && TRANSPORT_TOWN_COORDINATES[destination];
@@ -915,7 +908,8 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   }
 
   return (
-    <main className="module-shell">
+    <main className="module-shell transport-page-shell">
+      <div className="transport-background" aria-hidden="true" />
       <DemoDataNotice show={tripsAreDemo} what="departures" />
       {paymentResult && (
         <section className="module-section" aria-label="Backend payment result" aria-live="polite">
@@ -1041,13 +1035,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             ) : null
           ) : null}
           {displayedTrips.length > 0 && (
-            <nav className="module-tabs" aria-label="Available trips view">
-              <button type="button" className={tripView === "cards" ? "is-active" : ""} aria-pressed={tripView === "cards"} onClick={() => setTripView("cards")}>Cards</button>
-              <button type="button" className={tripView === "map" ? "is-active" : ""} aria-pressed={tripView === "map"} onClick={() => setTripView("map")}>Map</button>
-            </nav>
-          )}
-
-          {displayedTrips.length > 0 && tripView === "cards" ? (
             <div className="module-card-grid">
               {displayedTrips.map((trip) => {
                 const seats = seatsByTrip.get(tripKey(trip)) ?? availableSeats(trip, bookings);
@@ -1109,16 +1096,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
                 );
               })}
             </div>
-          ) : displayedTrips.length > 0 && tripView === "map" ? (
-            <TripMap
-              trips={displayedTrips}
-              userPosition={userPosition}
-              cityCoordinates={TRANSPORT_TOWN_COORDINATES}
-              tripRoadRoutes={tripRoadRoutes}
-              isTripRouting={isTripRouting}
-              tripFallbackCount={tripFallbackCount}
-            />
-          ) : null}
+          )}
         </div>
           </>
         )}

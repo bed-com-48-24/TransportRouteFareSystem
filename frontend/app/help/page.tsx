@@ -28,7 +28,8 @@ const bookingSteps = [
 
 export default function HelpPage() {
   return (
-    <main className="module-shell">
+    <main className="module-shell transport-page-shell">
+      <div className="transport-background" aria-hidden="true" />
       <header className="module-intro">
         <p className="module-eyebrow">PASSENGER HELP</p>
         <h1>How to book a trip</h1>

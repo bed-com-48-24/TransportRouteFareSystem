@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import * as authApi from "@/services/auth.service";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiSchedules from "@/services/schedules.service";
 import * as apiUsers from "@/services/users.service";
+import AdminRecordsPanel from "@/components/AdminRecordsPanel";
+import { revealAdminEditor, useAdminFeedbackReveal } from "@/components/admin-reveal";
 import { suggestedVehicleCapacity } from "@/lib/vehicle-capacity";
 import * as apiVehicles from "@/services/vehicles.service";
 import type { PendingRequest } from "@/services/auth.service";
@@ -132,6 +134,8 @@ function VehicleFleet() {
   const [description, setDescription] = useState("");
   const [driverId, setDriverId] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  useAdminFeedbackReveal(feedback, "admin-vehicle-feedback");
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
@@ -197,6 +201,7 @@ function VehicleFleet() {
     setDescription(vehicle.description ?? "");
     setDriverId(vehicle.driverId ? String(vehicle.driverId) : "");
     setFeedback("");
+    revealAdminEditor(sectionRef.current);
   }
 
   async function removeVehicle(vehicle: Vehicle) {
@@ -213,7 +218,7 @@ function VehicleFleet() {
   }
 
   return (
-    <section className="module-section" aria-labelledby="vehicle-fleet-heading">
+    <section className="module-section" aria-labelledby="vehicle-fleet-heading" ref={sectionRef}>
       <div className="module-section-heading">
         <div><p className="module-eyebrow">FLEET</p><h4 id="vehicle-fleet-heading">Manage vehicles</h4></div>
         <button type="button" className="secondary-button" onClick={() => void loadFleet()} disabled={loading}>{loading ? "Loading..." : "Refresh fleet"}</button>
@@ -234,17 +239,19 @@ function VehicleFleet() {
         {editingId !== null && <button className="secondary-button" type="button" onClick={resetForm}>Cancel edit</button>}
       </form>
       {error && <p className="module-error" role="alert">{error}</p>}
-      {feedback && <p className="module-feedback" role="status">{feedback}</p>}
-      {loading ? <p className="module-empty">Loading vehicles...</p> : vehicles.length === 0 ? <p className="module-empty">No vehicles have been added yet.</p> : (
-        <div className="admin-record-list">
-          {vehicles.map((vehicle) => (
-            <article key={vehicle.id}>
-              <div><strong>{vehicle.plateNumber} · {vehicle.vehicleType}</strong><small>{vehicle.capacity} seats · {vehicle.description || "No description"} · {drivers.find((driver) => driver.id === vehicle.driverId)?.fullName ?? "No driver assigned"}</small></div>
-              <div className="admin-record-actions"><button type="button" className="text-action" onClick={() => editVehicle(vehicle)}>Edit</button><button type="button" className="text-action danger-action" onClick={() => void removeVehicle(vehicle)}>Remove</button></div>
-            </article>
-          ))}
-        </div>
-      )}
+      {feedback && <p id="admin-vehicle-feedback" className="module-feedback" role="status">{feedback}</p>}
+      <AdminRecordsPanel label="vehicles in the fleet" count={vehicles.length}>
+        {loading ? <p className="module-empty">Loading vehicles...</p> : vehicles.length === 0 ? <p className="module-empty">No vehicles have been added yet.</p> : (
+          <div className="admin-record-list">
+            {vehicles.map((vehicle) => (
+              <article key={vehicle.id}>
+                <div><strong>{vehicle.plateNumber} · {vehicle.vehicleType}</strong><small>{vehicle.capacity} seats · {vehicle.description || "No description"} · {drivers.find((driver) => driver.id === vehicle.driverId)?.fullName ?? "No driver assigned"}</small></div>
+                <div className="admin-record-actions"><button type="button" className="text-action" onClick={() => editVehicle(vehicle)}>Edit</button><button type="button" className="text-action danger-action" onClick={() => void removeVehicle(vehicle)}>Remove</button></div>
+              </article>
+            ))}
+          </div>
+        )}
+      </AdminRecordsPanel>
     </section>
   );
 }
