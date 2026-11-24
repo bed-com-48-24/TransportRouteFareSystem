@@ -35,7 +35,7 @@ npm run dev
 
 Stops can be pickup points, drop-off points, or both. Route and stop information is shared between search, booking, map, and administration views.
 
-## Company admin workspace
+## Admin workspace
 
 Sign in at `/login` to open the company workspace. Its tabs cover each task separately and are deep-linkable. Saving a new route and fare starts a guided setup flow through **Stops → Schedules → Bookings → Passengers → Fleet & access → Reports → Company**. Adding a new stop advances to Schedules, and scheduling a new departure advances to Bookings. Every step also has a **Continue** button, and the last one returns to Overview:
 

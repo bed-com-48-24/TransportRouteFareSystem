@@ -1,22 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   adminReservedSeatNumbers,
-  availableSeatNumbers,
-  availableSeats,
   fmtDate,
 } from "@/lib/booking-data";
 import { readAdminProfile, updateAdminCompanyName, useSession } from "@/lib/auth";
-import DemoDataNotice from "@/components/DemoDataNotice";
 import AdminOperations from "@/components/AdminOperations";
-import AdminRecordsPanel from "@/components/AdminRecordsPanel";
+import ListPagination from "@/components/ListPagination";
 import { revealAdminEditor, useAdminFeedbackReveal } from "@/components/admin-reveal";
+import { LIST_PAGE_SIZE, sortByLabel } from "@/lib/list-utils";
 import { hasCoords, travelEstimate } from "@/lib/geo";
 import { MALAWI_LOCATIONS, TRANSPORT_TOWN_COORDINATES } from "@/lib/malawi-locations";
 import {
-  notifyBookingStatus,
   notifyCompanyUpdate,
   notifyReportUpdate,
   notifyRouteUpdate,
@@ -81,22 +78,6 @@ export function isAdminSection(value: string | null): value is AdminSection {
   return value === "management" || ADMIN_SECTIONS.some((section) => section.id === value);
 }
 
-/** Guided order shown after a new route and fare are saved. */
-const SETUP_FLOW: AdminSection[] = [
-  "routes",
-  "stops",
-  "schedules",
-  "bookings",
-  "passengers",
-  "operations",
-  "reports",
-  "company",
-];
-
-function adminSectionLabel(section: AdminSection): string {
-  return ADMIN_SECTIONS.find((item) => item.id === section)?.label ?? "Administration";
-}
-
 const EMPTY_TRIPS: Trip[] = [];
 const EMPTY_BOOKINGS: Booking[] = [];
 
@@ -116,16 +97,6 @@ function stopKindLabel(kind: StopKind) {
   return kind === "pickup" ? "Pickup" : "Drop-off";
 }
 
-function paymentMethodLabel(method?: Booking["paymentMethod"]) {
-  switch (method) {
-    case "tnm": return "TNM Mpamba";
-    case "airtel": return "Airtel Money";
-    case "bank": return "Bank transfer";
-    case "card": return "Card";
-    default: return "Not recorded";
-  }
-}
-
 function formatMoment(value?: string) {
   if (!value) return "Not recorded";
   const date = new Date(value);
@@ -136,12 +107,56 @@ function routeLabelForTrip(trip: Trip, routes: RouteItem[]) {
   return routes.find((route) => `${route.origin} → ${route.destination}`.toLowerCase() === trip.route.toLowerCase());
 }
 
+/** Compact, paginated table for large saved-record lists. */
+function AdminDataTable({
+  columns,
+  rows,
+  empty,
+}: {
+  columns: { key: string; label: string }[];
+  rows: { key: string; cells: ReactNode[] }[];
+  empty: string;
+}) {
+  const [page, setPage] = useState(1);
+  const pageSize = LIST_PAGE_SIZE;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  return (
+    <>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>{columns.map((column) => <th key={column.key} scope="col">{column.label}</th>)}</tr>
+          </thead>
+          <tbody>
+            {visibleRows.length === 0 ? (
+              <tr><td className="admin-table-empty" colSpan={columns.length}>{empty}</td></tr>
+            ) : visibleRows.map((row) => (
+              <tr key={row.key}>
+                {row.cells.map((cell, index) => <td key={columns[index]?.key ?? index}>{cell}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="admin-table-footer">
+        <ListPagination
+          page={currentPage - 1}
+          pageCount={pageCount}
+          onPageChange={(nextPage) => setPage(nextPage + 1)}
+          label="record"
+        />
+      </div>
+    </>
+  );
+}
+
 export default function AdminWorkspace({
   initialSection = "overview",
-  onShowMap,
 }: {
   initialSection?: AdminSection;
-  onShowMap?: () => void;
 }) {
   const router = useRouter();
   const activeSection: AdminSection = initialSection === "management" ? "routes" : initialSection;
@@ -160,24 +175,8 @@ export default function AdminWorkspace({
     );
   }
 
-  const setupStep = SETUP_FLOW.indexOf(section);
-  const nextSetupSection = setupStep >= 0 && setupStep < SETUP_FLOW.length - 1
-    ? SETUP_FLOW[setupStep + 1]
-    : null;
-
   return (
-    <section className="admin-workspace" aria-labelledby="admin-heading">
-      <div className="admin-workspace-heading">
-        <div>
-          <h2 id="admin-heading">Company admin workspace</h2>
-        </div>
-        {onShowMap && (
-          <button className="secondary-button" type="button" onClick={onShowMap}>
-            View public map
-          </button>
-        )}
-      </div>
-
+    <section className="admin-workspace" aria-label="Administration">
       <nav className="admin-tabs" aria-label="Administration sections">
         {ADMIN_SECTIONS.map((item) => (
           <button
@@ -192,25 +191,10 @@ export default function AdminWorkspace({
         ))}
       </nav>
 
-      {setupStep >= 0 && (
-        <div className="admin-flow" aria-label="Route setup progress">
-          <span>Step {setupStep + 1} of {SETUP_FLOW.length}: {adminSectionLabel(section)}</span>
-          {nextSetupSection ? (
-            <button className="primary-button" type="button" onClick={() => chooseSection(nextSetupSection)}>
-              Continue to {adminSectionLabel(nextSetupSection)} <span aria-hidden="true">→</span>
-            </button>
-          ) : (
-            <button className="primary-button" type="button" onClick={() => chooseSection("overview")}>
-              Finish setup <span aria-hidden="true">→</span>
-            </button>
-          )}
-        </div>
-      )}
-
       {section === "overview" && <OverviewPanel onNavigate={chooseSection} />}
-      {section === "routes" && <RouteFareManagement onNavigate={chooseSection} />}
-      {section === "stops" && <StopManagement onNavigate={chooseSection} />}
-      {section === "schedules" && <TripScheduleManagement onNavigate={chooseSection} />}
+      {section === "routes" && <RouteFareManagement />}
+      {section === "stops" && <StopManagement />}
+      {section === "schedules" && <TripScheduleManagement />}
       {section === "bookings" && <BookingManagement />}
       {section === "passengers" && <PassengerManagement />}
       {section === "operations" && <AdminOperations />}
@@ -221,62 +205,32 @@ export default function AdminWorkspace({
 }
 
 function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
-  const { data: routes, usingDemo: routesAreDemo, error: routesError, loading: routesLoading, reload: reloadRoutes } = useBackendRoutes();
-  const { data: fares, error: faresError, loading: faresLoading, reload: reloadFares } = useBackendFares();
+  const { data: routes, error: routesError, loading: routesLoading } = useBackendRoutes();
   const { data: stops } = useBackendStops();
   const { data: trips, error: tripsError } = useAdminTrips();
-  const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
+  const { data: bookings, error: bookingsError } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
   const { data: accounts, error: usersError } = useAdminUsers();
   const today = localDateValue();
 
   const upcomingTrips = trips.filter((trip) => trip.date >= today);
   const confirmedBookings = bookings.filter((booking) => booking.status === "confirmed");
-  const paidBookings = confirmedBookings.filter((booking) => booking.paymentStatus === "paid");
-  const revenue = paidBookings.reduce((total, booking) => total + (booking.amountPaid ?? 0), 0);
   const openReports = reports.filter((report) => report.status === "open" || report.status === "reviewing");
-  const seatsBooked = confirmedBookings.reduce((total, booking) => total + booking.passengers, 0);
-  const seatsAvailable = upcomingTrips.reduce(
-    (total, trip) => total + availableSeats(trip, bookings),
-    0,
-  );
-  const recentBookings = [...bookings]
-    .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
-    .slice(0, 5);
-  const recentReports = [...reports]
-    .sort((first, second) => second.createdAt.localeCompare(first.createdAt))
-    .slice(0, 5);
-
-  const stats: { id: AdminSection; label: string; value: string; hint: string }[] = [
-    { id: "routes", label: "Published routes", value: routesLoading ? "…" : String(routes.length), hint: faresLoading ? "Loading fare estimates…" : `${fares.length} fare estimate${fares.length === 1 ? "" : "s"} attached` },
-    { id: "stops", label: "Pickup & drop-off points", value: String(stops.length), hint: `${stops.filter(hasCoords).length} with map coordinates` },
-    { id: "schedules", label: "Upcoming departures", value: String(upcomingTrips.length), hint: `${seatsAvailable} bookable seats left` },
-    { id: "bookings", label: "Confirmed bookings", value: String(confirmedBookings.length), hint: `${seatsBooked} passenger seat${seatsBooked === 1 ? "" : "s"} sold` },
-    { id: "passengers", label: "Registered passengers", value: String(accounts.length), hint: "Guest bookings also appear in Passengers" },
-    { id: "bookings", label: "Revenue collected", value: `MWK ${revenue.toLocaleString("en-MW")}`, hint: `${paidBookings.length} paid booking${paidBookings.length === 1 ? "" : "s"}` },
-    { id: "reports", label: "Reports to review", value: String(openReports.length), hint: `${reports.length} report${reports.length === 1 ? "" : "s"} in total` },
-    { id: "company", label: "Company profile", value: "Manage", hint: "Update the company name or message passengers" },
+  const stats: { id: AdminSection; label: string; value: string }[] = [
+    { id: "routes", label: "Routes & stops", value: routesLoading ? "…" : `${routes.length} routes · ${stops.length} stops` },
+    { id: "schedules", label: "Schedules", value: String(upcomingTrips.length) },
+    { id: "bookings", label: "Confirmed bookings", value: String(confirmedBookings.length) },
+    { id: "passengers", label: "Users", value: String(accounts.length) },
+    { id: "reports", label: "Reports to review", value: String(openReports.length) },
   ];
 
   return (
-    <div className="admin-section-content">
-      <div className="admin-activity-heading">
-        <h3>Today at a glance</h3>
-        <button type="button" className="secondary-button" onClick={() => { reloadRoutes(); reloadFares(); }} disabled={routesLoading || faresLoading}>
-          {routesLoading || faresLoading ? "Refreshing…" : "Refresh routes & fares"}
-        </button>
-      </div>
-      <DemoDataNotice show={routesAreDemo || bookingsAreDemo} what="routes and bookings" />
-      <DemoDataNotice show what="customer reports" />
-      {(routesError || faresError || tripsError || bookingsError || usersError) && (
+    <div className="admin-section-content admin-overview-content">
+      {(routesError || tripsError || bookingsError || usersError) && (
         <p className="module-error" role="alert">
-          {routesError || faresError || tripsError || bookingsError || usersError}
+          {routesError || tripsError || bookingsError || usersError}
         </p>
       )}
-      <p className="module-copy">
-        Live figures come from the YendaRoute backend. Customer reports and notifications are kept
-        in this browser because the backend has no reports endpoint yet.
-      </p>
 
       <div className="admin-overview-grid">
         {stats.map((stat) => (
@@ -288,78 +242,18 @@ function OverviewPanel({ onNavigate }: { onNavigate: (section: AdminSection) => 
           >
             <span>{stat.label}</span>
             <strong>{stat.value}</strong>
-            <small>{stat.hint}</small>
           </button>
         ))}
       </div>
 
-      <div className="admin-overview-columns">
-        <section className="admin-activity" aria-labelledby="recent-bookings-heading">
-          <div className="admin-activity-heading">
-            <h3 id="recent-bookings-heading">Latest passenger bookings</h3>
-            <button type="button" className="text-action" onClick={() => onNavigate("bookings")}>Manage bookings</button>
-          </div>
-          {recentBookings.length === 0 ? (
-            <p className="module-empty">No passenger bookings yet. Bookings appear here as soon as a passenger reserves a seat.</p>
-          ) : (
-            <ul className="admin-activity-list">
-              {recentBookings.map((booking) => (
-                <li key={booking.reference}>
-                  <div>
-                    <strong>{booking.route}</strong>
-                    <small>{fmtDate(booking.travelDate)} · {booking.name} · {booking.passengers} seat{booking.passengers === 1 ? "" : "s"}</small>
-                  </div>
-                  <div className="admin-activity-tags">
-                    {booking.paymentStatus === "paid" && <span className="admin-tag is-paid">Paid</span>}
-                    <span className={`booking-state ${booking.status}`}>{booking.status}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="admin-activity" aria-labelledby="recent-reports-heading">
-          <div className="admin-activity-heading">
-            <h3 id="recent-reports-heading">Latest customer reports</h3>
-            <button type="button" className="text-action" onClick={() => onNavigate("reports")}>Review reports</button>
-          </div>
-          {recentReports.length === 0 ? (
-            <p className="module-empty">No reports have been submitted yet.</p>
-          ) : (
-            <ul className="admin-activity-list">
-              {recentReports.map((report) => (
-                <li key={report.id}>
-                  <div>
-                    <strong>{report.type}: {report.itemName}</strong>
-                    <small>{report.reporterName || report.reporterEmail || "Guest reporter"} · {formatMoment(report.createdAt)}</small>
-                  </div>
-                  <span className={`report-status-badge is-${report.status}`}>{REPORT_STATUS_LABELS[report.status]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <section className="admin-alignment" aria-labelledby="alignment-heading">
-        <h3 id="alignment-heading">How administration stays aligned with passengers</h3>
-        <ul>
-          <li>Routes and fares published here power passenger route search, saved routes, and fare estimates.</li>
-          <li>Trip schedules created here are the only departures passengers can book and select seats on.</li>
-          <li>Booking changes made here update seat availability, the passenger&apos;s bookings page, and their notifications.</li>
-          <li>Report status changes and staff notes appear in the passenger&apos;s report updates and notification feed.</li>
-          <li>Pickup and drop-off changes are carried through to scheduled trips and future passenger bookings.</li>
-        </ul>
-      </section>
     </div>
   );
 }
 
-function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
+function RouteFareManagement() {
   const { data: routes, usingDemo: routesAreDemo, reload: reloadRoutes, error: routesError } = useAdminBackendRoutes();
   const { data: fares, reload: reloadFares } = useBackendFares();
-  const { data: stops, loading: stopsLoading, error: stopsError, reload: reloadStops } = useBackendStops();
+  const { reload: reloadStops } = useBackendStops();
   const { data: trips } = useAdminTrips();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -373,17 +267,17 @@ function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSectio
   const [feedback, setFeedback] = useState("");
   const [isSavingRoute, setIsSavingRoute] = useState(false);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"list" | "form">("list");
   const sectionRef = useRef<HTMLDivElement>(null);
   useAdminFeedbackReveal(feedback, "admin-route-feedback");
   const normalizedQuery = query.trim().toLowerCase();
-  const shownRoutes = routes.filter((route) =>
-    !normalizedQuery ||
-    `${route.origin} ${route.destination} ${route.service}`.toLowerCase().includes(normalizedQuery),
+  const shownRoutes = sortByLabel(
+    routes.filter((route) =>
+      !normalizedQuery ||
+      `${route.origin} ${route.destination} ${route.service}`.toLowerCase().includes(normalizedQuery),
+    ),
+    (route) => `${route.origin} → ${route.destination}`,
   );
-  const availableIntermediateStops = stops.filter((stop) =>
-    ![origin.trim().toLowerCase(), destination.trim().toLowerCase()].includes(stop.city.trim().toLowerCase()),
-  );
-
   function fillRouteDetails(nextOrigin: string, nextDestination: string) {
     const start = nextOrigin.trim();
     const end = nextDestination.trim();
@@ -530,9 +424,7 @@ function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSectio
       setIntermediateStopIds([]);
       setEditingId(null);
       setFeedback(editingId ? "Route and fare updated for passenger search." : "Route and fare added for passenger search.");
-      if (!editingId) {
-        onNavigate("stops");
-      }
+      setView("list");
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message
@@ -555,7 +447,8 @@ function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSectio
     setIntermediateStopIds((route.intermediateStopIds ?? []).map(String));
     setFare(String(fares.find((item) => item.routeId === route.id)?.amount ?? ""));
     setFeedback("");
-    revealAdminEditor(sectionRef.current);
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
 
     // The formatted admin route lists intermediate stops by name, so map them
     // back to ids for the checkbox selection before the admin saves changes.
@@ -618,21 +511,73 @@ function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSectio
     }
   }
 
-  async function toggleRouteAvailability(route: RouteItem) {
-    const nextActive = route.isActive === false;
-    try {
-      await apiRoutes.update(Number(route.id), { isActive: nextActive });
-      reloadRoutes();
-      setFeedback(nextActive ? "Route is now available to passengers." : "Route is now hidden from passenger search.");
-    } catch (reason) {
-      setFeedback(reason instanceof Error ? reason.message : "The route availability could not be changed.");
-    }
+  function startAddRoute() {
+    setEditingId(null);
+    setOrigin("");
+    setDestination("");
+    setService("Minibus");
+    setFeatured(false);
+    setPickupLocation("");
+    setDistanceKm("");
+    setIntermediateStopIds([]);
+    setFare("");
+    setFeedback("");
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
   }
 
-  return (
+  return view === "list" ? (
+    <div className="admin-section-content">
+      <div className="admin-list-heading">
+        <div>
+          <h3>Saved routes and fares</h3>
+        </div>
+        <button className="primary-button" type="button" onClick={startAddRoute}>Add route</button>
+      </div>
+      {routesError && <p className="module-error" role="alert">{routesError}</p>}
+      {feedback && <p id="admin-route-feedback" className="module-feedback" role="status">{feedback}</p>}
+      <AdminDataTable
+        key={`routes-${query}`}
+        columns={[
+          { key: "route", label: "Route" },
+          { key: "service", label: "Service" },
+          { key: "fare", label: "Fare" },
+          { key: "distance", label: "Distance" },
+          { key: "pickup", label: "Primary pickup" },
+          { key: "availability", label: "Availability" },
+          { key: "featured", label: "Featured" },
+          { key: "departures", label: "Departures" },
+          { key: "actions", label: "Actions" },
+        ]}
+        rows={shownRoutes.map((route) => {
+          const routeFare = fares.find((item) => item.routeId === route.id);
+          const scheduled = trips.filter((trip) => trip.route.toLowerCase() === `${route.origin} → ${route.destination}`.toLowerCase()).length;
+          return {
+            key: route.id,
+            cells: [
+              <strong key="route">{route.origin} → {route.destination}</strong>,
+              route.service,
+              routeFare ? `MWK ${routeFare.amount.toLocaleString("en-MW")}` : "Not set",
+              route.distance ? `${(route.distance / 1000).toLocaleString("en-MW")} km` : "—",
+              route.pickupLocation || "—",
+              route.isActive === false ? "Hidden" : "Available",
+              route.featured ? "Yes" : "No",
+              String(scheduled),
+              <div className="admin-table-actions" key="actions">
+                <button type="button" className="text-action" onClick={() => void editRoute(route)}>Edit</button>
+                <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${route.origin} to ${route.destination}?`)) void deleteRoute(route.id); }}>Remove</button>
+              </div>,
+            ],
+          };
+        })}
+        empty="No routes match this search."
+      />
+    </div>
+  ) : (
     <div className="admin-section-content" ref={sectionRef}>
-      <h3>{editingId ? "Edit route and fare" : "Add a route and estimated fare"}</h3>
-      <DemoDataNotice show={routesAreDemo} what="routes and fares" />
+      <div className="admin-list-heading">
+        <button className="secondary-button" type="button" onClick={() => { setView("list"); setFeedback(""); }}>Back to routes</button>
+      </div>
       {routesError && <p className="module-error" role="alert">{routesError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitRoute}>
         <label>Starting town<input list="malawi-route-towns" value={origin} onChange={(event) => {
@@ -654,68 +599,20 @@ function RouteFareManagement({ onNavigate }: { onNavigate: (section: AdminSectio
             <option value="Shuttle">Shuttle</option>
           </select>
         </label>
-        <p className="module-footnote">Suggested capacity: {suggestedVehicleCapacity(service)} seats. The selected fleet vehicle sets the schedule capacity.</p>
         <label className="admin-feature-route"><input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} /> Feature this route on the home page</label>
         <label>Primary pickup location<input value={pickupLocation} onChange={(event) => setPickupLocation(event.target.value)} maxLength={120} /></label>
         <label>Approx. route distance (km)<input type="number" min="0.1" step="0.1" value={distanceKm} onChange={(event) => setDistanceKm(event.target.value)} /></label>
-        <fieldset className="admin-stop-picker">
-          <legend>Intermediate stops (select in journey order)</legend>
-          {stopsLoading ? <span className="module-copy">Loading stops…</span>
-            : stopsError ? <span className="module-error" role="alert">Stops could not be loaded. <button type="button" className="text-action" onClick={reloadStops}>Retry</button></span>
-            : availableIntermediateStops.length === 0
-              ? <span className="module-copy">No intermediate stops available. <button type="button" className="text-action" onClick={() => onNavigate("stops")}>Add pickup/drop-off points</button>.</span>
-              : availableIntermediateStops.map((stop) => (
-              <label key={stop.id}><input type="checkbox" checked={intermediateStopIds.includes(stop.id)} onChange={(event) => setIntermediateStopIds((selected) => event.target.checked ? [...selected, stop.id] : selected.filter((id) => id !== stop.id))} />{stop.name} · {stop.city}</label>
-            ))}
-        </fieldset>
         <label>Estimated fare (MWK)<input type="number" min="1" step="1" value={fare} onChange={(event) => setFare(event.target.value)} required /></label>
-        <button className="primary-button" type="submit" disabled={isSavingRoute}>{isSavingRoute ? "Saving route…" : editingId ? "Save changes" : "Add route"}</button>
-        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setOrigin(""); setDestination(""); setFare(""); setFeedback(""); }}>Stop editing</button>}
+        <button className="primary-button" type="submit" disabled={isSavingRoute}>{isSavingRoute ? "Saving route…" : editingId ? "Save changes" : "Save route"}</button>
+        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setOrigin(""); setDestination(""); setFare(""); setFeedback(""); setView("list"); }}>Cancel</button>}
         {feedback && <p id="admin-route-feedback" className="module-feedback" role={isSavingRoute ? "status" : "alert"}>{feedback}</p>}
       </form>
 
-      <AdminRecordsPanel label="saved routes and fares" count={routes.length}>
-        <div className="admin-toolbar">
-          <label>Find a route
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Town, destination, or service" />
-          </label>
-          <span className="module-count">{shownRoutes.length} of {routes.length}</span>
-        </div>
-
-        {shownRoutes.length === 0 ? (
-          <p className="module-empty">No routes match this search.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shownRoutes.map((route) => {
-              const routeFare = fares.find((item) => item.routeId === route.id);
-              const scheduled = trips.filter((trip) => trip.route.toLowerCase() === `${route.origin} → ${route.destination}`.toLowerCase()).length;
-              return (
-                <article key={route.id}>
-                  <div>
-                    <strong>{route.origin} → {route.destination}</strong>
-                    <small>
-                      {route.service} · {routeFare ? `MWK ${routeFare.amount.toLocaleString("en-MW")}` : "Fare not set"} ·{" "}
-                      {scheduled} scheduled departure{scheduled === 1 ? "" : "s"}
-                    </small>
-                    <small>{route.isActive === false ? "Hidden from passengers" : "Available to passengers"} · {route.featured ? "Featured on home" : "Not featured"}</small>
-                    {(route.pickupLocation || route.distance) && <small>{route.pickupLocation || "Pickup location not set"}{route.distance ? ` · ${(route.distance / 1000).toLocaleString("en-MW")} km` : ""}</small>}
-                  </div>
-                  <div className="admin-record-actions">
-                    <button type="button" className="text-action" onClick={() => editRoute(route)}>Edit</button>
-                    <button type="button" className="text-action" onClick={() => void toggleRouteAvailability(route)}>{route.isActive === false ? "Publish" : "Hide"}</button>
-                    <button type="button" className="text-action danger-action" onClick={() => { if (window.confirm(`Remove ${route.origin} to ${route.destination}?`)) deleteRoute(route.id); }}>Remove</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </AdminRecordsPanel>
     </div>
   );
 }
 
-function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
+function TripScheduleManagement() {
   const { data: routes, loading: routesLoading, error: routesError, reload: reloadRoutes } = useBackendRoutes();
   const { data: fares } = useBackendFares();
   const { data: stops } = useBackendStops();
@@ -740,10 +637,9 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [tripFilter, setTripFilter] = useState<"all" | "upcoming" | "past">("all");
   const [feedback, setFeedback] = useState("");
   const [removingScheduleId, setRemovingScheduleId] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "form">("list");
   const sectionRef = useRef<HTMLDivElement>(null);
   useAdminFeedbackReveal(feedback, "admin-schedule-feedback");
   const loadVehicles = useCallback(async () => {
@@ -821,22 +717,31 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
   const dropoffOptions = route
     ? stops.filter((stop) => stop.city.toLowerCase() === route.destination.toLowerCase() && (stop.kind === "dropoff" || stop.kind === "both"))
     : [];
-  const today = localDateValue();
-  const normalizedQuery = query.trim().toLowerCase();
-  const shownTrips = [...trips]
-    .filter((trip) => !normalizedQuery || `${trip.route} ${trip.date} ${trip.departure}`.toLowerCase().includes(normalizedQuery))
-    .filter((trip) => tripFilter === "all" || (tripFilter === "upcoming" ? trip.date >= today : trip.date < today))
-    .sort((first, second) => first.date.localeCompare(second.date) || first.departure.localeCompare(second.departure));
+  const shownTrips = sortByLabel(
+    trips,
+    (trip) => `${trip.route} ${trip.date} ${trip.departure}`,
+  );
 
   const chooseRoute = useCallback((nextRouteId: string) => {
     setRouteId(nextRouteId);
     setFare(String(fares.find((item) => item.routeId === nextRouteId)?.amount ?? ""));
     const selectedRoute = routes.find((item) => item.id === nextRouteId);
-    if (selectedRoute) setCapacity(String(suggestedVehicleCapacity(selectedRoute.service)));
-    setPickup("");
-    setDropoff("");
+    if (selectedRoute) {
+      setCapacity(String(suggestedVehicleCapacity(selectedRoute.service)));
+      const nextPickups = stops.filter((stop) =>
+        stop.city.toLowerCase() === selectedRoute.origin.toLowerCase() && (stop.kind === "pickup" || stop.kind === "both"),
+      );
+      const nextDropoffs = stops.filter((stop) =>
+        stop.city.toLowerCase() === selectedRoute.destination.toLowerCase() && (stop.kind === "dropoff" || stop.kind === "both"),
+      );
+      setPickup(nextPickups[0]?.name ?? selectedRoute.pickupLocation ?? selectedRoute.origin);
+      setDropoff(nextDropoffs[0]?.name ?? selectedRoute.destination);
+    } else {
+      setPickup("");
+      setDropoff("");
+    }
     setFeedback("");
-  }, [fares, routes]);
+  }, [fares, routes, stops]);
 
   useEffect(() => {
     function selectSavedRoute(event: Event) {
@@ -879,7 +784,8 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
     setPickup(trip.pickup[0] ?? "");
     setDropoff(trip.dropoff[0] ?? "");
     setFeedback("");
-    revealAdminEditor(sectionRef.current);
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
   }
 
   async function submitSchedule(event: FormEvent<HTMLFormElement>) {
@@ -1007,9 +913,7 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
       }
       resetForm();
       setFeedback(editingTripId ? "Scheduled departure updated for passengers." : "Trip scheduled. Passengers can now book this departure.");
-      if (!editingTripId) {
-        onNavigate("bookings");
-      }
+      setView("list");
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message
@@ -1056,10 +960,62 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
     }
   }
 
-  return (
+  function startAddSchedule() {
+    resetForm();
+    setFeedback("");
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
+  }
+
+  return view === "list" ? (
+    <div className="admin-section-content">
+      <div className="admin-list-heading">
+        <div>
+          <h3>Saved schedules</h3>
+        </div>
+        <button className="primary-button" type="button" onClick={startAddSchedule}>Add schedule</button>
+      </div>
+      {tripsError && <p className="module-error" role="alert">{tripsError}</p>}
+      {feedback && <p id="admin-schedule-feedback" className="module-feedback" role="status">{feedback}</p>}
+      <AdminDataTable
+        key="schedules"
+        columns={[
+          { key: "route", label: "Route" },
+          { key: "date", label: "Date" },
+          { key: "time", label: "Departure – arrival" },
+          { key: "days", label: "Operating days" },
+          { key: "vehicle", label: "Vehicle" },
+          { key: "fare", label: "Fare" },
+          { key: "stops", label: "Boarding → drop-off" },
+          { key: "actions", label: "Actions" },
+        ]}
+        rows={shownTrips.map((trip) => {
+          const vehicle = vehicles.find((item) => String(item.id) === trip.vehicleId);
+          return {
+            key: trip.id,
+            cells: [
+              <strong key="route">{trip.route}</strong>,
+              fmtDate(trip.date),
+              `${trip.departure}–${trip.arrival}`,
+              (trip.daysOfWeek ?? []).join(", ") || "First date only",
+              vehicle ? `${vehicle.plateNumber} · ${vehicle.vehicleType}` : "Not recorded",
+              `MWK ${trip.fare.toLocaleString("en-MW")}`,
+              `${trip.pickup.join(", ")} → ${trip.dropoff.join(", ")}`,
+              <div className="admin-table-actions" key="actions">
+                <button type="button" className="text-action" onClick={() => startEdit(trip)}>Edit</button>
+                <button type="button" className="text-action danger-action" disabled={removingScheduleId !== null} onClick={() => void removeSchedule(trip)}>{removingScheduleId === trip.id ? "Removing…" : "Remove"}</button>
+              </div>,
+            ],
+          };
+        })}
+        empty="No scheduled trips available."
+      />
+    </div>
+  ) : (
     <div className="admin-section-content" ref={sectionRef}>
-      <h3>{editingTripId ? "Edit a scheduled departure" : "Schedule a departure"}</h3>
-      <DemoDataNotice show={tripsAreDemo} what="scheduled departures" />
+      <div className="admin-list-heading">
+        <button className="secondary-button" type="button" onClick={() => { resetForm(); setFeedback(""); setView("list"); }}>Back to schedules</button>
+      </div>
       {tripsError && <p className="module-error" role="alert">{tripsError}</p>}
       {vehiclesError && (
         <div className="module-error" role="alert">
@@ -1069,7 +1025,6 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
           </button>
         </div>
       )}
-      <p className="module-copy">Only departures scheduled here can be booked by passengers. Choose a future travel date.</p>
       {routesError && <p className="module-error" role="alert">Routes could not be loaded. <button type="button" className="text-action" onClick={reloadRoutes}>Retry</button></p>}
       {vehiclesLoading ? (
         <p className="module-empty">Loading fleet vehicles…</p>
@@ -1092,7 +1047,6 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
             <label>Passenger seats (suggested)
               <input type="number" min="1" max="200" step="1" value={newVehicleCapacity} onChange={(event) => setNewVehicleCapacity(event.target.value)} required />
             </label>
-            <p className="module-footnote">Capacity fills from vehicle type; adjust it to match the actual vehicle.</p>
             <button className="primary-button" type="submit" disabled={vehicleSaving}>
               {vehicleSaving ? "Adding vehicle…" : "Add vehicle to fleet"}
             </button>
@@ -1158,55 +1112,11 @@ function TripScheduleManagement({ onNavigate }: { onNavigate: (section: AdminSec
             </label>
           )}
           <button className="primary-button" type="submit" disabled={vehiclesLoading || vehicles.length === 0}>{editingTripId ? "Save departure" : "Add scheduled trip"}</button>
-          {editingTripId && <button className="secondary-button" type="button" onClick={() => { resetForm(); setFeedback(""); }}>Stop editing</button>}
+          {editingTripId && <button className="secondary-button" type="button" onClick={() => { resetForm(); setFeedback(""); setView("list"); }}>Cancel</button>}
         </form>
       )}
       {feedback && <p id="admin-schedule-feedback" className="module-feedback" role="status">{feedback}</p>}
 
-      <AdminRecordsPanel label="scheduled departures" count={trips.length}>
-        <div className="admin-toolbar">
-          <label>Find a departure
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Route, date, or time" />
-          </label>
-          <label>Show
-            <select value={tripFilter} onChange={(event) => setTripFilter(event.target.value as "all" | "upcoming" | "past")}>
-              <option value="all">All departures</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="past">Past</option>
-            </select>
-          </label>
-          <span className="module-count">{shownTrips.length} of {trips.length}</span>
-        </div>
-
-        <h3>Scheduled trips</h3>
-        {shownTrips.length === 0 ? (
-          <p className="module-empty">No scheduled trips match this view.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shownTrips.map((trip) => {
-              const bookedSeats = bookings
-                .filter((booking) => booking.tripId === trip.id && booking.status === "confirmed")
-                .reduce((total, booking) => total + booking.passengers, 0);
-              const seatsLeft = availableSeats(trip, bookings);
-              const isPast = trip.date < today;
-              return (
-                <article key={trip.id}>
-                  <div>
-                    <strong>{trip.route} · {fmtDate(trip.date)}</strong>
-                    <small>{trip.departure}–{trip.arrival} · {trip.capacity} seats · MWK {trip.fare.toLocaleString("en-MW")} · {bookedSeats} booked · {seatsLeft} left</small>
-                    <small>{trip.pickup.join(", ")} → {trip.dropoff.join(", ")}</small>
-                  </div>
-                  <div className="admin-record-actions">
-                    <span className={`admin-tag ${isPast ? "is-muted" : "is-upcoming"}`}>{isPast ? "Past" : "Upcoming"}</span>
-                    <button type="button" className="text-action" onClick={() => startEdit(trip)}>Edit</button>
-                    <button type="button" className="text-action danger-action" disabled={removingScheduleId !== null} onClick={() => void removeSchedule(trip)}>{removingScheduleId === trip.id ? "Removing…" : "Remove"}</button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </AdminRecordsPanel>
     </div>
   );
 }
@@ -1509,18 +1419,19 @@ async function saveEditedRoute(input: RouteEditInput): Promise<number> {
   }
 }
 
-function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) => void }) {
+function StopManagement() {
   const { data: stops, usingDemo: stopsAreDemo, reload: reloadStops, error: stopsError } = useBackendStops();
   const { data: routes } = useAdminBackendRoutes();
   const { data: trips } = useAdminTrips();
   const [routeId, setRouteId] = useState("");
+  const [startTown, setStartTown] = useState("");
+  const [endTown, setEndTown] = useState("");
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [kind, setKind] = useState<StopKind>("pickup");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState("");
   const [stopNotice, setStopNotice] = useState<{
     stopId: string;
@@ -1528,17 +1439,30 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
     message: string;
   } | null>(null);
   const [busyStopId, setBusyStopId] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "form">("list");
   const sectionRef = useRef<HTMLDivElement>(null);
   useAdminFeedbackReveal(feedback, "admin-stop-feedback");
-  const normalizedQuery = query.trim().toLowerCase();
-  const shownStops = stops.filter((stop) =>
-    !normalizedQuery || `${stop.name} ${stop.city} ${stopKindLabel(stop.kind)}`.toLowerCase().includes(normalizedQuery),
+  const shownStops = sortByLabel(
+    stops,
+    (stop) => `${stop.name} ${stop.city}`,
   );
 
-  function fillStopFromRoute(selectedRouteId: string, pointKind: StopKind) {
-    const route = routes.find((item) => item.id === selectedRouteId);
-    if (!route) return;
-    const town = pointKind === "dropoff" ? route.destination : route.origin;
+  function fillStopFromTowns(nextStart: string, nextEnd: string, pointKind: StopKind) {
+    const start = nextStart.trim();
+    const end = nextEnd.trim();
+    if (!start && !end) return;
+
+    const matchingRoute = routes.find((route) =>
+      (!start || route.origin.toLowerCase() === start.toLowerCase()) &&
+      (!end || route.destination.toLowerCase() === end.toLowerCase()),
+    );
+    setRouteId(matchingRoute?.id ?? "");
+
+    const town = pointKind === "dropoff"
+      ? end || matchingRoute?.destination || ""
+      : start || matchingRoute?.origin || "";
+    if (!town) return;
+
     const coords = Object.entries(TRANSPORT_TOWN_COORDINATES)
       .find(([location]) => location.toLowerCase() === town.toLowerCase())?.[1];
     const pointLabel = pointKind === "pickup" ? "Pickup" : pointKind === "dropoff" ? "Drop-off" : "Pickup & Drop-off";
@@ -1618,6 +1542,8 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
       setName("");
       setCity("");
       setRouteId("");
+      setStartTown("");
+      setEndTown("");
       setKind("pickup");
       setLat("");
       setLng("");
@@ -1628,9 +1554,7 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
       setFeedback(
         (editingId ? "Stop updated." : "Stop added.") + (extra ? ` ${extra}.` : ""),
       );
-      if (!editingId) {
-        onNavigate("schedules");
-      }
+      setView("list");
     } catch (reason) {
       setFeedback(
         reason instanceof Error && reason.message
@@ -1644,11 +1568,14 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
     setEditingId(stop.id);
     setName(stop.name);
     setCity(stop.city);
+    setStartTown("");
+    setEndTown("");
     setKind(stop.kind);
     setLat(stop.lat?.toString() ?? "");
     setLng(stop.lng?.toString() ?? "");
     setFeedback("");
-    revealAdminEditor(sectionRef.current);
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
   }
 
   async function hideStop(stop: StopItem, reason: string) {
@@ -1816,34 +1743,101 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
     }
   }
 
-  return (
+  function startAddStop() {
+    setEditingId(null);
+    setName("");
+    setCity("");
+    setRouteId("");
+    setStartTown("");
+    setEndTown("");
+    setKind("pickup");
+    setLat("");
+    setLng("");
+    setFeedback("");
+    setStopNotice(null);
+    setView("form");
+    window.requestAnimationFrame(() => revealAdminEditor(sectionRef.current));
+  }
+
+  return view === "list" ? (
+    <div className="admin-section-content" id="admin-stop-management">
+      <div className="admin-list-heading">
+        <div>
+          <h3>Saved pickup and drop-off points</h3>
+        </div>
+        <button className="primary-button" type="button" onClick={startAddStop}>Add stop</button>
+      </div>
+      {stopsError && <p className="module-error" role="alert">{stopsError}</p>}
+      {feedback && <p id="admin-stop-feedback" className="module-feedback" role="status">{feedback}</p>}
+      {stopNotice && (
+        <p className={`module-feedback ${stopNotice.tone}`} role={stopNotice.tone === "error" ? "alert" : "status"}>
+          {stopNotice.message}
+        </p>
+      )}
+      <AdminDataTable
+        key="stops"
+        columns={[
+          { key: "name", label: "Stop" },
+          { key: "town", label: "Town" },
+          { key: "type", label: "Point type" },
+          { key: "coords", label: "Coordinates" },
+          { key: "usage", label: "Used by" },
+          { key: "actions", label: "Actions" },
+        ]}
+        rows={shownStops.map((stop) => {
+          const linkedTrips = tripsUsing(stop.name);
+          return {
+            key: stop.id,
+            cells: [
+              <strong key="name">{stop.name}</strong>,
+              stop.city,
+              stopKindLabel(stop.kind),
+              hasCoords(stop) ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}` : "No map coordinates",
+              linkedTrips.length > 0 ? `${linkedTrips.length} scheduled trip${linkedTrips.length === 1 ? "" : "s"}` : "Not used yet",
+              <div className="admin-table-actions" key="actions">
+                <button type="button" className="text-action" onClick={() => editStop(stop)} disabled={busyStopId === stop.id}>Edit</button>
+                <button type="button" className="text-action danger-action" disabled={busyStopId === stop.id} onClick={() => { if (window.confirm(`Remove ${stop.name}?`)) void deleteStop(stop); }}>
+                  {busyStopId === stop.id ? "Removing…" : "Remove"}
+                </button>
+                {stopNotice?.stopId === stop.id && stopNotice.tone === "error" && (
+                  <small className="admin-record-note error" role="alert">{stopNotice.message}</small>
+                )}
+              </div>,
+            ],
+          };
+        })}
+        empty="No stops available."
+      />
+    </div>
+  ) : (
     <div className="admin-section-content" id="admin-stop-management" ref={sectionRef}>
-      <h3>{editingId ? "Edit pickup or drop-off point" : "Add a pickup or drop-off point"}</h3>
-      <DemoDataNotice show={stopsAreDemo} what="stops" />
+      <div className="admin-list-heading">
+        <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setFeedback(""); setView("list"); }}>Back to stops</button>
+      </div>
       {stopsError && <p className="module-error" role="alert">{stopsError}</p>}
       <form className="module-form admin-data-form" onSubmit={submitStop}>
-        <label>Route
-          <select value={routeId} onChange={(event) => {
-            const nextRouteId = event.target.value;
-            setRouteId(nextRouteId);
-            fillStopFromRoute(nextRouteId, kind);
-          }}>
-            <option value="">Choose route to fill stop details</option>
-            {routes.map((route) => <option key={route.id} value={route.id}>{route.origin} → {route.destination}</option>)}
-          </select>
-        </label>
+        <label>Starting town<input list="malawi-stop-towns" value={startTown} onChange={(event) => {
+          const value = event.target.value;
+          setStartTown(value);
+          fillStopFromTowns(value, endTown, kind);
+        }} maxLength={60} /></label>
+        <label>Destination town<input list="malawi-stop-towns" value={endTown} onChange={(event) => {
+          const value = event.target.value;
+          setEndTown(value);
+          fillStopFromTowns(startTown, value, kind);
+        }} maxLength={60} /></label>
+        <datalist id="malawi-stop-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
         <label>Stop name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={100} required /></label>
         <label>Town<input list="malawi-stop-towns" value={city} onChange={(event) => setCity(event.target.value)} maxLength={60} required /></label>
-        <datalist id="malawi-stop-towns">{MALAWI_LOCATIONS.map((town) => <option key={town} value={town} />)}</datalist>
         <label>Point type<select value={kind} onChange={(event) => {
           const nextKind = event.target.value as StopKind;
           setKind(nextKind);
-          fillStopFromRoute(routeId, nextKind);
+          fillStopFromTowns(startTown, endTown, nextKind);
         }}><option value="pickup">Pickup only</option><option value="dropoff">Drop-off only</option><option value="both">Pickup &amp; drop-off</option></select></label>
         <label>Latitude <span className="optional-label">Optional</span><input type="number" min="-90" max="90" step="any" value={lat} onChange={(event) => setLat(event.target.value)} /></label>
         <label>Longitude <span className="optional-label">Optional</span><input type="number" min="-180" max="180" step="any" value={lng} onChange={(event) => setLng(event.target.value)} /></label>
         <button className="primary-button" type="submit">{editingId ? "Save changes" : "Add stop"}</button>
-        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setName(""); setCity(""); setLat(""); setLng(""); setFeedback(""); }}>Stop editing</button>}
+        {editingId && <button className="secondary-button" type="button" onClick={() => { setEditingId(null); setName(""); setCity(""); setStartTown(""); setEndTown(""); setLat(""); setLng(""); setFeedback(""); setView("list"); }}>Cancel</button>}
       </form>
       {feedback && <p id="admin-stop-feedback" className="module-feedback" role="status">{feedback}</p>}
 
@@ -1853,262 +1847,63 @@ function StopManagement({ onNavigate }: { onNavigate: (section: AdminSection) =>
         </p>
       )}
 
-      <AdminRecordsPanel label="saved pickup and drop-off points" count={stops.length}>
-        <div className="admin-toolbar">
-          <label>Find a stop
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Stop, town, or point type" />
-          </label>
-          <span className="module-count">{shownStops.length} of {stops.length}</span>
-        </div>
-
-        {shownStops.length === 0 ? (
-          <p className="module-empty">No stops match this search.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shownStops.map((stop) => {
-              const linkedTrips = tripsUsing(stop.name);
-              return (
-                <article key={stop.id}>
-                  <div>
-                    <strong>{stop.name}</strong>
-                    <small>{stopKindLabel(stop.kind)} · {stop.city} · {hasCoords(stop) ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}` : "No map coordinates"}</small>
-                    <small>{linkedTrips.length > 0 ? `Used by ${linkedTrips.length} scheduled trip${linkedTrips.length === 1 ? "" : "s"}` : "Not used by a scheduled trip yet"}</small>
-                    {stopNotice?.stopId === stop.id && stopNotice.tone === "error" && (
-                      <small className="admin-record-note error" role="alert">{stopNotice.message}</small>
-                    )}
-                  </div>
-                  <div className="admin-record-actions">
-                    <button type="button" className="text-action" onClick={() => editStop(stop)} disabled={busyStopId === stop.id}>Edit</button>
-                    <button
-                      type="button"
-                      className="text-action danger-action"
-                      disabled={busyStopId === stop.id}
-                      onClick={() => { if (window.confirm(`Remove ${stop.name}?`)) deleteStop(stop); }}
-                    >
-                      {busyStopId === stop.id ? "Removing…" : "Remove"}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </AdminRecordsPanel>
     </div>
   );
 }
 
 function BookingManagement() {
-  const { data: bookings, usingDemo: bookingsAreDemo, reload: reloadBookings, error: bookingsError } = useAdminBookings();
+  const { data: bookings, error: bookingsError } = useAdminBookings();
   const { data: trips } = useAdminTrips();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Booking["status"]>("all");
-  const [paymentFilter, setPaymentFilter] = useState<"all" | "paid" | "pending">("all");
-  const [feedback, setFeedback] = useState("");
-  const [error, setError] = useState("");
-  const [updatingReference, setUpdatingReference] = useState<string | null>(null);
-  useAdminFeedbackReveal(feedback, "admin-booking-feedback");
-  const normalizedQuery = query.trim().toLowerCase();
-
-  const confirmedCount = bookings.filter((booking) => booking.status === "confirmed").length;
-  const cancelledCount = bookings.length - confirmedCount;
-  const paidCount = bookings.filter((booking) => booking.paymentStatus === "paid").length;
-  const revenue = bookings
-    .filter((booking) => booking.status === "confirmed" && booking.paymentStatus === "paid")
-    .reduce((total, booking) => total + (booking.amountPaid ?? 0), 0);
-
-  const shown = [...bookings]
-    .filter((booking) =>
-      (!normalizedQuery || [booking.reference, booking.name, booking.email, booking.route, booking.pickup, booking.dropoff].some((value) => value.toLowerCase().includes(normalizedQuery))) &&
-      (statusFilter === "all" || booking.status === statusFilter) &&
-      (paymentFilter === "all" || (paymentFilter === "paid" ? booking.paymentStatus === "paid" : booking.paymentStatus !== "paid")),
-    )
-    .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
-
-  async function setStatus(reference: string, status: Booking["status"]) {
-    const target = bookings.find((booking) => booking.reference === reference);
-    if (!target || target.status === status) return;
-    if (updatingReference) return;
-    if (status === "cancelled" && !window.confirm(`Cancel booking ${reference} for ${target.name}?`)) return;
-    if (status === "cancelled" && target.travelDate < localDateValue()) {
-      setError(`Booking ${reference} is for a past trip and cannot be cancelled.`);
-      return;
-    }
-
-    if (status === "confirmed" && !bookingsAreDemo) {
-      setError(
-        `The backend cannot re-confirm ${reference}. Ask the passenger to make a new booking instead.`,
-      );
-      return;
-    }
-
-    if (status === "confirmed") {
-      const trip = trips.find((item) => item.id === target.tripId);
-      if (!trip) {
-        setError(`Cannot re-confirm ${reference}: its scheduled trip is no longer available.`);
-        return;
-      }
-      const others = bookings.filter((booking) => booking.reference !== reference);
-      const available = availableSeatNumbers(trip, others);
-      const availableSet = new Set(available);
-      if (target.seats?.length && !target.seats.every((seat) => availableSet.has(seat))) {
-        setError(`Cannot re-confirm ${reference}: one of its seats has since been taken.`);
-        return;
-      }
-      if (available.length < target.passengers) {
-        setError(`Cannot re-confirm ${reference}: the trip has only ${available.length} seat${available.length === 1 ? "" : "s"} left.`);
-        return;
-      }
-    }
-
-    setError("");
-    setUpdatingReference(reference);
-    setFeedback(status === "cancelled" ? `Cancelling booking ${reference}…` : `Updating booking ${reference}…`);
-    const updatedBooking = { ...target, status };
-    try {
-      if (bookingsAreDemo) {
-        const all = loadList<Booking>(KEYS.bookings, EMPTY_BOOKINGS);
-        saveList(KEYS.bookings, all.map((booking) => (booking.reference === reference ? updatedBooking : booking)));
-      } else {
-        await apiBookings.cancel(reference);
-      }
-      reloadBookings();
-    } catch (reason) {
-      setError(
-        reason instanceof Error && reason.message
-          ? reason.message
-          : "The booking status could not be updated. Please try again.",
-      );
-      setFeedback("");
-      return;
-    } finally {
-      setUpdatingReference(null);
-    }
-
-    try {
-      notifyBookingStatus(
-        updatedBooking,
-        status === "cancelled" ? "booking-cancelled" : "booking-reconfirmed",
-        status === "cancelled"
-          ? `Your booking for ${target.route} on ${fmtDate(target.travelDate)} was cancelled by the transport company. The seats have been released for other passengers.`
-          : `Your booking for ${target.route} on ${fmtDate(target.travelDate)} was confirmed again by the transport company.`,
-      );
-    } catch (reason) {
-      setFeedback(
-        reason instanceof Error
-          ? `Booking status was updated, but its notification could not be saved: ${reason.message}`
-          : "Booking status was updated, but its notification could not be saved.",
-      );
-      return;
-    }
-    setFeedback(
-      status === "cancelled"
-        ? `Booking ${reference} cancelled. Seats are available again and the passenger was notified.`
-        : `Booking ${reference} confirmed again. The passenger was notified.`,
-    );
-  }
+  const shown = sortByLabel(bookings, (booking) => `${booking.name} ${booking.route}`);
 
   return (
     <div className="admin-section-content">
-      <h3>Passenger bookings</h3>
-      <DemoDataNotice show={bookingsAreDemo} what="bookings" />
+      <h3>Bookings</h3>
       {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
-      <p className="module-copy">{bookings.length} total · {confirmedCount} confirmed · {cancelledCount} cancelled · {paidCount} paid · MWK {revenue.toLocaleString("en-MW")}</p>
-
-      {error && <p className="module-error" role="alert">{error}</p>}
-      {feedback && <p id="admin-booking-feedback" className="module-feedback" role="status">{feedback}</p>}
-
-      <AdminRecordsPanel label="passenger bookings" count={bookings.length}>
-        <div className="admin-toolbar">
-          <label>Search bookings
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Reference, name, email, route, or stop" />
-          </label>
-          <label>Booking status
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | Booking["status"])}>
-              <option value="all">All bookings</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </label>
-          <label>Payment
-            <select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value as "all" | "paid" | "pending")}>
-              <option value="all">All payments</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending / not recorded</option>
-            </select>
-          </label>
-          <span className="module-count">{shown.length} shown</span>
-        </div>
-
-        {shown.length === 0 ? (
-          <p className="module-empty">No bookings match this view.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shown.map((booking) => {
-              const trip = trips.find((item) => item.id === booking.tripId);
-              return (
-                <article className="admin-booking-record" key={booking.reference}>
-                  <div>
-                    <strong>{booking.route} · {fmtDate(booking.travelDate)}</strong>
-                    <small>{booking.name} ({booking.email}) · {booking.passengers} passenger{booking.passengers === 1 ? "" : "s"} · Seats {booking.seats?.length ? booking.seats.join(", ") : "not recorded"}</small>
-                    <small>{booking.pickup} → {booking.dropoff} · Reference {booking.reference} · Booked {formatMoment(booking.createdAt)}</small>
-                    {booking.paymentStatus === "paid" ? (
-                      <small className="admin-payment-line">
-                        Paid MWK {(booking.amountPaid ?? 0).toLocaleString("en-MW")} via {booking.paymentProvider ?? paymentMethodLabel(booking.paymentMethod)}
-                        {booking.payerPhone ? ` (${booking.payerPhone})` : ""}
-                        {booking.payerAccountLast4 ? ` (account •••• ${booking.payerAccountLast4})` : ""}
-                        {booking.paymentReference ? ` · Ref ${booking.paymentReference}` : ""}
-                        {booking.paymentCode ? ` · Code ${booking.paymentCode}` : ""}
-                      </small>
-                    ) : (
-                      <small className="admin-payment-line is-pending">Payment not recorded</small>
-                    )}
-                    <small>{trip ? `Trip departs ${trip.departure} and arrives ${trip.arrival}` : "The scheduled trip for this booking no longer exists."}</small>
-                  </div>
-                  <div className="admin-booking-actions">
-                    <div className="admin-activity-tags">
-                      {booking.paymentStatus === "paid" && <span className="admin-tag is-paid">Paid</span>}
-                      <span className={`booking-state ${booking.status}`}>{booking.status}</span>
-                    </div>
-                    {booking.status === "confirmed" ? (
-                      <button type="button" className="text-action danger-action" disabled={updatingReference !== null} onClick={() => void setStatus(booking.reference, "cancelled")}>{updatingReference === booking.reference ? "Cancelling…" : "Cancel booking"}</button>
-                    ) : (
-                      <button type="button" className="text-action" disabled={updatingReference !== null} onClick={() => void setStatus(booking.reference, "confirmed")}>{updatingReference === booking.reference ? "Updating…" : "Re-confirm booking"}</button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </AdminRecordsPanel>
+      <AdminDataTable
+        key="bookings"
+        columns={[
+          { key: "reference", label: "Reference" },
+          { key: "route", label: "Route" },
+          { key: "travelDate", label: "Travel date" },
+        ]}
+        rows={shown.map((booking) => {
+          const trip = trips.find((item) => item.id === booking.tripId);
+          return {
+            key: booking.reference,
+            cells: [
+              <strong key="reference">{booking.reference}</strong>,
+              <span key="route">
+                {booking.route}
+                <small>{trip ? `${trip.departure}–${trip.arrival}` : `${booking.pickup} → ${booking.dropoff}`}</small>
+              </span>,
+              fmtDate(booking.travelDate),
+            ],
+          };
+        })}
+        empty="No bookings available."
+      />
     </div>
   );
 }
 
 function ReportManagement() {
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
-  const [filter, setFilter] = useState<"all" | ReportStatus>("all");
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
   useAdminFeedbackReveal(feedback, "admin-report-feedback");
 
-  const shown = [...reports]
-    .filter((report) => filter === "all" || report.status === filter)
-    .sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+  const shown = sortByLabel(reports, (report) => `${report.type} ${report.itemName}`);
 
-  function updateReport(report: ReportItem, patch: Partial<ReportItem>) {
+  function updateReport(report: ReportItem, status: ReportStatus) {
     try {
-      const nextReport = { ...report, ...patch };
+      const nextReport = { ...report, status };
       saveList(
         KEYS.reports,
         loadList<ReportItem>(KEYS.reports, MOCK_REPORTS).map((item) => item.id === report.id ? nextReport : item),
       );
-      const statusLabel = REPORT_STATUS_LABELS[nextReport.status];
-      const note = nextReport.adminNote.trim();
       try {
         notifyReportUpdate(
-          `Report ${report.id.toUpperCase()} (${report.type}: ${report.itemName}) is now ${statusLabel.toLowerCase()}.${note ? ` Staff note: ${note}` : ""}`,
+          `Report ${report.id.toUpperCase()} (${report.type}: ${report.itemName}) is now ${REPORT_STATUS_LABELS[status].toLowerCase()}.`,
           report.id,
           report.reporterEmail,
         );
@@ -2121,86 +1916,44 @@ function ReportManagement() {
     }
   }
 
-  function saveNote(report: ReportItem) {
-    const note = (noteDrafts[report.id] ?? report.adminNote).trim();
-    updateReport(report, { adminNote: note });
-  }
-
-  function deleteReport(report: ReportItem) {
-    if (!window.confirm(`Delete report ${report.id.toUpperCase()}? This cannot be undone.`)) return;
-    try {
-      saveList(KEYS.reports, loadList<ReportItem>(KEYS.reports, MOCK_REPORTS).filter((item) => item.id !== report.id));
-      setFeedback("Report deleted.");
-    } catch {
-      setFeedback("The report could not be deleted. Please try again.");
-    }
-  }
-
   return (
     <div className="admin-section-content">
-      <h3>Customer submitted reports</h3>
-      <DemoDataNotice show what="customer reports and staff notes" />
-
       {feedback && <p id="admin-report-feedback" className="module-feedback" role="status">{feedback}</p>}
-
-      <AdminRecordsPanel label="customer reports" count={reports.length}>
-        <div className="admin-toolbar">
-          <label>Show reports
-            <select value={filter} onChange={(event) => setFilter(event.target.value as "all" | ReportStatus)}>
-              <option value="all">All ({reports.length})</option>
-              <option value="open">Open ({reports.filter((report) => report.status === "open").length})</option>
-              <option value="reviewing">Reviewing ({reports.filter((report) => report.status === "reviewing").length})</option>
-              <option value="resolved">Resolved ({reports.filter((report) => report.status === "resolved").length})</option>
-              <option value="dismissed">Dismissed ({reports.filter((report) => report.status === "dismissed").length})</option>
-            </select>
-          </label>
-          <span className="module-count">{shown.length} shown</span>
-        </div>
-
-        {shown.length === 0 ? (
-          <p className="module-empty">There are no customer reports in this view.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shown.map((report) => (
-              <article className="admin-report-record" key={report.id}>
-                <div>
-                  <strong>{report.type}: {report.itemName}</strong>
-                  <small>
-                    {report.reporterName || "Guest reporter"}
-                    {report.reporterEmail ? ` · ${report.reporterEmail}` : " · No email provided"} ·{" "}
-                    {report.location || "Location not provided"} · {formatMoment(report.createdAt)} · Ref {report.id.toUpperCase()}
-                  </small>
-                  <p>{report.description}</p>
-                  <label className="admin-note-field">
-                    Staff note shown to the passenger
-                    <textarea
-                      rows={3}
-                      maxLength={500}
-                      value={noteDrafts[report.id] ?? report.adminNote}
-                      onChange={(event) => setNoteDrafts((current) => ({ ...current, [report.id]: event.target.value }))}
-                      placeholder="Explain what was checked or what changed…"
-                    />
-                  </label>
-                  <div className="admin-report-actions">
-                    <label className="status-control">
-                      Status
-                      <select value={report.status} onChange={(event) => updateReport(report, { status: event.target.value as ReportStatus })}>
-                        <option value="open">Open</option>
-                        <option value="reviewing">Reviewing</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="dismissed">Dismissed</option>
-                      </select>
-                    </label>
-                    <button type="button" className="secondary-button" onClick={() => saveNote(report)}>Save note</button>
-                    <button type="button" className="text-action danger-action" onClick={() => deleteReport(report)}>Delete</button>
-                  </div>
-                </div>
-                <span className={`report-status-badge is-${report.status}`}>{REPORT_STATUS_LABELS[report.status]}</span>
-              </article>
-            ))}
-          </div>
-        )}
-      </AdminRecordsPanel>
+      <AdminDataTable
+        key="reports"
+        columns={[
+          { key: "type", label: "Type" },
+          { key: "item", label: "Report" },
+          { key: "reporter", label: "Reporter" },
+          { key: "submitted", label: "Submitted" },
+          { key: "status", label: "Status" },
+        ]}
+        rows={shown.map((report) => ({
+          key: report.id,
+          cells: [
+            report.type,
+            <span key="item"><strong>{report.itemName}</strong><small>{report.description}</small></span>,
+            <span key="reporter">
+              {report.reporterName || "Guest reporter"}
+              <small>{report.reporterEmail || report.location || "No contact provided"}</small>
+            </span>,
+            formatMoment(report.createdAt),
+            <div className="status-control" key="status">
+              <select
+                aria-label={`Status for ${report.itemName}`}
+                value={report.status}
+                onChange={(event) => updateReport(report, event.target.value as ReportStatus)}
+              >
+                <option value="open">Open</option>
+                <option value="reviewing">Reviewing</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
+            </div>,
+          ],
+        }))}
+        empty="No reports available."
+      />
     </div>
   );
 }
@@ -2210,171 +1963,69 @@ type PassengerRow = {
   name: string;
   email: string;
   registered: boolean;
-  bookingCount: number;
-  reportCount: number;
-  lastActivity: string;
 };
 
 function PassengerManagement() {
   const { data: accounts } = useAdminUsers();
-  const { data: bookings, usingDemo: bookingsAreDemo, error: bookingsError } = useAdminBookings();
+  const { data: bookings, error: bookingsError } = useAdminBookings();
   const reports = useStoredList<ReportItem>(KEYS.reports, MOCK_REPORTS);
-  const [query, setQuery] = useState("");
-  const [messaging, setMessaging] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [feedback, setFeedback] = useState("");
-  useAdminFeedbackReveal(feedback, "admin-passenger-feedback");
-  const normalizedQuery = query.trim().toLowerCase();
 
   const people = useMemo(() => {
     const map = new Map<string, PassengerRow>();
     const ensure = (name: string, email: string, registered: boolean) => {
       const key = email.trim().toLowerCase();
-      if (!key) return null;
+      if (!key) return;
       const existing = map.get(key);
       if (existing) {
         if (!existing.name && name) existing.name = name;
         existing.registered = existing.registered || registered;
-        return existing;
+        return;
       }
-      const row: PassengerRow = {
-        key,
-        name: name.trim() || key,
-        email: key,
-        registered,
-        bookingCount: 0,
-        reportCount: 0,
-        lastActivity: "",
-      };
-      map.set(key, row);
-      return row;
+      map.set(key, { key, name: name.trim() || key, email: key, registered });
     };
 
     for (const account of accounts) ensure(account.fullName, account.email ?? "", true);
-
-    for (const booking of bookings) {
-      const row = ensure(booking.name, booking.email, false);
-      if (row) {
-        row.bookingCount += 1;
-        if (booking.createdAt > row.lastActivity) row.lastActivity = booking.createdAt;
-      }
-    }
-
+    for (const booking of bookings) ensure(booking.name, booking.email, false);
     for (const report of reports) {
-      if (!report.reporterEmail) continue;
-      const row = ensure(report.reporterName ?? "", report.reporterEmail, false);
-      if (row) {
-        row.reportCount += 1;
-        if (report.createdAt > row.lastActivity) row.lastActivity = report.createdAt;
-      }
+      if (report.reporterEmail) ensure(report.reporterName ?? "", report.reporterEmail, false);
     }
 
     return [...map.values()].sort((first, second) => first.name.localeCompare(second.name));
   }, [accounts, bookings, reports]);
 
-  const shown = people.filter((person) =>
-    !normalizedQuery || `${person.name} ${person.email}`.toLowerCase().includes(normalizedQuery),
-  );
-  const registeredCount = people.filter((person) => person.registered).length;
-  const guestCount = people.length - registeredCount;
-
-  function sendMessage(person: PassengerRow) {
-    const text = message.trim();
-    if (text.length < 3) {
-      setFeedback("Write at least 3 characters before sending an update.");
-      return;
-    }
-    try {
-      notifyCompanyUpdate(`Update for ${person.name}: ${text}`, "Passenger update", person.email);
-      setMessage("");
-      setMessaging(null);
-      setFeedback(`Demo update saved for ${person.name} in this browser. It was not sent to the backend.`);
-    } catch {
-      setFeedback("The passenger update could not be saved. Please try again.");
-    }
-  }
+  const shown = sortByLabel(people, (person) => person.name);
 
   return (
     <div className="admin-section-content">
-      <h3>Passengers and booking contacts</h3>
-      <DemoDataNotice show={bookingsAreDemo} what="passengers and bookings" />
+      <h3>Passengers</h3>
       {bookingsError && <p className="module-error" role="alert">{bookingsError}</p>}
-      <p className="module-copy">{registeredCount} registered · {guestCount} guest contacts</p>
-
-      {feedback && <p id="admin-passenger-feedback" className="module-feedback" role="status">{feedback}</p>}
-
-      <AdminRecordsPanel label="passengers and contacts" count={people.length}>
-        <div className="admin-toolbar">
-          <label>Find a passenger
-            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or email address" />
-          </label>
-          <span className="module-count">{shown.length} of {people.length}</span>
-        </div>
-
-        {shown.length === 0 ? (
-          <p className="module-empty">No passengers or booking contacts match this view.</p>
-        ) : (
-          <div className="admin-record-list">
-            {shown.map((person) => (
-              <article className="admin-passenger-record" key={person.key}>
-                <div>
-                  <strong>{person.name}</strong>
-                  <small>
-                    {person.email} · {person.registered ? "Registered account" : "Guest contact"} ·{" "}
-                    {person.bookingCount} booking{person.bookingCount === 1 ? "" : "s"} ·{" "}
-                    {person.reportCount} report{person.reportCount === 1 ? "" : "s"}
-                  </small>
-                  <small>Last activity: {person.lastActivity ? formatMoment(person.lastActivity) : "No booking or report yet"}</small>
-                  {messaging === person.key && (
-                    <div className="admin-message-form">
-                      <label>
-                        Message for {person.name}
-                        <textarea
-                          rows={2}
-                          maxLength={400}
-                          value={message}
-                          onChange={(event) => setMessage(event.target.value)}
-                          placeholder="e.g. Your departure time has changed. Please check your booking."
-                        />
-                      </label>
-                      <div className="admin-record-actions">
-                        <button type="button" className="primary-button" onClick={() => sendMessage(person)}>Send update</button>
-                        <button type="button" className="secondary-button" onClick={() => { setMessaging(null); setMessage(""); }}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="admin-record-actions">
-                  <span className={`admin-tag ${person.registered ? "is-registered" : "is-muted"}`}>
-                    {person.registered ? "Registered" : "Guest"}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-action"
-                    onClick={() => {
-                      setMessaging((current) => current === person.key ? null : person.key);
-                      setMessage("");
-                      setFeedback("");
-                    }}
-                  >
-                    {messaging === person.key ? "Close" : "Message"}
-                  </button>
-                  {person.registered && <span className="module-footnote" title="The backend has no account deletion endpoint yet">Account removal unavailable</span>}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </AdminRecordsPanel>
+      <AdminDataTable
+        key="passengers"
+        columns={[
+          { key: "name", label: "Passenger" },
+          { key: "email", label: "Email" },
+          { key: "type", label: "Type" },
+        ]}
+        rows={shown.map((person) => ({
+          key: person.key,
+          cells: [
+            <strong key="name">{person.name}</strong>,
+            person.email,
+            <span className={`admin-tag ${person.registered ? "is-registered" : "is-muted"}`} key="type">
+              {person.registered ? "Registered" : "Guest"}
+            </span>,
+          ],
+        }))}
+        empty="No passengers available."
+      />
     </div>
   );
 }
 
 function CompanyProfileManagement() {
   const session = useSession();
-  const [companyName, setCompanyName] = useState("");
+  const [companyName, setCompanyName] = useState("SBUS");
   const [email, setEmail] = useState("");
-  const [announcement, setAnnouncement] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   useAdminFeedbackReveal(feedback, "admin-company-feedback");
@@ -2384,7 +2035,7 @@ function CompanyProfileManagement() {
     const timer = window.setTimeout(() => {
       const profile = readAdminProfile(session.email);
       setEmail(profile?.email ?? session.email);
-      setCompanyName(profile?.companyName ?? "");
+      setCompanyName(profile?.companyName || "SBUS");
     }, 0);
     return () => window.clearTimeout(timer);
   }, [session?.email]);
@@ -2414,66 +2065,15 @@ function CompanyProfileManagement() {
     }
   }
 
-  function sendAnnouncement(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setFeedback("");
-    const text = announcement.trim();
-    if (text.length < 5 || text.length > 500) {
-      setError("Write an announcement between 5 and 500 characters.");
-      return;
-    }
-    try {
-      notifyCompanyUpdate(text, "Company announcement");
-      setAnnouncement("");
-      setFeedback("Demo announcement saved in this browser. It was not sent to the backend.");
-    } catch {
-      setError("The announcement could not be saved. Please try again.");
-    }
-  }
-
   return (
     <div className="admin-section-content">
-      <h3>Company profile and announcements</h3>
-      <DemoDataNotice show what="company profile settings and announcements" />
-
       {error && <p className="module-error" role="alert">{error}</p>}
       {feedback && <p id="admin-company-feedback" className="module-feedback" role="status">{feedback}</p>}
-
-      <div className="admin-company-grid">
-        <form className="module-form admin-data-form" onSubmit={saveProfile}>
-          <h4>Company details</h4>
-          <label>Company name<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} minLength={2} maxLength={100} required /></label>
-          <label>Company email<input type="email" value={email} readOnly aria-describedby="company-email-note" /></label>
-          <p id="company-email-note" className="module-footnote">Admin sign-in email cannot be changed.</p>
-          <button className="primary-button" type="submit">Save company profile</button>
-        </form>
-
-        <form className="module-form admin-data-form" onSubmit={sendAnnouncement}>
-          <h4>Message passengers</h4>
-          <label>Announcement
-            <textarea
-              rows={5}
-              maxLength={500}
-              value={announcement}
-              onChange={(event) => setAnnouncement(event.target.value)}
-              placeholder="e.g. New Blantyre to Lilongwe departures are now open for booking."
-            />
-          </label>
-          <p className="module-footnote">Announcements are demo-only and stored in this browser; the backend has no announcement endpoint.</p>
-          <button className="primary-button" type="submit">Send announcement</button>
-        </form>
-      </div>
-
-      <section className="admin-alignment" aria-labelledby="company-checks-heading">
-        <h3 id="company-checks-heading">Administrator checklist</h3>
-        <ul>
-          <li>Publish the routes and fare estimates passengers can search.</li>
-          <li>Schedule future departures so passengers can pick seats and pay in the demo checkout.</li>
-          <li>Keep pickup and drop-off points accurate; renaming a stop updates its scheduled trips and bookings.</li>
-          <li>Review bookings and reports, then send updates so passengers see the outcome immediately.</li>
-        </ul>
-      </section>
+      <form className="module-form admin-data-form" onSubmit={saveProfile}>
+        <label>Company name<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} minLength={2} maxLength={100} required /></label>
+        <label>Company email<input type="email" value={email} readOnly /></label>
+        <button className="primary-button" type="submit">Save company profile</button>
+      </form>
     </div>
   );
 }

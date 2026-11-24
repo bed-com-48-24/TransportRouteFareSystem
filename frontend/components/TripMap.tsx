@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer } from "react-leaflet";
+import type { LatLngTuple } from "leaflet";
+import FitMapToRoute from "@/components/FitMapToRoute";
 import {
   BOTH_ENDS_PIN_ICON,
   DESTINATION_PIN_ICON,
@@ -19,8 +20,6 @@ interface TripMapProps {
   userPosition?: Coordinates | null;
   cityCoordinates: Record<string, Coordinates>;
   tripRoadRoutes: Record<string, RoadRouteGeometry>;
-  isTripRouting: boolean;
-  tripFallbackCount: number;
 }
 
 interface MapEndpoint {
@@ -36,8 +35,6 @@ export default function TripMap({
   userPosition,
   cityCoordinates,
   tripRoadRoutes,
-  isTripRouting,
-  tripFallbackCount,
 }: TripMapProps) {
   const endpoints = useMemo(() => {
     const found = new Map<string, MapEndpoint>();
@@ -82,9 +79,33 @@ export default function TripMap({
     });
   }, [trips, cityCoordinates]);
 
+  // Fit on the chosen trips' route geometry (road line when loaded, direct line
+  // while loading). User position is deliberately excluded so a far-away
+  // passenger does not shrink the selected route to a dot.
+  const fitPoints = useMemo(() => {
+    const points: LatLngTuple[] = [];
+    trips.forEach((trip) => {
+      const [origin, destination] = trip.route.split(" → ");
+      const originCoordinates = cityCoordinates[origin];
+      const destinationCoordinates = cityCoordinates[destination];
+      if (!originCoordinates || !destinationCoordinates) return;
+      const geometry = tripRoadRoutes[trip.id];
+      if (geometry?.positions?.length) {
+        points.push(...geometry.positions);
+      } else {
+        points.push(
+          [originCoordinates.lat, originCoordinates.lng],
+          [destinationCoordinates.lat, destinationCoordinates.lng],
+        );
+      }
+    });
+    return points;
+  }, [trips, cityCoordinates, tripRoadRoutes]);
+
   return (
     <div className="network-map" role="region" aria-label="Booking route map">
       <MapContainer center={[-13.4, 34.2]} zoom={6} scrollWheelZoom className="route-map">
+        <FitMapToRoute points={fitPoints} fallbackCenter={[-13.4, 34.2]} fallbackZoom={6} padding={[28, 28]} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -111,7 +132,6 @@ export default function TripMap({
               }}
             >
               <Popup>
-                <strong>{trip.route}</strong><br />
                 {fmtDate(trip.date)} · {trip.departure}<br />
                 Estimated fare: MWK {trip.fare.toLocaleString("en-MW")}
                 <br />
@@ -120,8 +140,6 @@ export default function TripMap({
                   : geometry?.status === "fallback"
                     ? "Road data unavailable · showing a direct-line fallback"
                     : "Loading road geometry · direct-line fallback remains visible"}
-                <br />
-                <Link className="map-trip-select" href={`/transport-booking/details/${trip.id}?date=${trip.date}`}>Choose this trip</Link>
               </Popup>
             </Polyline>
           );
@@ -192,13 +210,6 @@ export default function TripMap({
           </CircleMarker>
         )}
       </MapContainer>
-      <p className="route-map-status" role="status" aria-live="polite">
-        {isTripRouting
-          ? "Loading road geometry. Direct-line fallbacks remain visible while routes load."
-          : tripFallbackCount > 0
-            ? `${tripFallbackCount} trip${tripFallbackCount === 1 ? "" : "s"} shown as a direct-line fallback because road data is unavailable.`
-            : "Trip routes follow available roads. Dashed lines indicate a direct-line fallback."}
-      </p>
       <div className="map-legend" aria-label="Map legend">
         <span><i className="legend-origin" /> Departure town</span>
         <span><i className="legend-destination" /> Final destination</span>

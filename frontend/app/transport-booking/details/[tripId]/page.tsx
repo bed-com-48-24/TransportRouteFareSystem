@@ -17,7 +17,11 @@ function TripDetails() {
 
 export default function TripDetailsPage() {
   return (
-    <Suspense fallback={<main className="module-shell" aria-busy="true" />}>
+    <Suspense fallback={(
+      <main className="module-shell" aria-busy="true">
+        <div className="module-empty" role="status">Opening your trip…</div>
+      </main>
+    )}>
       <TripDetails />
     </Suspense>
   );

@@ -787,7 +787,6 @@ body { background: var(--background); color: var(--foreground); }
 .home-destination-search > label { margin-top: 3px; color: var(--sb-text); font-size: 12px; font-weight: 750; }
 .home-destination-search > input { width: 100%; min-height: 43px; padding: 10px 12px; border: 1px solid var(--sb-border-strong); border-radius: 8px; outline: none; color: var(--navy); background: var(--sb-surface); font: inherit; font-size: 14px; }
 .home-destination-search > input:focus { border-color: var(--sb-ink-soft); box-shadow: 0 0 0 3px #29466d1c; }
-.home-location-hint { margin: 0; color: var(--sb-text-muted); font-size: 12px; line-height: 1.5; }
 .home-location-status { margin: 0; color: var(--sb-text-muted); font-size: 12px; line-height: 1.5; }
 .home-current-origin { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 9px; border: 1px solid var(--sb-border); border-radius: 8px; padding: 10px 12px; background: var(--sb-page); }
 .home-current-origin span { color: var(--sb-text-muted); font-size: 11px; }
@@ -838,7 +837,8 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .payment-panel h3 { margin: 4px 0; color: var(--navy); font-size: 19px; }
 .payment-panel p { margin: 5px 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .payment-panel strong { color: var(--navy); font-size: 15px; }
-.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.payment-provider-fields { display: grid; gap: 12px; margin-top: 14px; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sb-border-subtle); }
 .ticket-card { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 24px; align-items: center; margin-top: 20px; border: 1px solid var(--sb-border-strong); border-left: 6px solid var(--sb-success); border-radius: 10px; padding: 22px; background: var(--sb-surface); }
 .ticket-details h3 { margin: 4px 0 12px; color: var(--navy); font-size: 23px; }
 .ticket-details > p:not(.module-eyebrow) { margin: 6px 0; color: var(--sb-text-quiet); font-size: 12px; line-height: 1.6; }
@@ -884,7 +884,6 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .trip-results { display: grid; gap: 14px; margin-top: 18px; }
 .trip-results-hint { margin: 0; color: var(--sb-text-muted); font-size: 12px; font-weight: 600; }
 .trip-choice { display: flex; min-width: 0; flex-direction: column; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--sb-surface); }
-.trip-choice.is-selected { border-color: var(--navy-light); box-shadow: 0 0 0 2px #2348661a; }
 .trip-choice-top { display: flex; justify-content: space-between; gap: 8px; }
 .trip-service { color: var(--sb-text-quiet); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
 .seat-status { color: var(--sb-success); font-size: 10px; font-weight: 750; }
@@ -939,7 +938,7 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .module-form textarea { min-height: 120px; resize: vertical; }
 .module-form input[readonly] { color: var(--sb-text-quiet); background: var(--sb-surface-sunken); }
 .module-field-hint { color: var(--sb-warning); font-size: 10px; font-weight: 400; line-height: 1.45; }
-.reservation-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border-radius: 11px; padding: 16px; background: var(--sb-surface-sunken); }
+.reservation-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; border-radius: 11px; padding: 16px; background: var(--sb-surface-sunken); }
 .reservation-summary > div { display: grid; align-content: start; gap: 4px; }
 .reservation-summary span,
 .reservation-summary small { color: var(--muted); font-size: 10px; }
@@ -952,7 +951,9 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .seat-number:hover:not(:disabled) { border-color: var(--navy-light); background: var(--sb-accent-soft); }
 .seat-number.is-selected { border-color: var(--navy); color: var(--sb-text-on-ink); background: var(--navy); }
 .seat-number.is-taken { border-color: var(--sb-border-subtle); color: var(--sb-text-quiet); background: var(--sb-surface-sunken); cursor: not-allowed; text-decoration: line-through; }
+.seat-number.is-taken:hover { border-color: var(--sb-border-subtle); background: var(--sb-surface-sunken); }
 .seat-number.is-locked { border-color: var(--sb-border-subtle); color: var(--sb-text-quiet); background: var(--sb-surface-muted); cursor: not-allowed; }
+.seat-number.is-locked:hover { border-color: var(--sb-border-subtle); background: var(--sb-surface-muted); }
 .seat-number:focus-visible { outline: 2px solid var(--navy-light); outline-offset: 2px; }
 .seat-picker-help { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .seat-step { display: grid; gap: 16px; }
@@ -997,14 +998,85 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .reservation-actions,
 .ticket-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .reservation-actions { margin-top: 2px; }
-.detail-booking-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr); gap: 18px; align-items: start; }
-.detail-booking-main { min-width: 0; }
-.detail-trip-map { position: sticky; top: 16px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--sb-surface); }
-.detail-trip-map h3 { margin: 6px 0 12px; color: var(--navy); font-size: 16px; }
-.detail-trip-map .route-map { height: 360px; }
+.booking-page-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.booking-page-columns.has-trip { grid-template-columns: minmax(230px, 0.7fr) minmax(0, 1.9fr) minmax(260px, 0.8fr); }
+.booking-page-columns > .module-section { margin: 0; min-width: 0; padding: 22px 20px; }
+.booking-page-columns > .module-section,
+.booking-page-columns > .detail-trip-map { height: 100%; }
+.booking-page-columns .module-section-heading { margin-bottom: 16px; gap: 12px; }
+.booking-page-columns .module-section-heading h2 { margin-top: 6px; font-size: 20px; line-height: 1.3; }
+.booking-page-columns .module-eyebrow { font-size: 11px; letter-spacing: .14em; }
+.booking-page-columns .module-form label { font-size: 12px; }
+.booking-page-columns .module-form input,
+.booking-page-columns .module-form select { min-height: 42px; font-size: 13px; }
+.book-trip-search-button { width: 100%; min-height: 46px; margin-top: 4px; }
+.booking-page-columns > .detail-trip-map { margin: 0; min-width: 0; position: static; }
+@media (max-width: 1100px) {
+  .booking-page-columns.has-trip { grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr); }
+  .booking-page-columns > .detail-trip-map { grid-column: 1 / -1; height: auto; }
+}
 @media (max-width: 720px) {
+  .booking-page-columns.has-trip { grid-template-columns: 1fr; }
+  .booking-page-columns > .detail-trip-map { grid-column: auto; }
+}
+.booking-search-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.booking-search-layout.is-split { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr); align-items: start; }
+.booking-search-layout.is-split .module-form { position: sticky; top: 12px; }
+.trip-chat-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; padding-right: 4px; }
+.trip-chat-item { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--sb-surface); }
+.trip-chat-item.is-open { border-color: var(--sb-border-strong); box-shadow: 0 6px 18px #102b4312; }
+.trip-chat-row { display: grid; width: 100%; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 0; padding: 11px 12px; color: inherit; background: var(--sb-surface); text-align: left; text-decoration: none; cursor: pointer; }
+.trip-chat-avatar { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--sb-text-on-ink); background: var(--navy); font-size: 11px; font-weight: 800; }
+.trip-chat-copy { display: grid; gap: 3px; min-width: 0; }
+.trip-chat-copy strong { color: var(--navy); font-size: 12px; }
+.trip-chat-copy > span { overflow: hidden; color: var(--muted); font-size: 10.5px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.trip-chat-status { flex: 0 0 auto; border-radius: 20px; padding: 4px 8px; color: var(--sb-success); background: var(--sb-success-bg); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.trip-chat-status.is-full { color: var(--sb-danger); background: var(--sb-danger-bg); }
+.trip-chat-details { display: grid; gap: 6px; border-top: 1px solid var(--line); padding: 12px; background: var(--sb-surface-muted); }
+.trip-chat-details p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.trip-chat-details p strong { color: var(--navy); }
+.trip-chat-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.trip-chat-actions .primary-button { min-height: 36px; }
+@media (max-width: 900px) {
+  .booking-search-layout.is-split { grid-template-columns: 1fr; }
+  .booking-search-layout.is-split .module-form { position: static; }
+  .trip-chat-list { max-height: none; }
+}
+.detail-booking-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.detail-booking-layout.is-payment { grid-template-columns: minmax(0, 1fr); }
+.detail-booking-main { min-width: 0; height: 100%; }
+.detail-trip-side { display: grid; gap: 16px; min-width: 0; height: 100%; }
+.detail-trip-side .seat-step-layout { grid-template-columns: 1fr; }
+.payment-trip-card { margin: 0; }
+.detail-trip-map { position: static; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--sb-surface); }
+.detail-trip-map h3 { margin: 6px 0 12px; color: var(--navy); font-size: 16px; }
+.detail-trip-map .network-map { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.detail-trip-map .route-map { flex: 1; height: auto; min-height: 260px; }
+@media (max-width: 900px) {
   .detail-booking-layout { grid-template-columns: 1fr; }
-  .detail-trip-map { position: static; }
+}
+.payment-summary-columns { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(340px, 1.05fr); gap: 20px; align-items: stretch; }
+.payment-summary-columns > .module-section { margin: 0; min-width: 0; padding: 22px 20px; }
+.payment-summary-columns > .payment-summary-panel { grid-column: 1; }
+.payment-summary-columns > .payment-checkout-panel { grid-column: 2; display: flex; flex-direction: column; }
+.payment-summary-columns .module-eyebrow { font-size: 11px; letter-spacing: .14em; }
+.payment-summary-columns h2 { margin: 8px 0 4px; color: var(--navy); font-size: 20px; line-height: 1.3; }
+.payment-summary-columns .payment-checkout-panel .module-error,
+.payment-summary-columns .payment-checkout-panel .module-notice { margin-top: 0; }
+.payment-summary-columns .payment-progress { display: grid; align-content: center; gap: 8px; min-height: 260px; border: 1px solid var(--sb-border-strong); border-radius: 10px; padding: 22px; background: var(--sb-surface-muted); }
+.payment-summary-columns .payment-progress h3 { margin: 6px 0 0; color: var(--navy); font-size: 18px; }
+.payment-summary-columns .payment-progress p:last-child { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.payment-summary-columns .ticket-card { grid-template-columns: minmax(0, 1fr); gap: 18px; margin-top: 0; }
+.payment-summary-columns .ticket-qr-wrap { border-top: 1px dashed var(--sb-border-strong); border-left: 0; padding: 18px 0 0; }
+.process-summary-list { display: grid; gap: 14px; margin: 18px 0 22px; padding: 0; list-style: none; }
+.process-summary-list li { display: flex; align-items: flex-start; gap: 12px; }
+.process-step { display: grid; flex: 0 0 auto; width: 26px; height: 26px; place-items: center; border-radius: 50%; color: var(--sb-text-on-ink); background: var(--navy); font-size: 11px; font-weight: 800; }
+.process-summary-list strong { display: block; color: var(--navy); font-size: 12px; }
+.process-summary-list p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .payment-summary-columns { grid-template-columns: 1fr; }
+  .payment-summary-columns > .payment-summary-panel,
+  .payment-summary-columns > .payment-checkout-panel { grid-column: auto; }
 }
 .booking-list { display: grid; gap: 10px; }
 .saved-booking { display: flex; justify-content: space-between; gap: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
@@ -1172,6 +1244,11 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
   .map-route-list { grid-template-columns: 1fr; }
   .ticket-card { grid-template-columns: 1fr; }
   .ticket-qr-wrap { border-top: 1px dashed var(--sb-border-strong); border-left: 0; padding: 18px 0 0; }
+  .payment-success-page .payment-success-panel { padding: 18px 16px; }
+  .payment-success-page .payment-success-heading { flex-direction: column; gap: 10px; text-align: center; }
+  .payment-success-page .payment-success-check { flex-basis: 48px; width: 48px; height: 48px; font-size: 26px; }
+  .payment-success-page .ticket-qr-wrap img { width: min(200px, 100%); height: auto; }
+  .payment-success-page .ticket-qr-placeholder { width: min(200px, 100%); }
   .module-form-grid,
   .reservation-summary,
   .admin-data-form { grid-template-columns: 1fr; }
@@ -1388,30 +1465,6 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
   box-shadow: 0 8px 24px #102b4314;
 }
 
-.home-popular-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.home-popular-tag {
-  border-radius: 20px;
-  padding: 4px 9px;
-  color: var(--navy);
-  background: var(--sb-accent-soft);
-  font-size: 10px;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.home-popular-service {
-  color: var(--sb-text-quiet);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .home-popular-card h3 {
   margin: 6px 0 2px;
   color: var(--navy);
@@ -1556,6 +1609,15 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .home-popular-panel .home-popular-actions button {
   min-width: 96px;
 }
+.home-schedule-stage { min-height: 190px; }
+.home-schedule-card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--sb-surface); box-shadow: 0 8px 24px #102b4312; animation: homeScheduleIn 900ms ease both; }
+.home-schedule-card h3 { margin: 2px 0; color: var(--navy); font-size: 20px; }
+.home-schedule-line { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.home-schedule-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 14px; }
+.home-schedule-dot { width: 9px; height: 9px; border: 0; border-radius: 50%; padding: 0; background: var(--sb-border-strong); cursor: pointer; transition: transform 160ms ease, background-color 160ms ease; }
+.home-schedule-dot.is-active { background: var(--navy); transform: scale(1.35); }
+@keyframes homeScheduleIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .home-schedule-card { animation: none; } }
 
 @media (max-width: 760px) {
   .home-top-grid {
@@ -1630,13 +1692,6 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .profile-booking-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .profile-booking-head h3 { margin: 3px 0 0; color: var(--sb-ink); font-size: 16px; }
 .profile-booking-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 6px; color: var(--sb-text-quiet); font-size: 11px; }
-.profile-ticket { margin-top: 8px; border-top: 1px dashed var(--sb-border-subtle); padding-top: 9px; }
-.profile-ticket summary { color: var(--sb-ink-soft); font-size: 12px; font-weight: 700; cursor: pointer; }
-.profile-ticket-body { margin-top: 10px; padding: 12px; border-radius: 9px; background: var(--sb-surface-muted); }
-.profile-ticket-body dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; }
-.profile-ticket-body dt { color: var(--sb-text-quiet); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
-.profile-ticket-body dd { margin: 2px 0 0; color: var(--sb-ink); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
-.profile-ticket-body .module-footnote { margin-top: 12px; }
 .profile-journey-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .profile-journey-list li { display: flex; gap: 12px; padding: 11px 0 14px 2px; border-bottom: 1px solid var(--sb-border-subtle); }
 .profile-journey-list li:last-child { border-bottom: 0; }
@@ -1673,8 +1728,7 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 }
 @media (max-width: 560px) {
   .profile-menu { grid-template-columns: 1fr; }
-  .profile-location-grid,
-  .profile-ticket-body dl { grid-template-columns: 1fr; }
+  .profile-location-grid { grid-template-columns: 1fr; }
   .profile-saved-list li { flex-wrap: wrap; }
   .profile-saved-actions { width: 100%; justify-content: flex-end; }
 }
@@ -1684,6 +1738,80 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .admin-workspace-heading h2 { margin: 5px 0 6px; color: var(--navy); font-size: 24px; letter-spacing: -.5px; }
 .admin-workspace-heading .module-copy { max-width: 700px; margin: 0; }
 .admin-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 16px 0 22px; }
+.admin-list-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.admin-list-heading h3 { margin: 0 0 4px; color: var(--navy); font-size: 17px; }
+.admin-list-heading .module-copy { margin: 0; }
+.admin-table-wrap { overflow-x: auto; border: 1px solid var(--sb-border); border-radius: 11px; background: var(--sb-surface); }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.admin-table th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; color: var(--sb-text-quiet); background: var(--sb-surface-muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.admin-table td { padding: 10px 12px; border-top: 1px solid var(--sb-border-subtle); color: var(--sb-text); vertical-align: middle; }
+.admin-table tbody tr:hover { background: var(--sb-surface-muted); }
+.admin-table-empty { padding: 22px 12px !important; color: var(--sb-text-quiet) !important; text-align: center; }
+.admin-table-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.admin-table-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; color: var(--sb-text-quiet); font-size: 11px; }
+.admin-table-pages { display: flex; align-items: center; gap: 8px; }
+.admin-table-pages .secondary-button { min-height: 32px; padding: 0 10px; font-size: 10px; }
+body:has(.admin-overview-page) { background-color: #d9e2ec; background-image: linear-gradient(115deg, rgba(10, 31, 52, .28), rgba(18, 48, 74, .08) 62%, rgba(10, 31, 52, .18)), url("/transport-coach-background.webp"); background-position: center, center 56%; background-size: cover, cover; background-repeat: no-repeat; background-attachment: fixed; }
+.admin-overview-page { position: relative; isolation: isolate; min-height: calc(100vh - 130px); }
+body:has(.admin-overview-page) .site-header { position: relative; z-index: 2; border-bottom-color: rgba(255, 255, 255, .24); background: rgba(14, 39, 64, .78); box-shadow: 0 8px 24px rgba(7, 27, 48, .16); backdrop-filter: blur(10px); }
+body:has(.admin-overview-page) .site-brand,
+body:has(.admin-overview-page) .site-brand small,
+body:has(.admin-overview-page) .site-nav a,
+body:has(.admin-overview-page) .site-nav-logout { color: #fff; }
+body:has(.admin-overview-page) .site-nav a.is-active { color: #fff; background: rgba(255, 255, 255, .17); }
+.admin-overview-page .admin-workspace { border-color: rgba(255, 255, 255, .25); background: transparent; }
+.admin-overview-page .admin-workspace-heading h2 { color: #fff; }
+.admin-overview-page .admin-tabs button { border-color: rgba(255, 255, 255, .18); color: #fff; background: rgba(14, 39, 64, .55); }
+.admin-overview-page .admin-tabs button:hover { color: #fff; background: rgba(14, 39, 64, .85); }
+.admin-overview-page .admin-tabs button.is-active { border-color: rgba(255, 255, 255, .3); color: #fff; background: rgba(14, 39, 64, .9); }
+.admin-overview-content { position: relative; isolation: isolate; padding: 18px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 14px; background: rgba(248, 251, 255, .12); box-shadow: 0 12px 30px rgba(7, 27, 48, .12); }
+.admin-overview-content > * { position: relative; z-index: 1; }
+.admin-overview-content .admin-overview-grid { margin: 0; }
+.admin-overview-page .admin-stat { border-color: rgba(255, 255, 255, .28); color: #fff; background: rgba(14, 39, 64, .78); backdrop-filter: blur(10px); box-shadow: 0 10px 24px rgba(7, 27, 48, .18); }
+.admin-overview-page .admin-stat:hover { border-color: rgba(255, 255, 255, .5); background: rgba(14, 39, 64, .92); }
+.admin-overview-page .admin-stat span,
+.admin-overview-page .admin-stat strong { color: #fff; }
+.admin-overview-content .module-error { padding: 10px 12px; border-radius: 8px; background: rgba(248, 251, 255, .9); }
+
+/* Welcome and login pages: same blended backdrop and navy/white controls as the overview */
+body:has(.welcome-page) .site-header,
+body:has(.account-page) .site-header { position: relative; z-index: 2; border-bottom-color: rgba(255, 255, 255, .24); background: rgba(14, 39, 64, .78); box-shadow: 0 8px 24px rgba(7, 27, 48, .16); backdrop-filter: blur(10px); }
+body:has(.welcome-page) .site-brand,
+body:has(.welcome-page) .site-brand small,
+body:has(.welcome-page) .site-nav a,
+body:has(.welcome-page) .site-nav-logout,
+body:has(.account-page) .site-brand,
+body:has(.account-page) .site-brand small,
+body:has(.account-page) .site-nav a,
+body:has(.account-page) .site-nav-logout { color: #fff; }
+body:has(.welcome-page) .site-nav a.is-active,
+body:has(.account-page) .site-nav a.is-active { color: #fff; background: rgba(255, 255, 255, .17); }
+
+.welcome-page .welcome-simple { border-color: rgba(255, 255, 255, .35); background: rgba(248, 251, 255, .12); backdrop-filter: blur(6px); }
+.welcome-page .welcome-simple-eyebrow { color: #fff !important; }
+.welcome-page .welcome-simple-copy h1 { color: #fff; text-shadow: 0 2px 12px rgba(7, 27, 48, .5); }
+.welcome-page .welcome-simple-copy h1::first-line { color: #fff; }
+.welcome-page .welcome-simple-copy > p:not(.welcome-simple-eyebrow) { color: #fff; text-shadow: 0 1px 8px rgba(7, 27, 48, .45); }
+.welcome-page .welcome-simple-copy > p.welcome-access-note { color: rgba(255, 255, 255, .82); }
+.welcome-page .welcome-simple-footer { color: rgba(255, 255, 255, .82); }
+.welcome-page .welcome-simple-login { color: #fff; background: rgba(14, 39, 64, .85); }
+.welcome-page .welcome-simple-login:hover { color: #fff; background: rgba(14, 39, 64, .98); }
+
+.account-page .account-card { border-color: rgba(255, 255, 255, .35); background: rgba(248, 251, 255, .12); backdrop-filter: blur(6px); }
+.account-page .account-card h1,
+.account-page .account-form > label,
+.account-page .account-label-row label,
+.account-page .account-options span,
+.account-page .account-footnote { color: #fff; }
+.account-page .account-form input,
+.account-page .account-form select,
+.account-page .account-form textarea { background: rgba(255, 255, 255, .92); }
+.account-page .account-text-button,
+.account-page .account-forgot,
+.account-page .account-password-toggle { color: #fff; }
+.account-page .account-submit { color: #fff; background: rgba(14, 39, 64, .85); }
+.account-page .account-submit:hover { color: #fff; background: rgba(14, 39, 64, .98); }
+.account-page .account-submit:disabled { color: rgba(255, 255, 255, .8); background: rgba(14, 39, 64, .5); }
 .admin-stat { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--sb-border); border-radius: 11px; color: var(--navy); background: var(--sb-surface-muted); font: inherit; text-align: left; cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
 .admin-stat:hover { transform: translateY(-1px); border-color: var(--sb-border-hover); box-shadow: 0 8px 20px #12304a10; }
 .admin-stat span { color: var(--sb-text-quiet); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
@@ -1771,7 +1899,7 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
   max-width: none;
   min-height: calc(100vh - 130px);
   margin: 0;
-  padding: 44px max(4vw, 20px) 68px;
+  padding: 44px max(2.2vw, 16px) 68px;
   background-color: #d9e2ec;
   background-image: linear-gradient(110deg, rgba(10, 31, 52, .42), rgba(18, 48, 74, .16) 58%, rgba(10, 31, 52, .34)), url("/transport-coach-background.webp");
   background-position: center, center 56%;
@@ -1794,7 +1922,7 @@ body:has(.home-shell) .site-nav a.is-active { color: #fff; background: rgba(255,
 .transport-page-shell > *:not(.transport-background) {
   position: relative;
   z-index: 1;
-  width: min(1120px, 100%);
+  width: min(1480px, 100%);
   margin-right: auto;
   margin-left: auto;
 }
@@ -1870,6 +1998,13 @@ body:has(.transport-page-shell) .site-nav a.is-active {
   background: rgba(255, 255, 255, .86);
 }
 
+.transport-page-shell .profile-menu-card {
+  border-color: rgba(255, 255, 255, .72);
+  background: rgba(248, 251, 255, .86);
+  box-shadow: 0 18px 44px rgba(7, 27, 48, .16);
+  backdrop-filter: blur(8px);
+}
+
 @media (max-width: 620px) {
   .transport-page-shell {
     padding: 28px 14px 50px;
@@ -1880,4 +2015,978 @@ body:has(.transport-page-shell) .site-nav a.is-active {
   .transport-page-shell .module-section {
     padding: 18px 15px;
   }
+}
+
+/* Navigation controls use the same dark navy and shape as the primary buttons. */
+.site-nav a:not(.site-profile-badge),
+.site-nav-logout {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--navy) !important;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff !important;
+  background: var(--navy) !important;
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.site-nav a:not(.site-profile-badge):hover,
+.site-nav-logout:hover {
+  border-color: var(--navy-light) !important;
+  background: var(--navy-light) !important;
+}
+
+.site-nav a:not(.site-profile-badge).is-active {
+  border-color: var(--navy-light) !important;
+  background: var(--navy-light) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .32);
+}
+
+.booking-notification-toggle,
+.site-nav a.site-profile-badge {
+  border-color: var(--navy) !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+.booking-notification-toggle:hover,
+.site-nav a.site-profile-badge:hover {
+  border-color: var(--navy-light) !important;
+  background: var(--navy-light) !important;
+}
+
+.site-nav a:not(.site-profile-badge):focus-visible,
+.site-nav-logout:focus-visible,
+.booking-notification-toggle:focus-visible,
+.site-nav a.site-profile-badge:focus-visible {
+  outline: 3px solid var(--sb-accent-soft);
+  outline-offset: 2px;
+}
+
+/* Every clickable control gets the same green press feedback. */
+button:active:not(:disabled),
+button[aria-pressed="true"],
+.booking-notification-toggle[aria-expanded="true"],
+a.primary-button:active,
+a.secondary-button:active,
+a.home-book-button:active,
+.site-nav a:not(.site-profile-badge):active,
+.site-nav a.site-profile-badge:active,
+.booking-notification-toggle:active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 0 0 3px var(--sb-success-bg);
+}
+
+/* Dedicated success page: only the details the passenger needs. */
+.payment-success-page .payment-success-panel {
+  max-width: 760px;
+  margin: 0 auto;
+  animation: payment-success-in 320ms ease-out both;
+}
+
+.payment-success-page .payment-success-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.payment-success-page .payment-success-check {
+  display: grid;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--sb-success);
+  box-shadow: 0 0 0 8px var(--sb-success-bg);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.payment-success-page .payment-success-panel h1 {
+  margin: 4px 0 0;
+  color: var(--navy);
+  font-size: 24px;
+}
+
+.payment-success-page .ticket-card {
+  margin-top: 18px;
+}
+
+@keyframes payment-success-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-success-page .payment-success-panel { animation: none; }
+}
+
+.ticket-qr-placeholder {
+  display: block;
+  width: 200px;
+  height: 200px;
+  border: 1px dashed var(--sb-border-strong);
+  border-radius: 8px;
+}
+
+/* ==========================================================================
+   Shared SBUS finish: one backdrop, one navigation treatment, readable labels.
+   These rules are intentionally last so every page gets the same professional
+   look without changing the behaviour of the underlying components.
+   ========================================================================== */
+:root {
+  --sb-page-backdrop: linear-gradient(115deg, rgba(10, 31, 52, .28), rgba(18, 48, 74, .08) 62%, rgba(10, 31, 52, .18)), url("/transport-coach-background.webp");
+}
+
+html,
+body,
+.home-shell,
+.transport-page-shell,
+.transport-background,
+.welcome-page,
+.booking-shell,
+.account-home-page,
+.admin-overview-page {
+  background-color: #d9e2ec !important;
+  background-image: var(--sb-page-backdrop) !important;
+  background-position: center, center 56% !important;
+  background-size: cover, cover !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+body .site-header {
+  position: relative;
+  z-index: 10;
+  min-height: 78px;
+  border-bottom: 1px solid rgba(255, 255, 255, .2) !important;
+  background: linear-gradient(135deg, #12304a 0%, #0b233a 100%) !important;
+  box-shadow: 0 8px 26px rgba(7, 27, 48, .18) !important;
+  backdrop-filter: blur(10px);
+}
+
+body .site-brand,
+body .site-brand small {
+  color: #fff !important;
+}
+
+.site-nav {
+  align-items: center;
+  gap: 10px;
+}
+
+.site-nav a:not(.site-profile-badge),
+.site-nav-logout,
+.booking-notification-toggle,
+.site-nav a.site-profile-badge {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, .3) !important;
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #fff !important;
+  background: rgba(255, 255, 255, .12) !important;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.site-nav a:not(.site-profile-badge):hover,
+.site-nav-logout:hover,
+.booking-notification-toggle:hover,
+.site-nav a.site-profile-badge:hover,
+.site-nav a[aria-current="page"]:not(.site-profile-badge),
+.site-nav a.is-active:not(.site-profile-badge),
+.booking-notification-toggle[aria-expanded="true"],
+.site-nav a:not(.site-profile-badge):active,
+.site-nav-logout:active,
+.booking-notification-toggle:active,
+.site-nav a.site-profile-badge:active {
+  border-color: rgba(255, 255, 255, .55) !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, .24) !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .1);
+}
+
+.booking-notification-toggle,
+.site-nav a.site-profile-badge {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.site-nav-logout svg { width: 17px; height: 17px; }
+.notification-icon { width: 20px; height: 20px; }
+.site-profile-icon { width: 21px; height: 21px; }
+
+.site-nav a:not(.site-profile-badge):focus-visible,
+.site-nav-logout:focus-visible,
+.booking-notification-toggle:focus-visible,
+.site-nav a.site-profile-badge:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, .7);
+  outline-offset: 2px;
+}
+
+/* Primary actions stay the same navy on every page, including when pressed. */
+.primary-button,
+.secondary-button,
+.home-book-button {
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.home-popular-actions a,
+.home-popular-actions button {
+  font-size: 14px;
+}
+
+.home-schedule-panel .secondary-button {
+  border-color: var(--navy) !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.home-book-button:active:not(:disabled) {
+  border-color: var(--navy-light) !important;
+  color: #fff !important;
+  background: var(--navy-light) !important;
+  box-shadow: 0 0 0 3px rgba(18, 48, 74, .14) !important;
+}
+
+/* Home search and departures: comfortable text sizes for all passengers. */
+.home-destination-search > label { font-size: 14px; }
+.home-destination-search > input { min-height: 46px; font-size: 15px; }
+.home-location-status { font-size: 13px; }
+.home-section-heading h2 { font-size: 28px; }
+.home-schedule-card h3 { font-size: 22px; }
+.home-schedule-line { font-size: 14px; }
+.home-schedule-dot { width: 11px; height: 11px; }
+
+@media (max-width: 620px) {
+  .site-nav { gap: 6px; }
+  .site-nav a:not(.site-profile-badge),
+  .site-nav-logout {
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+  .booking-notification-toggle,
+  .site-nav a.site-profile-badge { width: 40px; height: 40px; }
+  .home-section-heading h2 { font-size: 24px; }
+}
+
+/* Green hover feedback on every clickable control, including Book now. */
+button:not(:disabled):hover,
+input[type="button"]:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+a.primary-button:not(.is-disabled):hover,
+a.secondary-button:not(.is-disabled):hover,
+a.home-book-button:hover,
+a.home-cta:hover,
+a.welcome-simple-login:hover,
+a.login-choice-action:hover,
+a.confirmation-cta:hover,
+.site-nav a:not(.site-profile-badge):hover,
+.site-nav-logout:hover,
+.booking-notification-toggle:hover,
+.site-nav a.site-profile-badge:hover,
+.site-nav a[aria-current="page"]:not(.site-profile-badge),
+.site-nav a.is-active:not(.site-profile-badge),
+button[aria-pressed="true"],
+.booking-notification-toggle[aria-expanded="true"],
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.home-book-button:active:not(:disabled),
+.site-nav a:not(.site-profile-badge):active,
+.site-nav-logout:active,
+.booking-notification-toggle:active,
+.site-nav a.site-profile-badge:active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+/* Keep the home panels at their natural size and centre the pair on the page. */
+.home-shell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.home-top-grid {
+  min-height: 0;
+  align-items: center;
+  margin: 32px auto 48px;
+}
+
+.home-top-grid .home-hero,
+.home-top-grid .home-popular-panel {
+  height: auto;
+}
+
+.home-top-grid .home-hero {
+  display: grid;
+  align-items: center;
+}
+
+.home-hero-content {
+  width: 100%;
+}
+
+.home-popular-panel {
+  align-content: center;
+}
+
+.home-schedule-stage {
+  display: block;
+}
+
+.home-schedule-card {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .home-top-grid {
+    min-height: 0;
+  }
+  .home-top-grid .home-hero,
+  .home-top-grid .home-popular-panel {
+    height: auto;
+  }
+  .home-schedule-stage {
+    display: block;
+  }
+}
+
+/* Final consistency pass: green click feedback on every control, everywhere. */
+button:not(:disabled):hover,
+button:active:not(:disabled),
+input[type="button"]:not(:disabled):hover,
+input[type="button"]:active:not(:disabled),
+input[type="submit"]:not(:disabled):hover,
+input[type="submit"]:active:not(:disabled),
+button[aria-pressed="true"],
+a.primary-button:not(.is-disabled):hover,
+a.primary-button:not(.is-disabled):active,
+a.secondary-button:not(.is-disabled):hover,
+a.secondary-button:not(.is-disabled):active,
+a.home-book-button:hover,
+a.home-book-button:active,
+a.home-cta:hover,
+a.home-cta:active,
+a.welcome-simple-login:hover,
+a.welcome-simple-login:active,
+a.login-choice-action:hover,
+a.login-choice-action:active,
+a.confirmation-cta:hover,
+a.confirmation-cta:active,
+.admin-nav a:hover,
+.admin-nav a:active,
+.admin-nav a.is-active,
+.site-nav a:not(.site-profile-badge):hover,
+.site-nav a:not(.site-profile-badge):active,
+.site-nav a[aria-current="page"]:not(.site-profile-badge),
+.site-nav a.is-active:not(.site-profile-badge),
+.site-nav-logout:hover,
+.site-nav-logout:active,
+.booking-notification-toggle:hover,
+.booking-notification-toggle:active,
+.booking-notification-toggle[aria-expanded="true"],
+.site-nav a.site-profile-badge:hover,
+.site-nav a.site-profile-badge:active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+/* Clear cards and centrally placed welcome/sign-in screens. */
+body .site-header {
+  backdrop-filter: none !important;
+}
+
+.welcome-page,
+.account-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+}
+
+.welcome-page .welcome-simple,
+body:has(.account-page) .account-card {
+  border: 1px solid rgba(255, 255, 255, .9) !important;
+  background: #fff !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 20px 50px rgba(7, 27, 48, .2) !important;
+}
+
+.welcome-page .welcome-simple-eyebrow { color: var(--sb-ink-soft) !important; font-size: 12px !important; }
+.welcome-page .welcome-simple-copy h1,
+.welcome-page .welcome-simple-copy h1::first-line { color: var(--navy) !important; text-shadow: none !important; }
+.welcome-page .welcome-simple-copy > p:not(.welcome-simple-eyebrow),
+.welcome-page .welcome-simple-copy > p.welcome-access-note,
+.welcome-page .welcome-simple-footer { color: var(--sb-text) !important; text-shadow: none !important; }
+
+body:has(.account-page) .account-card h1,
+body:has(.account-page) .account-form > label,
+body:has(.account-page) .account-label-row label,
+body:has(.account-page) .account-options span,
+body:has(.account-page) .account-footnote,
+body:has(.account-page) .account-forgot,
+body:has(.account-page) .account-password-toggle { color: var(--navy) !important; }
+
+body:has(.account-page) .account-form input,
+body:has(.account-page) .account-form select,
+body:has(.account-page) .account-form textarea { color: var(--navy) !important; background: #fff !important; }
+
+body:has(.account-page) .account-submit { color: #fff !important; background: var(--navy) !important; }
+body:has(.account-page) .account-submit:disabled { color: rgba(255, 255, 255, .8) !important; background: var(--sb-border-strong) !important; }
+
+/* Bigger text across the shared controls and entry pages. */
+.site-nav a:not(.site-profile-badge),
+.site-nav-logout { font-size: 16px; }
+.primary-button,
+.secondary-button,
+.home-book-button { font-size: 16px; }
+.admin-nav a { font-size: 14px; }
+.module-tabs button,
+.admin-tabs button { font-size: 13px; }
+.welcome-simple-brand-name { font-size: 18px; }
+.welcome-simple-brand-caption { font-size: 11px; }
+.welcome-simple-copy h1 { font-size: clamp(40px, 5vw, 62px); }
+.welcome-simple-copy > p:not(.welcome-simple-eyebrow) { font-size: 18px; }
+.welcome-simple-login { min-height: 52px; font-size: 16px; }
+.welcome-simple-footer { font-size: 13px; }
+.account-card h1 { font-size: clamp(30px, 4vw, 38px); }
+.account-form > label,
+.account-label-row label { font-size: 15px; }
+.account-form input,
+.account-form select,
+.account-form textarea { font-size: 15px; }
+.account-submit { min-height: 52px; font-size: 16px; }
+.account-footnote,
+.account-message { font-size: 14px; }
+
+@media (max-width: 640px) {
+  .welcome-page,
+  .account-page { min-height: 100vh; padding: 20px 14px; }
+  .welcome-simple-copy h1 { font-size: clamp(34px, 10vw, 46px); }
+  .welcome-simple-copy > p:not(.welcome-simple-eyebrow) { font-size: 16px; }
+}
+
+/* Sign-in submit must follow the same green hover/active feedback as every other button. */
+body:has(.account-page) .account-submit:not(:disabled):hover,
+body:has(.account-page) .account-submit:not(:disabled):active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+/* Arrow-only page controls for long schedule and record lists. */
+.list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.list-pagination button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--navy);
+  border-radius: 10px;
+  padding: 0;
+  color: var(--navy);
+  background: #fff;
+  cursor: pointer;
+}
+
+.list-pagination button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.list-pagination button:not(:disabled):hover,
+.list-pagination button:not(:disabled):active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+.list-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+/* Keep the green hover on departure rows, but make every label readable on it. */
+.trip-chat-row:hover,
+.trip-chat-row:active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+.trip-chat-row:hover .trip-chat-avatar,
+.trip-chat-row:active .trip-chat-avatar {
+  color: var(--sb-success) !important;
+  background: #fff !important;
+}
+
+.trip-chat-row:hover .trip-chat-copy strong,
+.trip-chat-row:active .trip-chat-copy strong,
+.trip-chat-row:hover .trip-chat-copy > span,
+.trip-chat-row:active .trip-chat-copy > span {
+  color: #fff !important;
+}
+
+.trip-chat-row:hover .trip-chat-status,
+.trip-chat-row:active .trip-chat-status,
+.trip-chat-row:hover .trip-chat-status.is-full,
+.trip-chat-row:active .trip-chat-status.is-full {
+  color: var(--sb-success) !important;
+  background: #fff !important;
+}
+
+/* Payment success: make the confirmation and ticket easy to see at a glance. */
+.payment-success-page .module-shell {
+  width: min(960px, calc(100% - 32px));
+  padding-top: 44px;
+}
+
+.payment-success-page .payment-success-panel {
+  padding: 34px 38px;
+  border-radius: 18px;
+}
+
+.payment-success-page .payment-success-heading {
+  gap: 20px;
+}
+
+.payment-success-page .payment-success-check {
+  flex-basis: 72px;
+  width: 72px;
+  height: 72px;
+  font-size: 38px;
+}
+
+.payment-success-page .module-eyebrow {
+  font-size: 13px;
+  letter-spacing: .16em;
+}
+
+.payment-success-page .payment-success-panel h1 {
+  font-size: clamp(30px, 5vw, 40px);
+  line-height: 1.15;
+}
+
+.payment-success-page .ticket-card {
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 30px;
+  padding: 28px;
+  border-radius: 14px;
+}
+
+.payment-success-page .ticket-details .ticket-route {
+  font-size: 24px;
+}
+
+.payment-success-page .ticket-details > p:not(.module-eyebrow) {
+  font-size: 15px;
+}
+
+.payment-success-page .ticket-receipt dl div {
+  font-size: 13px;
+}
+
+.payment-success-page .ticket-qr-wrap img,
+.payment-success-page .ticket-qr-placeholder {
+  width: 240px;
+  height: 240px;
+}
+
+.payment-success-page .ticket-qr-wrap small {
+  font-size: 12px;
+}
+
+.payment-success-page .ticket-actions .primary-button {
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: 16px;
+}
+
+@media (max-width: 620px) {
+  .payment-success-page .module-shell {
+    width: calc(100% - 24px);
+    padding-top: 24px;
+  }
+
+  .payment-success-page .payment-success-panel {
+    padding: 24px 18px;
+  }
+
+  .payment-success-page .payment-success-heading {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .payment-success-page .payment-success-check {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    font-size: 34px;
+  }
+
+  .payment-success-page .payment-success-panel h1 {
+    font-size: 30px;
+  }
+
+  .payment-success-page .ticket-card {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 20px;
+  }
+
+  .payment-success-page .ticket-qr-wrap img,
+  .payment-success-page .ticket-qr-placeholder {
+    width: min(240px, 100%);
+    height: auto;
+  }
+
+  .payment-success-page .ticket-qr-placeholder {
+    aspect-ratio: 1;
+  }
+}
+
+/* Admin overview: full-page backdrop image with navy cards/controls, green touch feedback, and white text. */
+html,
+body {
+  min-height: 100vh;
+}
+
+body:has(.admin-overview-page) {
+  background-color: #d9e2ec !important;
+  background-image: var(--sb-page-backdrop) !important;
+  background-position: center, center !important;
+  background-size: cover, cover !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+body:has(.admin-overview-page) .site-header {
+  backdrop-filter: none !important;
+}
+
+.admin-overview-page .admin-workspace {
+  border-color: var(--sb-border) !important;
+  background: #fff !important;
+  box-shadow: 0 18px 44px rgba(7, 27, 48, .12);
+  backdrop-filter: none !important;
+}
+
+.admin-overview-page .admin-tabs {
+  margin-top: 0;
+  border-bottom-color: var(--sb-border-subtle) !important;
+}
+
+.admin-overview-page .admin-tabs button {
+  border-color: var(--navy-light) !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+.admin-overview-page .admin-tabs button:hover,
+.admin-overview-page .admin-tabs button.is-active:hover {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+}
+
+.admin-overview-page .admin-tabs button.is-active {
+  border-color: #fff !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+.admin-overview-page .admin-overview-content {
+  border-color: var(--sb-border) !important;
+  background: #f8fbff !important;
+  box-shadow: none;
+  backdrop-filter: none !important;
+}
+
+.admin-overview-page .admin-overview-grid {
+  gap: 14px;
+}
+
+.admin-overview-page .admin-stat {
+  min-height: 112px;
+  padding: 18px 20px;
+  border-color: var(--navy-light) !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+  box-shadow: 0 8px 20px rgba(18, 48, 74, .22);
+  backdrop-filter: none !important;
+}
+
+.admin-overview-page .admin-stat:hover {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+}
+
+.admin-overview-page .admin-stat span {
+  color: #fff !important;
+  font-size: 11px;
+}
+
+.admin-overview-page .admin-stat strong {
+  color: #fff !important;
+  font-size: 26px;
+}
+
+.admin-overview-content .module-error {
+  color: var(--sb-danger) !important;
+  background: var(--sb-danger-bg) !important;
+}
+
+/* Global button finish: dark navy, white words, green on touch, responsive layout. */
+button:not(:disabled),
+input[type="button"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+a.primary-button:not(.is-disabled),
+a.secondary-button:not(.is-disabled),
+a.home-book-button,
+a.home-cta,
+a.welcome-simple-login,
+a.login-choice-action,
+a.confirmation-cta {
+  border-color: var(--navy) !important;
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+button:not(:disabled):hover,
+button:not(:disabled):active,
+input[type="button"]:not(:disabled):hover,
+input[type="button"]:not(:disabled):active,
+input[type="submit"]:not(:disabled):hover,
+input[type="submit"]:not(:disabled):active,
+a.primary-button:not(.is-disabled):hover,
+a.primary-button:not(.is-disabled):active,
+a.secondary-button:not(.is-disabled):hover,
+a.secondary-button:not(.is-disabled):active,
+a.home-book-button:hover,
+a.home-book-button:active,
+a.home-cta:hover,
+a.home-cta:active,
+a.welcome-simple-login:hover,
+a.welcome-simple-login:active,
+a.login-choice-action:hover,
+a.login-choice-action:active,
+a.confirmation-cta:hover,
+a.confirmation-cta:active {
+  border-color: var(--sb-success) !important;
+  color: #fff !important;
+  background: var(--sb-success) !important;
+  box-shadow: 0 6px 16px rgba(31, 107, 69, .24) !important;
+}
+
+@media (max-width: 760px) {
+  .admin-list-heading,
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-list-heading > .primary-button,
+  .admin-list-heading > .secondary-button {
+    width: 100%;
+  }
+  .admin-table-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* Admin row actions stay text links with working clicks; fleet form sits after its table. */
+button.text-action:not(:disabled),
+button.text-action:not(:disabled):hover,
+button.text-action:not(:disabled):active {
+  border-color: transparent !important;
+  color: var(--navy-light) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-decoration: none;
+}
+
+button.text-action:not(:disabled):hover,
+button.text-action:not(:disabled):active {
+  text-decoration: underline;
+}
+
+button.text-action.danger-action:not(:disabled),
+button.text-action.danger-action:not(:disabled):hover,
+button.text-action.danger-action:not(:disabled):active {
+  color: var(--sb-danger) !important;
+}
+
+.admin-vehicle-form-wrap {
+  margin-top: 22px;
+  border-top: 1px solid var(--sb-border-subtle);
+  padding-top: 18px;
+}
+
+/* Sign-in: muted password eye, original navy sign-up submit; hashed 20261124b. */
+body:has(.account-page) .account-password-toggle,
+body:has(.account-page) .account-password-toggle:active {
+  border-color: transparent !important;
+  color: var(--sb-text-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body:has(.account-page) .account-password-toggle:hover,
+body:has(.account-page) .account-password-toggle:focus-visible {
+  color: var(--sb-ink) !important;
+  background: var(--sb-accent-soft) !important;
+}
+
+body:has(.account-page) .account-submit:not(:disabled),
+body:has(.account-page) .account-submit:not(:disabled):active {
+  color: #fff !important;
+  background: var(--navy) !important;
+}
+
+body:has(.account-page) .account-submit:not(:disabled):hover {
+  color: #fff !important;
+  background: var(--sb-ink-soft) !important;
+  box-shadow: 0 6px 16px #12304a24 !important;
+}
+
+/* 20261124d: account switch controls are anchors, so the base link style applies. */
+
+/* 20261124e: passenger profile tables share the admin table finish and link-style actions. */
+.profile-table-wrap { margin-top: 4px; }
+.profile-table-wrap .admin-table { min-width: 680px; }
+.profile-table-wrap td small { display: block; margin-top: 2px; color: var(--sb-text-quiet); font-size: 10px; font-weight: 500; line-height: 1.45; }
+.profile-table-wrap .admin-table-actions { justify-content: flex-start; }
+
+/* 20261124f: keep the sign-up switch black on the dark account backdrop. */
+body:has(.account-page) .account-signup-link,
+body:has(.account-page) .account-signup-link:hover,
+body:has(.account-page) .account-signup-link:focus-visible {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #000 !important;
+  background: #fff;
+  font-weight: 800;
+}
+
+/* 20261124g: the help cards match in height and use high-contrast copy. */
+.help-layout { align-items: stretch; }
+.help-layout > .module-section {
+  display: flex;
+  flex-direction: column;
+  border-color: var(--sb-border);
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(7, 27, 48, .12);
+}
+.help-layout .module-section-heading h2 { color: var(--sb-ink); }
+.booking-help-steps li > span { color: var(--sb-ink-soft); }
+.booking-help-steps p { color: var(--sb-text); font-size: 13px; line-height: 1.55; }
+.help-report .module-form { gap: 9px; }
+.help-report .module-form label { gap: 4px; color: var(--sb-ink); font-size: 12px; }
+.help-report .module-form input,
+.help-report .module-form select,
+.help-report .module-form textarea {
+  min-height: 36px;
+  padding: 7px 10px;
+  border-color: var(--sb-border-strong);
+  color: var(--sb-ink);
+  background: #fff;
+  font-size: 13px;
+}
+.help-report .report-description { min-height: 58px; }
+.help-report .optional-label { color: var(--sb-text-muted); }
+.help-report .form-submit { min-height: 36px; margin-top: 0; }
+
+/* The seat map keeps its original states; global button coloring must not hide a picked seat. */
+button.seat-number,
+button.seat-number:not(:disabled),
+button.seat-number:not(:disabled):hover,
+button.seat-number:not(:disabled):active,
+button.seat-number[aria-pressed="false"] {
+  border-color: var(--sb-border-strong) !important;
+  color: var(--navy) !important;
+  background: var(--sb-surface) !important;
+  box-shadow: none !important;
+}
+
+button.seat-number.is-selected,
+button.seat-number.is-selected:not(:disabled),
+button.seat-number.is-selected:not(:disabled):hover,
+button.seat-number.is-selected:not(:disabled):active,
+button.seat-number.is-selected[aria-pressed="true"] {
+  border-color: var(--navy) !important;
+  color: var(--sb-text-on-ink) !important;
+  background: var(--navy) !important;
+  box-shadow: none !important;
+}
+
+button.seat-number.is-taken,
+button.seat-number.is-taken:not(:disabled),
+button.seat-number.is-taken:not(:disabled):hover,
+button.seat-number.is-taken:not(:disabled):active {
+  border-color: var(--sb-border-subtle) !important;
+  color: var(--sb-text-quiet) !important;
+  background: var(--sb-surface-sunken) !important;
+  box-shadow: none !important;
+}
+
+button.seat-number.is-locked,
+button.seat-number.is-locked:not(:disabled),
+button.seat-number.is-locked:not(:disabled):hover,
+button.seat-number.is-locked:not(:disabled):active {
+  border-color: var(--sb-border-subtle) !important;
+  color: var(--sb-text-quiet) !important;
+  background: var(--sb-surface-muted) !important;
+  box-shadow: none !important;
+}
+
+button.seat-number.is-admin,
+button.seat-number.is-admin:not(:disabled),
+button.seat-number.is-admin:not(:disabled):hover,
+button.seat-number.is-admin:not(:disabled):active {
+  border-color: #cdae64 !important;
+  color: var(--sb-warning) !important;
+  background: var(--sb-warning-bg) !important;
+  box-shadow: none !important;
 }

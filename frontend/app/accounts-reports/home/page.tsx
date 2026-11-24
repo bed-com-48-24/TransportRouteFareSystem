@@ -9,7 +9,7 @@ const links = [
 
 export default function AccountHomePage() {
   return (
-    <main className="min-h-screen bg-[var(--sb-page)] px-5 py-10 text-[var(--sb-ink)]">
+    <main className="account-home-page min-h-screen px-5 py-10 text-[var(--sb-ink)]">
       <section className="mx-auto max-w-5xl">
         <Link href="/" className="text-sm font-semibold text-[var(--sb-ink-soft)]">
           ← Passenger home
@@ -24,7 +24,7 @@ export default function AccountHomePage() {
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {links.map(([title, description, href]) => (
             <Link
-              key={href}
+              key={title}
               href={href}
               className="rounded-2xl border border-[var(--sb-border)] bg-white p-5 shadow-sm transition hover:border-[var(--sb-border-hover)] hover:shadow-md"
             >

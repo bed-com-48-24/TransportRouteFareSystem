@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     agentFeedback: true,
+    turbopackFileSystemCacheForDev: false,
   },
   cacheComponents: true,
   partialPrefetching: true,

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import DemoDataNotice from "@/components/DemoDataNotice";
+import ListPagination from "@/components/ListPagination";
+import { usePagedItems } from "@/components/usePagedItems";
 import { fmtDate } from "@/lib/booking-data";
 import { readBookings, saveBookings } from "@/lib/booking-data";
 import { notifyBookingStatus } from "@/lib/notifications";
@@ -49,6 +50,9 @@ export default function MyBookingsPage() {
           !email.trim() || item.email.toLowerCase() === email.trim().toLowerCase(),
       )
     : [];
+  const bookingPages = usePagedItems(results, (booking) => `${booking.route} ${booking.travelDate}`, {
+    resetKey: `${searched}|${email}`,
+  });
 
   function findBookings(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,7 +111,6 @@ export default function MyBookingsPage() {
         <div className="eyebrow">PASSENGER BOOKINGS</div>
         <h1 id="page-title">Find your bookings</h1>
         <p className="intro">Enter the email address used when you made the reservation.</p>
-        <DemoDataNotice show={usingDemo} what="bookings" />
         {error && !usingDemo && (
           <p className="message" role="alert">
             {error} — sign in as a passenger to see your live bookings.
@@ -131,7 +134,7 @@ export default function MyBookingsPage() {
         {notice && <p className="message success-message" role="status">{notice}</p>}
         {searched && (results.length ? (
           <div className="booking-list">
-            {[...results].reverse().map((booking) => (
+            {bookingPages.visibleItems.map((booking) => (
               <article className="booking-record" key={booking.reference}>
                 <div className="booking-record-main">
                   <strong>{booking.route || `Trip ${booking.tripId}`}</strong>
@@ -164,6 +167,12 @@ export default function MyBookingsPage() {
               : "No bookings found for this account yet."}
           </p>
         ))}
+        <ListPagination
+          page={bookingPages.page}
+          pageCount={bookingPages.pageCount}
+          onPageChange={bookingPages.setPage}
+          label="booking"
+        />
         <p className="booking-footnote">
           <span>ⓘ</span>{" "}
           {usingDemo

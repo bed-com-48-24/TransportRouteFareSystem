@@ -1,25 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import DemoDataNotice from "@/components/DemoDataNotice";
+import ListPagination from "@/components/ListPagination";
 import { useRoadRoutes } from "@/components/road-routing";
-import { travelEstimate } from "@/lib/geo";
-import QRCode from "qrcode";
+import { usePagedItems } from "@/components/usePagedItems";
 import { adminReservedSeatNumbers, availableSeatNumbers, availableSeats, fmtDate } from "@/lib/booking-data";
 import { nearestTransportTown, TRANSPORT_TOWN_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
 import { notifyBookingStatus } from "@/lib/notifications";
-import { readSavedRoutes, savedRouteId, toggleSavedRoute } from "@/lib/saved-routes";
 import { useBackendRoutes, useBackendTrips, useMyBookings } from "@/lib/use-backend-data";
 import type { Booking, Trip } from "@/lib/types";
 import { toBooking, toTrip } from "@/services/adapters";
 import * as apiBookings from "@/services/bookings.service";
 import * as apiPayments from "@/services/payments.service";
 import * as apiSchedules from "@/services/schedules.service";
-import type { Booking as ApiBooking, Payment, PaymentMethod } from "@/services/types";
+import type { Booking as ApiBooking, PaymentMethod } from "@/services/types";
+import { readPaymentDraft, savePaymentDraft } from "@/lib/payment-draft";
+import { holdSeats, readHeldSeats, releaseSeatHold } from "@/lib/seat-holds";
 import { savePaymentReceipt } from "@/lib/payment-receipts";
+import { savePaymentSuccess } from "@/lib/payment-success";
 import { savePassengerBookingDetails } from "@/lib/passenger-booking-details";
 import { useSession } from "@/lib/auth";
 import { readPassengerSession } from "@/lib/passenger-auth";
@@ -39,14 +40,8 @@ function tripKey(trip: Pick<Trip, "id" | "date">) {
   return `${trip.id}:${trip.date}`;
 }
 
-function paymentMethodLabel(method?: Booking["paymentMethod"]) {
-  switch (method) {
-    case "tnm": return "TNM Mpamba";
-    case "airtel": return "Airtel Money";
-    case "bank": return "Bank transfer";
-    case "card": return "Card";
-    default: return "Not recorded";
-  }
+function sameSeats(first: number[] = [], second: number[] = []) {
+  return first.length === second.length && first.every((seat, index) => seat === second[index]);
 }
 
 /** Read a booking search value passed from the home page on the client only. */
@@ -56,8 +51,9 @@ function readQueryParam(name: string): string {
 }
 
 export default function TransportBookingPage({ initialTripId, initialDate }: { initialTripId?: string; initialDate?: string }) {
+  const router = useRouter();
   const session = useSession();
-  const { data: trips, usingDemo: tripsAreDemo, reload: reloadTrips } = useBackendTrips();
+  const { data: trips, reload: reloadTrips } = useBackendTrips();
   const { data: routes } = useBackendRoutes();
   const { data: bookings, reload: reloadBookings } = useMyBookings();
   const initialTrip =
@@ -65,21 +61,19 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     trips.find((trip) => trip.id === initialTripId);
   const [selectedTripId, setSelectedTripId] = useState(initialTrip?.id ?? "");
   const [recoveryTrip, setRecoveryTrip] = useState<Trip | null>(null);
-  const [showDepartures, setShowDepartures] = useState(Boolean(initialTripId));
+  const [initialTripApplied, setInitialTripApplied] = useState(false);
   const [origin, setOrigin] = useState(initialTrip?.route.split(" → ")[0] ?? "");
   const [destination, setDestination] = useState(initialTrip?.route.split(" → ")[1] ?? "");
   const [travelDate, setTravelDate] = useState(initialTrip?.date ?? "");
   const [pickup, setPickup] = useState(initialTrip?.pickup[0] ?? "");
   const [dropoff, setDropoff] = useState(initialTrip?.dropoff[0] ?? "");
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
-  const [bookingStage, setBookingStage] = useState<"seats" | "details">("seats");
   const [seatError, setSeatError] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [notificationError, setNotificationError] = useState("");
   const [saving, setSaving] = useState(false);
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -92,15 +86,9 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
   const [paymentAccountName, setPaymentAccountName] = useState("");
   const [paymentAccountNumber, setPaymentAccountNumber] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
-  const [paymentResult, setPaymentResult] = useState<Payment | null>(null);
-  const [demoPaymentConfirmation, setDemoPaymentConfirmation] = useState(false);
   const [liveSeats, setLiveSeats] = useState<{ tripId: string; date: string; seats: number[] | null } | null>(null);
-  const [ticket, setTicket] = useState<Booking | null>(null);
-  const [ticketQr, setTicketQr] = useState("");
-  const [showTicket, setShowTicket] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [savedRouteIds, setSavedRouteIds] = useState<string[]>([]);
-  const [saveRouteError, setSaveRouteError] = useState("");
+  const [openingTrip, setOpeningTrip] = useState(false);
   const [locationStatus, setLocationStatus] = useState("Finding your current location…");
   const [userPosition, setUserPosition] = useState<Coordinates | null>(null);
   useEffect(() => {
@@ -151,7 +139,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         setEmail(booking.passengerEmail ?? passenger?.email ?? sessionEmail);
         setPassengerPhone(booking.phoneNumber ?? "");
         setPendingBookingReference(booking.reference);
-        setBookingStage("details");
         setPaymentPending(true);
         setNotice(`Continue payment for booking ${booking.reference}. This will reuse the seats already reserved.`);
       } catch (reason) {
@@ -192,7 +179,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     if (!selectedTrip) return;
     const { id, date } = selectedTrip;
     let cancelled = false;
-    apiSchedules.getSeats(Number(id), date).then((result) => {
+    const loadSeats = () => apiSchedules.getSeats(Number(id), date).then((result) => {
       if (cancelled) return;
       let available: number[] | null = null;
       if (Array.isArray(result.seats)) {
@@ -220,7 +207,11 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     }).catch(() => {
       if (!cancelled) setLiveSeats(null);
     });
-    return () => { cancelled = true; };
+    void loadSeats();
+    // Refresh while the passenger is choosing so seats picked by other
+    // passengers become locked here too, with an "already selected" message.
+    const timer = window.setInterval(() => void loadSeats(), 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, [selectedTrip]);
   const towns = [...new Set([
     ...routes.flatMap((route) => [route.origin, route.destination]),
@@ -282,6 +273,12 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     return routeTrips.filter((trip) => trip.date === travelDate);
   }, [hasRouteSelection, routeTrips, travelDate, upcomingTrips]);
 
+  const tripPages = usePagedItems(
+    displayedTrips,
+    (trip) => `${trip.route} ${trip.date} ${trip.departure}`,
+    { resetKey: `${hasRouteSelection}|${origin}|${destination}|${travelDate}` },
+  );
+
   const detailTrip = selectedTrip;
   const mapTrips = detailTrip ? [detailTrip] : [];
   const tripRoadRoutes = useRoadRoutes(mapTrips.flatMap((trip) => {
@@ -292,14 +289,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       ? [{ id: trip.id, origin: originCoordinates, destination: destinationCoordinates }]
       : [];
   }));
-  const visibleTripGeometry = mapTrips
-    .filter((trip) => {
-      const [origin, destination] = trip.route.split(" → ");
-      return TRANSPORT_TOWN_COORDINATES[origin] && TRANSPORT_TOWN_COORDINATES[destination];
-    })
-    .map((trip) => tripRoadRoutes[trip.id]);
-  const isTripRouting = visibleTripGeometry.some((geometry) => !geometry || geometry.status === "loading");
-  const tripFallbackCount = visibleTripGeometry.filter((geometry) => geometry?.status === "fallback").length;
   const seatsByTrip = useMemo(
     () =>
       new Map(
@@ -320,37 +309,38 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     () => (selectedTrip ? adminReservedSeatNumbers(selectedTrip) : []),
     [selectedTrip],
   );
+  const selectedTripIdForSeats = selectedTrip?.id ?? "";
+  const localHeldSeats = useMemo(
+    () => (selectedTripIdForSeats ? readHeldSeats(selectedTripIdForSeats, travelDate) : []),
+    [selectedTripIdForSeats, travelDate],
+  );
   const availableSeatList = useMemo(
     () => {
       const seats = liveAvailableSeatNumbers ?? (selectedTrip ? availableSeatNumbers(selectedTrip, bookings) : []);
-      return seats.filter((seat) => !adminSeats.includes(seat));
+      return seats.filter((seat) => !adminSeats.includes(seat) && !localHeldSeats.includes(seat));
     },
-    [selectedTrip, bookings, liveAvailableSeatNumbers, adminSeats],
+    [selectedTrip, bookings, liveAvailableSeatNumbers, adminSeats, localHeldSeats],
   );
   const available = availableSeatList.length;
   const passengers = selectedSeats.length;
   const seatLimitReached = passengers >= MAX_PASSENGERS;
 
-  function toggleTripSaved(route: string, fare: number) {
-    setSaveRouteError("");
-    try {
-      setSavedRouteIds(toggleSavedRoute(route, fare).map((item) => item.id));
-    } catch {
-      setSaveRouteError("That route could not be saved in this browser. Please try again.");
-    }
-  }
-  const onboardSeats = selectedTrip ? selectedTrip.capacity - availableSeatList.length : 0;
-
+  // If another passenger takes a seat that is in your selection, release it
+  // and explain that it has already been selected.
   useEffect(() => {
+    if (!selectedTrip || !liveAvailableSeatNumbers) return;
+    const taken = selectedSeats.filter(
+      (seat) => !liveAvailableSeatNumbers.includes(seat) || localHeldSeats.includes(seat),
+    );
+    if (taken.length === 0) return;
     const timer = window.setTimeout(() => {
-      try {
-        setSavedRouteIds(readSavedRoutes().map((route) => route.id));
-      } catch {
-        // Saved routes are optional; leave the bookmarks empty.
-      }
+      setSelectedSeats((current) => current.filter((seat) => !taken.includes(seat)));
+      setSeatError(`Seat ${taken.join(", ")} has already been selected by another passenger. Choose another seat.`);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [selectedTrip, liveAvailableSeatNumbers, localHeldSeats, selectedSeats]);
+
+  const onboardSeats = selectedTrip ? selectedTrip.capacity - availableSeatList.length : 0;
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -400,13 +390,12 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     const frame = window.requestAnimationFrame(() => {
       if (queryOrigin) setOrigin(queryOrigin);
       if (queryDestination) setDestination(queryDestination);
-      setShowDepartures(true);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [initialTripId]);
 
   useEffect(() => {
-    if (!initialTrip || (selectedTripId && selectedTripId !== initialTrip.id)) return;
+    if (!initialTrip || initialTripApplied || (selectedTripId && selectedTripId !== initialTrip.id)) return;
     const timer = window.setTimeout(() => {
       const [tripOrigin, tripDestination] = initialTrip.route.split(" → ");
       setSelectedTripId(initialTrip.id);
@@ -415,66 +404,73 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       setDestination((curr) => curr || tripDestination?.trim() || "");
       setPickup((curr) => curr || initialTrip.pickup[0] || "");
       setDropoff((curr) => curr || initialTrip.dropoff[0] || "");
+      setOpeningTrip(false);
+      // Apply the deep-linked trip once; "Back to trips" must stay cleared.
+      setInitialTripApplied(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [initialTrip, initialDate, selectedTripId]);
+  }, [initialTrip, initialDate, selectedTripId, initialTripApplied]);
 
   function resetTripSelection() {
     setSelectedTripId("");
     setSelectedSeats([]);
     setPendingBookingReference("");
-    setBookingStage("seats");
     setSeatError("");
     setPaymentPending(false);
     setSearchError("");
+    setOpeningTrip(false);
     setError("");
     setNotice("");
-    setPaymentResult(null);
-  }
-
-  function startBooking() {
-    setSearchError("");
-    setShowDepartures(true);
-    setTimeout(() => {
-      document.getElementById("trip-results")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 50);
   }
 
   function searchTrips(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetTripSelection();
-    setShowDepartures(true);
+    setOpeningTrip(true);
+
+    function stopWithError(message: string) {
+      setOpeningTrip(false);
+      setSearchError(message);
+    }
 
     if (!origin.trim() || !destination.trim()) {
-      setSearchError("Enter a departure location and destination.");
+      stopWithError("Enter a departure location and destination.");
       return;
     }
     if (origin.trim().toLocaleLowerCase() === destination.trim().toLocaleLowerCase()) {
-      setSearchError("Choose a destination different from your departure location.");
+      stopWithError("Choose a destination different from your departure location.");
       return;
     }
     if (!hasDefinedRoute) {
-      setSearchError(`A direct route from ${origin.trim()} to ${destination.trim()} has not been defined by the admin.`);
+      stopWithError(`A direct route from ${origin.trim()} to ${destination.trim()} has not been defined by the admin.`);
       return;
     }
     if (travelDate && travelDate < minTravelDate) {
-      setSearchError("Choose a future travel date.");
+      stopWithError("Choose a future travel date.");
       return;
     }
     if (travelDate && !scheduledDates.includes(travelDate)) {
-      setSearchError("Choose a travel date that has an admin-scheduled trip for this route.");
+      stopWithError("Choose a travel date that has an admin-scheduled trip for this route.");
       return;
     }
 
-    setTimeout(() => {
-      document.getElementById("trip-results")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 50);
+    // The button says "Book a trip", so open the first matching departure
+    // instead of only scrolling to results that are already on screen.
+    const firstTrip = displayedTrips[0];
+    if (!firstTrip) {
+      stopWithError("No admin-scheduled departures match this search yet.");
+      window.setTimeout(() => {
+        document.getElementById("trip-results")?.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start",
+        });
+      }, 50);
+      return;
+    }
+
+    router.push(
+      `/transport-booking/details/${encodeURIComponent(firstTrip.id)}?date=${encodeURIComponent(firstTrip.date)}`,
+    );
   }
 
   function toggleSeat(seat: number) {
@@ -483,7 +479,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       return;
     }
     if (!availableSeatList.includes(seat)) {
-      setSeatError(`Seat ${seat} is already taken. Choose an available seat.`);
+      setSeatError(`Seat ${seat} has already been selected. Choose an available seat.`);
       return;
     }
 
@@ -503,54 +499,15 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     }
   }
 
-  function confirmSeats() {
-    if (!selectedTrip) return;
-    if (selectedSeats.length === 0) {
-      setSeatError("Choose at least one available seat to continue.");
-      return;
-    }
-    if (selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
-      setSeatError("One of your seats has just been taken. Choose another seat.");
-      return;
-    }
-    setSeatError("");
-    setBookingStage("details");
-    setTimeout(() => {
-      document.getElementById("reservation-heading")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 50);
-  }
-
-  function selectTripForBooking(trip: Trip) {
-    const seatsLeft = seatsByTrip.get(tripKey(trip)) ?? availableSeats(trip, bookings);
-    if (seatsLeft === 0) return;
-
-    setSelectedTripId(trip.id);
-    setTravelDate(trip.date);
-    setPickup(trip.pickup[0] ?? "");
-    setDropoff(trip.dropoff[0] ?? "");
-    setSelectedSeats([]);
-    setBookingStage("seats");
-    setSeatError("");
-    setPaymentPending(false);
-    setError("");
-    setNotice("");
-
-    setTimeout(() => {
-      document.getElementById("reservation-heading")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 50);
-  }
-
   function returnToTrips() {
-    document.getElementById("trips-heading")?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    });
+    // Clear the current choice so the departure list is visible again.
+    resetTripSelection();
+    setTimeout(() => {
+      document.getElementById("trips-heading")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 50);
   }
 
   async function submitBooking(event: FormEvent<HTMLFormElement>) {
@@ -589,12 +546,71 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
       return;
     }
 
-    if (!pendingBookingReference && selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
-      setError("One of your seats is no longer available. Go back and choose another seat.");
+    const seats = [...selectedSeats].sort((first, second) => first - second);
+    if (selectedSeats.some((seat) => !availableSeatList.includes(seat))) {
+      setError("One of your seats has already been selected by another passenger. Choose another seat.");
       return;
     }
 
-    setPaymentPending(true);
+    setSaving(true);
+    try {
+      // Hold the seats on the backend as soon as the passenger commits to
+      // booking. Other passengers will no longer see them as selectable.
+      const existingDraft = readPaymentDraft();
+      let holdReference = existingDraft?.pendingBookingReference ?? "";
+
+      if (holdReference) {
+        const existing = await apiBookings.get(holdReference);
+        if (existing.status === "paid" || existing.status === "confirmed") {
+          setError("These seats have already been booked. Choose different seats.");
+          return;
+        }
+        const reusable =
+          (existing.status === "draft" || existing.status === "reviewed") &&
+          existing.scheduleId === Number(selectedTrip.id) &&
+          existing.travelDate === travelDate &&
+          sameSeats(existing.seatNumbers, seats);
+        if (!reusable) {
+          await apiBookings.cancel(holdReference).catch(() => undefined);
+          releaseSeatHold(holdReference);
+          holdReference = "";
+        }
+      }
+
+      if (!holdReference) {
+        const created = await apiBookings.create({
+          scheduleId: Number(selectedTrip.id),
+          travelDate,
+          seatNumbers: seats,
+        });
+        holdReference = created.reference;
+      }
+
+      await apiBookings.updatePassenger(holdReference, {
+        passengerName: name.trim(),
+        passengerEmail: email.trim().toLowerCase(),
+        phoneNumber: passengerPhone.replace(/[\s-]/g, ""),
+      });
+      holdSeats({ reference: holdReference, tripId: selectedTrip.id, date: travelDate, seats });
+      savePaymentDraft({
+        tripId: selectedTrip.id,
+        travelDate,
+        seats,
+        pickup,
+        dropoff,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: passengerPhone.replace(/[\s-]/g, ""),
+        pendingBookingReference: holdReference,
+      });
+      reloadTrips();
+      reloadBookings();
+      router.push("/transport-booking/payment");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The seats could not be held. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function completePayment() {
@@ -631,7 +647,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
 
     setSaving(true);
     setError("");
-    setNotificationError("");
     let createdReference: string | undefined = pendingBookingReference || undefined;
     let shouldCancelCreatedBooking = false;
     let paymentRequestStarted = false;
@@ -701,8 +716,6 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         const demoSuccess = backendPaymentStatus === "pending" && selectedMethod.provider === "simulated";
         const paymentStatus = demoSuccess ? "successful" : backendPaymentStatus;
         const paymentConfirmed = demoSuccess || ["succeeded", "paid", "completed", "success", "successful"].includes(paymentStatus);
-        setDemoPaymentConfirmation(demoSuccess);
-        setPaymentResult({ ...payment, status: paymentStatus });
         const paidAmount = Number(payment.amount ?? activeTrip.fare * passengers);
         try {
           savePaymentReceipt({
@@ -724,7 +737,7 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
         }
         if (!paymentConfirmed) {
           setPaymentPending(true);
-          setNotice(`Payment is ${payment.status ?? "pending"}. The booking is reserved, but it is not marked paid. Booking reference: ${created.reference}.`);
+          setNotice(`Payment pending. Booking reference: ${created.reference}. You can retry below.`);
           reloadBookings();
           reloadTrips();
           return;
@@ -752,63 +765,29 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
           paidAt: payment.createdAt ?? new Date().toISOString(),
         };
 
-      const qr = await QRCode.toDataURL(JSON.stringify({
-        reference: booking.reference,
-        tripId: booking.tripId,
-        route: booking.route,
-        travelDate: booking.travelDate,
-        pickup: booking.pickup,
-        dropoff: booking.dropoff,
-        passengers: booking.passengers,
-        seats: booking.seats,
-      }), { errorCorrectionLevel: "H", margin: 1, width: 280 });
-
-      setTicket(booking);
-      setTicketQr(qr);
-      setShowTicket(true);
-      window.setTimeout(() => {
-        document.getElementById("ticket-heading")?.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-          block: "start",
-        });
-      }, 50);
+      savePaymentSuccess(booking);
       setPaymentPending(false);
       setPendingBookingReference("");
-      setNotice(paymentConfirmed
-        ? demoSuccess
-          ? "Demo payment successful. Your ticket is ready. The backend payment record still shows pending."
-          : "Payment confirmed. Your bus ticket is ready."
-        : `Payment ${payment.status ?? "initiated"}. Your booking reference is ${booking.reference}.`);
-      try {
-        const paymentDetails = [
-          `Passenger: ${name.trim()}`,
-          `Route: ${booking.route}`,
-          `Amount paid: ${payment.currency ?? "MWK"} ${paidAmount.toLocaleString("en-MW")}`,
-          `Method: ${selectedMethod.name}`,
-          `Payment record ID: ${payment.id}`,
-          ...(demoSuccess ? ["Demo confirmation only; backend payment status remains pending"] : []),
-          payment.transactionReference
-            ? `Confirmation code: ${payment.transactionReference}`
-            : "Confirmation code: Not provided by the payment simulator",
-          `Booking reference: ${booking.reference}`,
-        ].join(" · ");
-        notifyBookingStatus(
-          booking,
-          "payment-complete",
-          `Payment ${payment.status ?? "successful"}. ${paymentDetails}`,
-        );
-      } catch {
-        setNotificationError("Your booking and ticket are ready, but the in-app notification could not be saved.");
-      }
+      setNotice("");
       setSelectedTripId("");
       setSelectedSeats([]);
-      setBookingStage("seats");
       setName("");
       setEmail("");
       setPassengerPhone("");
+      try {
+        notifyBookingStatus(
+          booking,
+          "payment-complete",
+          `Payment received for ${booking.route}. Booking reference: ${booking.reference}.`,
+        );
+      } catch {
+        // The confirmation page remains authoritative if notifications are unavailable.
+      }
       // The booking just changed live seat counts, so refresh the trip list.
       reloadTrips();
       reloadBookings();
+      router.push("/transport-booking/payment/success");
+      return;
     } catch (reason) {
       if (createdReference && shouldCancelCreatedBooking && !paymentRequestStarted) {
         try {
@@ -827,148 +806,22 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
     }
   }
 
-  function viewTicket() {
-    setShowTicket(true);
-    setTimeout(() => {
-      document.getElementById("ticket-heading")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 50);
-  }
-
-  async function downloadTicketImage() {
-    if (!ticket || !ticketQr) return;
-
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1200;
-      canvas.height = 720;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas is not available in this browser.");
-
-      context.fillStyle = "#f2f7fb";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = "#ffffff";
-      context.fillRect(32, 32, 1136, 656);
-      context.fillStyle = "#12304a";
-      context.fillRect(32, 32, 1136, 130);
-      context.fillStyle = "#ffffff";
-      context.font = "700 42px sans-serif";
-      context.fillText("SBUS BUS TICKET", 76, 92);
-      context.font = "20px sans-serif";
-      context.fillText("PAYMENT CONFIRMED", 78, 130);
-      const receiptLine = [
-        ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod),
-        `MWK ${(ticket.amountPaid ?? 0).toLocaleString("en-MW")}`,
-        `Booking ${ticket.reference}`,
-      ].filter(Boolean).join(" · ");
-      context.fillStyle = "#526d87";
-      context.font = "600 17px sans-serif";
-      context.fillText(`Paid: ${receiptLine}`, 78, 190, 900);
-
-      const ticketFields = [
-        ["ROUTE", ticket.route],
-        ["PASSENGER", ticket.name],
-        ["DATE", fmtDate(ticket.travelDate)],
-        ["BOARDING", ticket.pickup],
-        ["DESTINATION", ticket.dropoff],
-        ["PASSENGERS", String(ticket.passengers)],
-        ["SEATS", ticket.seats?.length ? ticket.seats.join(", ") : "Not assigned"],
-        ["REFERENCE", ticket.reference],
-      ];
-      let fieldY = 230;
-      for (const [label, value] of ticketFields) {
-        context.fillStyle = "#526d87";
-        context.font = "700 16px sans-serif";
-        context.fillText(label, 78, fieldY);
-        context.fillStyle = "#12304a";
-        context.font = "600 24px sans-serif";
-        context.fillText(value, 78, fieldY + 34, 680);
-        fieldY += label === "ROUTE" ? 90 : 68;
-      }
-
-      const qrImage = document.createElement("img");
-      qrImage.src = ticketQr;
-      await qrImage.decode();
-      context.fillStyle = "#ffffff";
-      context.fillRect(850, 300, 260, 260);
-      context.drawImage(qrImage, 860, 310, 240, 240);
-      context.fillStyle = "#526d87";
-      context.font = "16px sans-serif";
-      context.fillText("Scan to verify ticket", 880, 590);
-
-      const download = document.createElement("a");
-      download.href = canvas.toDataURL("image/png");
-      download.download = `sbus-ticket-${ticket.reference}.png`;
-      download.click();
-    } catch {
-      setError("Ticket image could not be created. Please try again.");
-    }
-  }
-
   return (
     <main className="module-shell transport-page-shell">
       <div className="transport-background" aria-hidden="true" />
-      <DemoDataNotice show={tripsAreDemo} what="departures" />
-      {paymentResult && (
-        <section className="module-section" aria-label="Backend payment result" aria-live="polite">
-          <div className="module-section-heading">
-            <div><p className="module-eyebrow">{demoPaymentConfirmation ? "DEMO PAYMENT RESULT" : "BACKEND PAYMENT RESULT"}</p><h2>{paymentResult.status ?? "Response received"}</h2></div>
-          </div>
-          {demoPaymentConfirmation && <p className="module-footnote">This is a local demonstration confirmation. The backend payment record remains pending; no real payment provider has confirmed a charge.</p>}
-          <dl className="payment-success-list">
-            <div><dt>Payment ID</dt><dd>{paymentResult.id}</dd></div>
-            {paymentResult.bookingReference && <div><dt>Booking reference</dt><dd>{paymentResult.bookingReference}</dd></div>}
-            {paymentResult.amount !== undefined && <div><dt>Amount</dt><dd>{paymentResult.currency ?? "MWK"} {paymentResult.amount.toLocaleString("en-MW")}</dd></div>}
-            {paymentResult.method && <div><dt>Method</dt><dd>{paymentResult.method}</dd></div>}
-            {paymentResult.transactionReference && <div><dt>Confirmation code</dt><dd>{paymentResult.transactionReference}</dd></div>}
-            {paymentResult.createdAt && <div><dt>Created</dt><dd>{new Date(paymentResult.createdAt).toLocaleString()}</dd></div>}
-            {!paymentResult.transactionReference && <p className="module-footnote">The payment simulator did not return a separate confirmation code. Use the payment ID above as the record ID.</p>}
-          </dl>
-        </section>
-      )}
-      <header className="module-intro">
-        <h1>{selectedTrip ? `${selectedTrip.route} booking` : "Book a scheduled trip"}</h1>
-        <p>Choose a departure, select seats, and enter passenger details.</p>
-        <div className="module-shortcuts">
-          <a href="#trips-heading">Scheduled departures</a>
-          {selectedTrip && <a href="#reservation-heading">Pick your seats</a>}
-          <Link href="/transport-booking/my-bookings">My bookings</Link>
-          <Link href="/help">How booking works</Link>
-        </div>
-      </header>
-
       {notice && <p className="module-notice" role="status">{notice}</p>}
       {error && !paymentPending && <p className="module-error" role="alert">{error}{!session && <> <Link href="/login/user">Sign in</Link></>}</p>}
-      {notificationError && <p className="module-error" role="alert">{notificationError}</p>}
       {((initialTripId && !initialTrip) || (selectedTripId && !selectedTrip)) && (
         <p className="module-error" role="alert">
           This scheduled trip is no longer available. Search again for an admin-scheduled departure.
         </p>
       )}
 
-      <section id="trips-heading" className="module-section" aria-label="Scheduled departures">
-        {!showDepartures ? (
-          <div className="module-empty booking-start">
-            <p className="module-eyebrow">READY TO TRAVEL?</p>
-            <p>Choose one of the departures scheduled by the transport admin, then pick your seats.</p>
-            <button className="primary-button" type="button" onClick={startBooking}>Book a trip</button>
-          </div>
-        ) : (
-          <>
-        <div className="module-section-heading">
-          <div>
-            <p className="module-eyebrow">SEARCH ADMIN SCHEDULES</p>
-            {hasRouteSelection && (
-              <h2>{origin.trim()} → {destination.trim()} scheduled trips</h2>
-            )}
-          </div>
-          <span className="module-count">{displayedTrips.length} departure{displayedTrips.length === 1 ? "" : "s"}</span>
-        </div>
-
+      <div className={`booking-page-columns${detailTrip ? " has-trip" : ""}`}>
+      <section id="trips-heading" className="module-section" aria-label="Available departures">
+        <div className={detailTrip ? "booking-search-layout" : "booking-search-layout is-split"}>
         <form className="module-form" onSubmit={searchTrips}>
-          <div className="module-form-grid">
+          <div className="module-form-grid" style={{ gridTemplateColumns: "1fr" }}>
             <label>
               Departure location
               <input list="booking-towns" value={origin} onChange={(event) => { setOrigin(event.target.value); setTravelDate(""); resetTripSelection(); }} placeholder="e.g. Zomba" autoComplete="off" required />
@@ -992,27 +845,19 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
               />
               {travelDate && !scheduledDates.includes(travelDate) ? (
                 <span className="module-field-hint">No admin-scheduled trip on this date. Choose a date the admin has scheduled.</span>
-              ) : !travelDate && scheduledDates.length > 0 ? (
-                <span className="module-field-hint">Pick an admin-scheduled date to filter the departures, or leave it blank to see every scheduled date.</span>
               ) : null}
             </label>
           </div>
           <datalist id="booking-towns">{towns.map((town) => <option key={town} value={town} />)}</datalist>
           {locationStatus && <p className="home-location-status" role="status">{locationStatus}</p>}
-          <button className="primary-button" type="submit">Book a trip</button>
+          <button className="primary-button book-trip-search-button" type="submit" disabled={openingTrip}>
+            {openingTrip ? "Opening trip…" : "Book a trip"}
+          </button>
         </form>
         {searchError && <p className="module-error" role="alert">{searchError}</p>}
 
+        {!selectedTrip && (
         <div id="trip-results" className="trip-results">
-          {displayedTrips.length > 0 && (
-            <p className="trip-results-hint">
-              {hasRouteSelection
-                ? `Select one of the ${displayedTrips.length} admin-scheduled departure${displayedTrips.length === 1 ? "" : "s"} below to continue.`
-                : "Select an upcoming departure below to continue."}
-            </p>
-          )}
-          <p className="module-footnote">Check your selected journey and fare before booking.</p>
-          {saveRouteError && <p className="module-error" role="alert">{saveRouteError}</p>}
           {displayedTrips.length === 0 ? (
             !hasRouteSelection ? (
               <div className="module-empty" role="status">
@@ -1035,91 +880,73 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             ) : null
           ) : null}
           {displayedTrips.length > 0 && (
-            <div className="module-card-grid">
-              {displayedTrips.map((trip) => {
-                const seats = seatsByTrip.get(tripKey(trip)) ?? availableSeats(trip, bookings);
-                const isSelected = selectedTrip ? tripKey(selectedTrip) === tripKey(trip) : false;
-                const departureTown = trip.route.split(" → ")[0] ?? "";
-                const departureCoordinates = TRANSPORT_TOWN_COORDINATES[departureTown];
-                const travelInfo = userPosition && departureCoordinates
-                  ? travelEstimate(userPosition.lat, userPosition.lng, departureCoordinates.lat, departureCoordinates.lng)
-                  : null;
+            <div className="trip-chat-list">
+              {tripPages.visibleItems.map((trip) => {
+                const key = tripKey(trip);
+                const seats = seatsByTrip.get(key) ?? availableSeats(trip, bookings);
+                const [fromTown, toTown] = trip.route.split(" → ");
                 return (
-                  <article className={`trip-choice${isSelected ? " is-selected" : ""}`} key={tripKey(trip)}>
-                    <div className="trip-choice-top">
-                      <span className="trip-service">{trip.vehicleType || "Scheduled trip"}</span>
-                      <div className="trip-choice-tools">
-                        <span className={`seat-status${seats === 0 ? " is-full" : ""}`}>
-                          {seats === 0 ? "Full" : `${seats} seats left`}
-                        </span>
-                        {(() => {
-                          const isSaved = savedRouteIds.includes(savedRouteId(trip.route));
-                          return (
-                            <button
-                              type="button"
-                              className={`save-route-button${isSaved ? " is-saved" : ""}`}
-                              aria-pressed={isSaved}
-                              onClick={() => toggleTripSaved(trip.route, trip.fare)}
-                            >
-                              <svg viewBox="0 0 24 24" width="13" height="13" fill={isSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M6 4h12v17l-6-4-6 4V4Z" />
-                              </svg>
-                              {isSaved ? "Saved" : "Save route"}
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <h3>{trip.route}</h3>
-                    <dl className="trip-facts">
-                      <div><dt>Date</dt><dd>{fmtDate(trip.date)}</dd></div>
-                      {travelInfo && <div><dt>From your position</dt><dd>{travelInfo.label}</dd></div>}
-                      <div><dt>Departure</dt><dd>{trip.departure}</dd></div>
-                      <div><dt>Arrival estimate</dt><dd>{trip.arrival}</dd></div>
-                      <div><dt>Passenger seats</dt><dd>{trip.capacity}</dd></div>
-                      <div><dt>Fare</dt><dd>MWK {trip.fare.toLocaleString("en-MW")} <small>per passenger</small></dd></div>
-                    </dl>
-                    <div className="trip-stops">
-                      <p><strong>Board:</strong> {trip.pickup.join(" or ")}</p>
-                      <p><strong>Get off:</strong> {trip.dropoff.join(" or ")}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className={`primary-button${seats === 0 ? " is-disabled" : ""}`}
-                      aria-disabled={seats === 0}
-                      disabled={seats === 0}
-                      onClick={() => selectTripForBooking(trip)}
-                    >
-                      {seats === 0 ? "Full" : isSelected ? "Selected for booking ✓" : "Choose this trip"}
-                    </button>
-                  </article>
+                  <Link
+                    key={key}
+                    className="trip-chat-item trip-chat-row"
+                    href={`/transport-booking/details/${encodeURIComponent(trip.id)}?date=${encodeURIComponent(trip.date)}`}
+                    aria-label={`View departure on ${fmtDate(trip.date)} at ${trip.departure}`}
+                  >
+                    <span className="trip-chat-avatar" aria-hidden="true">{fromTown?.slice(0, 1)}{toTown?.slice(0, 1)}</span>
+                    <span className="trip-chat-copy">
+                      <strong>{fmtDate(trip.date)} · {trip.departure}–{trip.arrival}</strong>
+                      <span>MWK {trip.fare.toLocaleString("en-MW")} · {seats === 0 ? "Full" : `${seats} seats left`}</span>
+                    </span>
+                    <span className={`trip-chat-status${seats === 0 ? " is-full" : ""}`}>{seats === 0 ? "Full" : `${seats} left`}</span>
+                  </Link>
                 );
               })}
             </div>
           )}
+          <ListPagination
+            page={tripPages.page}
+            pageCount={tripPages.pageCount}
+            onPageChange={tripPages.setPage}
+            label="departure"
+          />
         </div>
-          </>
         )}
+        </div>
       </section>
 
-      {(selectedTrip || ticket) && (
-      <section id="reservation-heading" className="module-section" aria-label={bookingStage === "seats" ? "Pick your seats" : "Passenger details"}>
+      {selectedTrip && (
+      <section id="reservation-heading" className="module-section" aria-label={paymentPending ? "Payment" : "Book your trip"}>
         {selectedTrip && (
           <div className="module-section-heading">
             <div>
-              <p className="module-eyebrow">{bookingStage === "seats" ? "STEP 1 · PICK YOUR SEATS" : "STEP 2 · PASSENGER DETAILS"}</p>
               <h2>{selectedTrip.route}</h2>
             </div>
-            <span className="module-count">{available} seats left</span>
           </div>
         )}
-        <div className={detailTrip ? "detail-booking-layout" : undefined}>
+        <div className={detailTrip ? `detail-booking-layout${paymentPending ? " is-payment" : ""}` : undefined}>
           <div className={detailTrip ? "detail-booking-main" : undefined}>
         {!selectedTrip ? null : paymentPending ? (
           <div className="payment-panel">
+            <article className="trip-choice payment-trip-card" aria-label="Trip selected for booking">
+              <div className="trip-choice-top">
+                <span className="trip-service">{selectedTrip.vehicleType || "Scheduled trip"}</span>
+              </div>
+              <h3>Selected departure</h3>
+              <dl className="trip-facts">
+                <div><dt>Date</dt><dd>{fmtDate(travelDate)}</dd></div>
+                <div><dt>Departure</dt><dd>{selectedTrip.departure}</dd></div>
+                <div><dt>Arrival estimate</dt><dd>{selectedTrip.arrival}</dd></div>
+                <div><dt>Seats</dt><dd>{selectedSeats.length > 0 ? selectedSeats.join(", ") : "None"}</dd></div>
+                <div><dt>Passengers</dt><dd>{passengers}</dd></div>
+                <div><dt>Fare</dt><dd>MWK {selectedTrip.fare.toLocaleString("en-MW")} <small>per passenger</small></dd></div>
+              </dl>
+              <div className="trip-stops">
+                <p><strong>Board:</strong> {pickup || selectedTrip.pickup.join(" or ")}</p>
+                <p><strong>Get off:</strong> {dropoff || selectedTrip.dropoff.join(" or ")}</p>
+              </div>
+            </article>
             <div>
-              <p className="module-eyebrow">CHECKOUT</p>
-              <h3>{selectedTrip.route}</h3>
+              <h3>Payment summary</h3>
               <p>{fmtDate(travelDate)} · {selectedTrip.departure} · {passengers} passenger{passengers === 1 ? "" : "s"}</p>
               <strong>Amount due: MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
             </div>
@@ -1148,129 +975,25 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
             }}>Retry</button></p>}
             {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="module-error" role="alert">No supported payment methods are available.</p>}
             {error && <p className="module-error" role="alert">{error}</p>}
-            <p className="module-footnote">Confirm the application fare and schedule with the transport operator before travelling.</p>
+            {saving && <p className="module-copy" role="status">Sending payment request…</p>}
             <div className="payment-actions">
-              <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethodsLoading || paymentMethods.length === 0}>
-                {saving ? "Sending payment request…" : `${pendingBookingReference ? "Retry payment for this booking" : "Pay"} · MWK ${(selectedTrip.fare * passengers).toLocaleString("en-MW")}`}
+              <button className="primary-button" type="button" onClick={completePayment} disabled={saving || paymentMethodsLoading || paymentMethods.length === 0} aria-busy={saving}>
+                Pay
               </button>
               <button className="secondary-button" type="button" onClick={() => setPaymentPending(false)} disabled={saving}>Back to reservation details</button>
             </div>
           </div>
-        ) : bookingStage === "seats" ? (
-          <div className="seat-step">
-            <div className="seat-step-intro">
-              <h3>Pick your seats</h3>
-              <p>
-                {fmtDate(selectedTrip.date)} · departs {selectedTrip.departure} · {selectedTrip.pickup.join(" or ")} to {selectedTrip.dropoff.join(" or ")}.
-                Seat 1 is reserved by the admin next to the door, and the driver seat cannot be booked.
-              </p>
-            </div>
-            <div className="seat-step-layout">
-              <div>
-                <div className="bus-seat-map">
-                  <div className="bus-front">
-                    <span className="bus-door">Door</span>
-                    <span className="bus-aisle-label">Aisle</span>
-                    <span className="driver-seat">Driver<small>Not bookable</small></span>
-                  </div>
-                  <div className="seat-grid bus-seat-grid" role="group" aria-label={`Seats for ${selectedTrip.route}`}>
-                    {Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1).map((seat, order) => {
-                      const isAdminSeat = adminSeats.includes(seat);
-                      const isAvailable = availableSeatList.includes(seat);
-                      const isSelected = selectedSeats.includes(seat);
-                      const isLockedByLimit = seatLimitReached && !isSelected;
-                      const seatState = isAdminSeat
-                        ? "reserved by the admin"
-                        : isSelected
-                          ? "selected"
-                          : isLockedByLimit
-                            ? `locked, you already picked the ${MAX_PASSENGERS}-seat limit`
-                            : isAvailable
-                              ? "available"
-                              : "taken";
-                      return (
-                        <button
-                          key={seat}
-                          type="button"
-                          style={{ gridColumn: SEAT_COLUMNS[order % SEAT_COLUMNS.length], gridRow: Math.floor(order / SEAT_COLUMNS.length) + 1 }}
-                          className={`seat-number${isSelected ? " is-selected" : ""}${isAvailable ? "" : " is-taken"}${isAdminSeat ? " is-admin" : ""}${isLockedByLimit ? " is-locked" : ""}`}
-                          aria-pressed={isSelected}
-                          aria-label={`Seat ${seat}, ${seatState}`}
-                          title={isAdminSeat ? "Seat 1 is reserved by the admin next to the door" : isSelected ? `Seat ${seat} selected` : isLockedByLimit ? `Deselect a seat to choose seat ${seat}` : isAvailable ? `Choose seat ${seat}` : `Seat ${seat} is taken`}
-                          disabled={!isAvailable || isLockedByLimit}
-                          onClick={() => toggleSeat(seat)}
-                        >
-                          <span>{seat}</span>
-                          {isAdminSeat ? <small>Admin</small> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <ul className="seat-legend" aria-label="Seat map key">
-                  <li><i className="legend-free" aria-hidden="true" />Available</li>
-                  <li><i className="legend-picked" aria-hidden="true" />Selected</li>
-                  <li><i className="legend-taken" aria-hidden="true" />Taken</li>
-                  <li><i className="legend-admin" aria-hidden="true" />Admin reserved (door side)</li>
-                  <li><i className="legend-driver" aria-hidden="true" />Driver</li>
-                </ul>
-                <p className="seat-picker-help">
-                  Select up to {MAX_PASSENGERS} seats. {availableSeatList.length} of {selectedTrip.capacity} seats are available on this trip.
-                  {selectedSeats.length >= MAX_PASSENGERS ? ` You have reached the ${MAX_PASSENGERS}-seat limit.` : ""}
-                </p>
-                {seatError && <p className="module-error" role="alert">{seatError}</p>}
-              </div>
-              <aside className="seat-summary" aria-label="Fare and seat calculation">
-                <p className="module-eyebrow">FARE CALCULATION</p>
-                <dl className="seat-summary-list">
-                  <div><dt>Fare per passenger</dt><dd>MWK {selectedTrip.fare.toLocaleString("en-MW")}</dd></div>
-                  <div><dt>Seats you picked</dt><dd>{selectedSeats.length > 0 ? selectedSeats.join(", ") : "None yet"}</dd></div>
-                  <div><dt>Passengers</dt><dd>{passengers} of {MAX_PASSENGERS}</dd></div>
-                  <div><dt>People on the bus</dt><dd>{onboardSeats} of {selectedTrip.capacity}</dd></div>
-                  <div><dt>After this booking</dt><dd>{Math.min(selectedTrip.capacity, onboardSeats + passengers)} of {selectedTrip.capacity}</dd></div>
-                  <div><dt>Seats still free</dt><dd>{Math.max(0, availableSeatList.length - passengers)} of {selectedTrip.capacity}</dd></div>
-                </dl>
-                <p className="seat-summary-total"><span>Total</span><strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong></p>
-                <p className="module-footnote">Seat {adminSeats[0] ?? 1} stays reserved for the admin. Payment is simulated after you enter passenger details.</p>
-                <button className="primary-button" type="button" onClick={confirmSeats} disabled={selectedSeats.length === 0}>
-                  Confirm {passengers === 0 ? "seats" : `${passengers} seat${passengers === 1 ? "" : "s"}`}
-                </button>
-                <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-              </aside>
-            </div>
-          </div>
         ) : (
-          <form className="module-form" onSubmit={submitBooking} noValidate>
+          <form id="passenger-details-form" className="module-form" onSubmit={submitBooking} noValidate>
             {!session && <p className="module-notice" role="status">Sign in as a passenger to reserve seats and pay. <Link href="/login/user">Sign in</Link></p>}
             <div className="reservation-summary">
               <div>
-                <span>Your trip</span>
-                <strong>{selectedTrip.route}</strong>
-                <small>{fmtDate(selectedTrip.date)} · departs {selectedTrip.departure}</small>
+                <strong>Selected departure</strong>
               </div>
               <div>
-                <span>People on the bus</span>
                 <strong>{onboardSeats} of {selectedTrip.capacity}</strong>
-                <small>{available} seats available · availability is checked when you confirm.</small>
+                <small>MWK {selectedTrip.fare.toLocaleString("en-MW")} × {passengers} = MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</small>
               </div>
-              <div>
-                <span>Estimated total</span>
-                <strong>MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")}</strong>
-                <small>{passengers} passenger{passengers === 1 ? "" : "s"} · payment not taken</small>
-              </div>
-            </div>
-
-            <div className="seat-selection-bar">
-              <div>
-                <span>Your seats</span>
-                <strong>{selectedSeats.join(", ")}</strong>
-                <small>
-                  {passengers} passenger{passengers === 1 ? "" : "s"} · MWK {(selectedTrip.fare * passengers).toLocaleString("en-MW")} total
-                </small>
-              </div>
-              <button className="secondary-button" type="button" onClick={() => setBookingStage("seats")}>
-                Change seats
-              </button>
             </div>
 
             <div className="module-form-grid">
@@ -1301,84 +1024,84 @@ export default function TransportBookingPage({ initialTripId, initialDate }: { i
               <label>
                 Phone number
                 <input type="tel" autoComplete="tel" maxLength={20} value={passengerPhone} onChange={(event) => setPassengerPhone(event.target.value)} placeholder="e.g. 0991234567" required />
-                <small>Enter at least 7 digits, including country code if needed.</small>
               </label>
             </div>
 
+            {saving && <p className="module-copy" role="status">Holding your seats…</p>}
             <div className="reservation-actions">
-              <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-              <button className="primary-button form-submit" type="submit" disabled={saving || !session || available === 0 || passengers > available}>
-                {session ? "Continue to payment" : "Sign in to continue"}
+              <button className="primary-button" type="button" onClick={returnToTrips}>Back to trips</button>
+              <button className="primary-button form-submit" type="submit" disabled={saving || !session || available === 0 || passengers === 0 || passengers > available} aria-busy={saving}>
+                {!session ? "Sign in to continue" : "Continue with payment"}
               </button>
             </div>
           </form>
         )}
           </div>
-          {detailTrip && (
-            <aside className="detail-trip-map" aria-label="Trip route map">
-              <p className="module-eyebrow">TRIP MAP</p>
-              <h3>{detailTrip.route}</h3>
-              <TripMap
-                trips={[detailTrip]}
-                userPosition={userPosition}
-                cityCoordinates={TRANSPORT_TOWN_COORDINATES}
-                tripRoadRoutes={tripRoadRoutes}
-                isTripRouting={isTripRouting}
-                tripFallbackCount={tripFallbackCount}
-              />
-              <p className="module-footnote">
-                {fmtDate(detailTrip.date)} · departs {detailTrip.departure} · arrives about {detailTrip.arrival}
-              </p>
+          {detailTrip && !paymentPending && (
+            <aside className="detail-trip-side" aria-label="Seat selection">
+              <div className="seat-step">
+                  <div className="seat-step-intro">
+                    <h3>Pick your seats</h3>
+                  </div>
+                  <div className="bus-seat-map">
+                        <div className="bus-front">
+                          <span className="bus-door">Door</span>
+                          <span className="bus-aisle-label">Aisle</span>
+                          <span className="driver-seat">Driver<small>Not bookable</small></span>
+                        </div>
+                        <div className="seat-grid bus-seat-grid" role="group" aria-label="Available seats">
+                          {Array.from({ length: selectedTrip.capacity }, (_, index) => index + 1).map((seat, order) => {
+                            const isAdminSeat = adminSeats.includes(seat);
+                            const isAvailable = availableSeatList.includes(seat);
+                            const isSelected = selectedSeats.includes(seat);
+                            const isLockedByLimit = seatLimitReached && !isSelected;
+                            const seatState = isAdminSeat
+                              ? "reserved by the admin"
+                              : isSelected
+                                ? "selected"
+                                : isLockedByLimit
+                                  ? `locked, you already picked the ${MAX_PASSENGERS}-seat limit`
+                                  : isAvailable
+                                    ? "available"
+                                    : "already selected";
+                            return (
+                              <button
+                                key={seat}
+                                type="button"
+                                style={{ gridColumn: SEAT_COLUMNS[order % SEAT_COLUMNS.length], gridRow: Math.floor(order / SEAT_COLUMNS.length) + 1 }}
+                                className={`seat-number${isSelected ? " is-selected" : ""}${isAvailable ? "" : " is-taken"}${isAdminSeat ? " is-admin" : ""}${isLockedByLimit ? " is-locked" : ""}`}
+                                aria-pressed={isSelected}
+                                aria-disabled={!isAvailable || isLockedByLimit}
+                                aria-label={`Seat ${seat}, ${seatState}`}
+                                title={isAdminSeat ? "Seat 1 is reserved by the admin next to the door" : isSelected ? `Seat ${seat} selected` : isLockedByLimit ? `Deselect a seat to choose seat ${seat}` : isAvailable ? `Choose seat ${seat}` : `Seat ${seat} has already been selected`}
+                                onClick={() => toggleSeat(seat)}
+                              >
+                                <span>{seat}</span>
+                                {isAdminSeat ? <small>Admin</small> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                  {seatError && <p className="module-error" role="alert">{seatError}</p>}
+                </div>
             </aside>
           )}
         </div>
-        {ticket && ticketQr && !showTicket && (
-          <div className="payment-success-panel" role="status">
-            <p className="module-eyebrow">PAYMENT CONFIRMED</p>
-            <h3>Your payment has been received</h3>
-            <dl className="payment-success-list">
-              <div><dt>Booking reference</dt><dd>{ticket.reference}</dd></div>
-              <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
-              <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
-              {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
-            </dl>
-            <button className="primary-button" type="button" onClick={viewTicket}>View e-ticket</button>
-          </div>
-        )}
-        {ticket && ticketQr && showTicket && (
-          <article className="ticket-card" aria-labelledby="ticket-heading">
-            <div className="ticket-details">
-              <p className="module-eyebrow">PAYMENT CONFIRMED</p>
-              <h3 id="ticket-heading">Your bus ticket</h3>
-              <p className="ticket-route">{ticket.route}</p>
-              <p>{fmtDate(ticket.travelDate)} · {ticket.pickup} to {ticket.dropoff}</p>
-              <p>{ticket.passengers} passenger{ticket.passengers === 1 ? "" : "s"} · {ticket.name}</p>
-              {ticket.seats?.length ? (
-                <p>Seat{ticket.seats.length === 1 ? "" : "s"}: {ticket.seats.join(", ")}</p>
-              ) : null}
-              <p className="ticket-reference">Reference: <strong>{ticket.reference}</strong></p>
-              <div className="ticket-receipt">
-                <p className="module-eyebrow">PAYMENT RECEIPT</p>
-                <dl>
-                  <div><dt>Payment method</dt><dd>{ticket.paymentProvider ?? paymentMethodLabel(ticket.paymentMethod)}</dd></div>
-                  {ticket.payerAccountLast4 && <div><dt>Account number</dt><dd>•••• {ticket.payerAccountLast4}</dd></div>}
-                  <div><dt>Amount paid</dt><dd>MWK {(ticket.amountPaid ?? 0).toLocaleString("en-MW")}</dd></div>
-                  {ticket.paidAt && <div><dt>Paid on</dt><dd>{new Date(ticket.paidAt).toLocaleString("en-MW", { dateStyle: "medium", timeStyle: "short" })}</dd></div>}
-                </dl>
-              </div>
-              <div className="ticket-actions">
-                <button className="primary-button" type="button" onClick={downloadTicketImage}>Download ticket PNG</button>
-                <button className="secondary-button" type="button" onClick={returnToTrips}>Back to trips</button>
-              </div>
-            </div>
-            <div className="ticket-qr-wrap">
-              <Image src={ticketQr} alt={`QR code for bus ticket ${ticket.reference}`} width={200} height={200} unoptimized />
-              <small>Show this code when boarding</small>
-            </div>
-          </article>
-        )}
       </section>
       )}
+      {detailTrip && (
+        <div className="detail-trip-map" aria-label="Trip route map">
+          <h3>Route map</h3>
+          <TripMap
+            trips={[detailTrip]}
+            userPosition={userPosition}
+            cityCoordinates={TRANSPORT_TOWN_COORDINATES}
+            tripRoadRoutes={tripRoadRoutes}
+          />
+        </div>
+      )}
+      </div>
     </main>
   );
 }

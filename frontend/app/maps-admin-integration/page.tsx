@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import AdminWorkspace, { isAdminSection, type AdminSection } from "@/components/AdminWorkspace";
+import ListPagination from "@/components/ListPagination";
 import RequireAdmin from "@/components/RequireAdmin";
 import { useRoadRoutes } from "@/components/road-routing";
+import { usePagedItems } from "@/components/usePagedItems";
 import { useSession } from "@/lib/auth";
-import DemoDataNotice from "@/components/DemoDataNotice";
 import { distanceKm, hasCoords } from "@/lib/geo";
 import { DISTRICT_COORDINATES, MALAWI_LOCATIONS, type Coordinates } from "@/lib/malawi-locations";
 import { useBackendFares, useBackendRoutes, useBackendStops } from "@/lib/use-backend-data";
@@ -49,9 +50,9 @@ function MapAdminContent() {
   const adminSection: AdminSection = isAdminSection(rawSection) ? rawSection : "overview";
   const mainPanel = searchParams.get("panel") === "admin" ? "admin" : "map";
 
-  const { data: routes, usingDemo: routesAreDemo } = useBackendRoutes();
+  const { data: routes } = useBackendRoutes();
   const { data: fares } = useBackendFares();
-  const { data: stops, usingDemo: stopsAreDemo } = useBackendStops();
+  const { data: stops } = useBackendStops();
   const [selectedRouteId, setSelectedRouteId] = useState("all");
   const [city, setCity] = useState("Blantyre");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -71,6 +72,17 @@ function MapAdminContent() {
   }, [origin, stops]);
 
   const visibleRoutes = selectedRouteId === "all" ? routes : routes.filter((route) => route.id === selectedRouteId);
+  const routePages = usePagedItems(
+    visibleRoutes,
+    (route) => `${route.origin} → ${route.destination}`,
+    { resetKey: selectedRouteId },
+  );
+  const nearbyPages = usePagedItems(
+    nearbyStops,
+    (stop) => stop.name,
+    { resetKey: `${city}|${userLocation ? "location" : "town"}` },
+  );
+  const unlocatedPages = usePagedItems(unlocatedStops, (stop) => stop.name);
   const roadRoutes = useRoadRoutes(mainPanel === "map" ? routes.flatMap((route) => {
     const originCoordinates = coordinatesForCity(route.origin);
     const destinationCoordinates = coordinatesForCity(route.destination);
@@ -84,10 +96,6 @@ function MapAdminContent() {
 
   function showAdmin() {
     router.replace("/maps-admin-integration?panel=admin&section=overview");
-  }
-
-  function showMap() {
-    router.replace("/maps-admin-integration");
   }
 
   function useMyLocation() {
@@ -118,7 +126,11 @@ function MapAdminContent() {
   }
 
   return (
-    <main className="module-shell">
+    <main
+      className={`module-shell${mainPanel === "admin" && adminSection === "overview" ? " admin-overview-page" : ""}`}
+      data-admin-overview={mainPanel === "admin" && adminSection === "overview" ? "true" : undefined}
+      data-admin-page={mainPanel === "admin" ? "administration" : undefined}
+    >
       {mainPanel === "map" ? (
         <>
           <header className="module-intro">
@@ -134,7 +146,6 @@ function MapAdminContent() {
             </button>
           </nav>
 
-          <DemoDataNotice show={routesAreDemo || stopsAreDemo} what="routes and stops" />
 
           <section className="module-section" aria-labelledby="map-heading">
             <div className="module-section-heading">
@@ -161,7 +172,7 @@ function MapAdminContent() {
               />
             )}
             <div className="map-route-list">
-              {visibleRoutes.map((route) => {
+              {routePages.visibleItems.map((route) => {
                 const fare = fares.find((item) => item.routeId === route.id);
                 return (
                   <article key={route.id}>
@@ -172,6 +183,12 @@ function MapAdminContent() {
                 );
               })}
             </div>
+            <ListPagination
+              page={routePages.page}
+              pageCount={routePages.pageCount}
+              onPageChange={routePages.setPage}
+              label="route"
+            />
             <p className="module-footnote">District markers use approximate center coordinates; transport stop markers use recorded stop coordinates. Stops without recorded coordinates are listed below.</p>
           </section>
 
@@ -193,7 +210,7 @@ function MapAdminContent() {
               <p className="module-empty">No recorded stops are within 30 km. Choose another town to search.</p>
             ) : (
               <ul className="nearby-stop-list">
-                {nearbyStops.map((stop) => (
+                {nearbyPages.visibleItems.map((stop) => (
                   <li key={stop.id}>
                     <span className={`stop-kind ${stop.kind}`}>{stopKindLabel(stop.kind)}</span>
                     <span><strong>{stop.name}</strong><small>{stop.city}</small></span>
@@ -202,17 +219,29 @@ function MapAdminContent() {
                 ))}
               </ul>
             )}
+            <ListPagination
+              page={nearbyPages.page}
+              pageCount={nearbyPages.pageCount}
+              onPageChange={nearbyPages.setPage}
+              label="nearby stop"
+            />
             {unlocatedStops.length > 0 && (
               <div className="unlocated-stops">
                 <h3>Location not recorded yet</h3>
-                <ul>{unlocatedStops.map((stop) => <li key={stop.id}>{stop.name} · {stopKindLabel(stop.kind)} · {stop.city}</li>)}</ul>
+                <ul>{unlocatedPages.visibleItems.map((stop) => <li key={stop.id}>{stop.name} · {stopKindLabel(stop.kind)} · {stop.city}</li>)}</ul>
+                <ListPagination
+                  page={unlocatedPages.page}
+                  pageCount={unlocatedPages.pageCount}
+                  onPageChange={unlocatedPages.setPage}
+                  label="unlocated stop"
+                />
               </div>
             )}
           </section>
         </>
       ) : (
         <RequireAdmin>
-          <AdminWorkspace initialSection={adminSection} onShowMap={showMap} />
+          <AdminWorkspace initialSection={adminSection} />
         </RequireAdmin>
       )}
     </main>

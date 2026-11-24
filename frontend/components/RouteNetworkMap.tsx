@@ -1,6 +1,8 @@
 "use client";
 
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from "react-leaflet";
+import type { LatLngTuple } from "leaflet";
+import FitMapToRoute from "@/components/FitMapToRoute";
 import { CITY_PIN_ICON, STOP_PIN_ICONS } from "@/components/map-pin-icons";
 import type { RoadRouteGeometry } from "@/components/road-routing";
 import { hasCoords } from "@/lib/geo";
@@ -33,9 +35,23 @@ export default function RouteNetworkMap({
   isRouting,
   fallbackRouteCount,
 }: RouteNetworkMapProps) {
+  const visibleRoutes = selectedRouteId === "all"
+    ? routes
+    : routes.filter((route) => route.id === selectedRouteId);
+  const fitPoints: LatLngTuple[] = visibleRoutes.flatMap((route) => {
+    const origin = cityCoordinates[route.origin];
+    const destination = cityCoordinates[route.destination];
+    if (!origin || !destination) return [];
+    const geometry = roadRoutes[route.id];
+    return geometry?.positions?.length
+      ? geometry.positions
+      : ([[origin.lat, origin.lng], [destination.lat, destination.lng]] as LatLngTuple[]);
+  });
+
   return (
     <div className="network-map">
       <MapContainer center={mapCenter} zoom={6} scrollWheelZoom className="route-map" worldCopyJump>
+        <FitMapToRoute points={fitPoints} fallbackCenter={mapCenter} fallbackZoom={6} padding={[28, 28]} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -384,17 +384,35 @@ export default function AccountAccessForm({ role }: { role: AccountRole }) {
           {creating ? (
             <>
               Already have an account?{" "}
-              <button type="button" className="account-text-button" onClick={() => { setCreating(false); setError(""); setInfo(""); }}>
+              <a
+                className="account-text-button"
+                href="#sign-in"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setCreating(false);
+                  setError("");
+                  setInfo("");
+                }}
+              >
                 Sign in
-              </button>
+              </a>
               .
             </>
           ) : (
             <>
               Don&apos;t have an account?{" "}
-              <button type="button" className="account-text-button" onClick={() => { setCreating(true); setError(""); setInfo(""); }}>
+              <a
+                className="account-text-button account-signup-link"
+                href="#sign-up"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setCreating(true);
+                  setError("");
+                  setInfo("");
+                }}
+              >
                 Sign up
-              </button>
+              </a>
               .
             </>
           )}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { useMemo } from "react";
+import { MapContainer, Marker, Polyline, Popup, TileLayer } from "react-leaflet";
 import type { LatLngTuple } from "leaflet";
+import FitMapToRoute from "@/components/FitMapToRoute";
 import { CITY_PIN_ICON, STOP_PIN_ICONS } from "@/components/map-pin-icons";
 import { useRoadRoutes, type RoadRouteRequest } from "@/components/road-routing";
 import { DISTRICT_COORDINATES, type Coordinates } from "@/lib/malawi-locations";
@@ -92,22 +93,6 @@ function waypointsForLeg(leg: RoutePreviewLeg, stops: StopItem[]) {
     coordinatesForStop(leg.dropOffPoint, leg.destination, stops),
   );
   return waypoints;
-}
-
-function FitMapToRoute({ points }: { points: LatLngTuple[] }) {
-  const map = useMap();
-  const pointKey = JSON.stringify(points);
-
-  useEffect(() => {
-    const routePoints = JSON.parse(pointKey) as LatLngTuple[];
-    if (routePoints.length > 1) {
-      map.fitBounds(routePoints, { padding: [24, 24], maxZoom: 11 });
-    } else if (routePoints.length === 1) {
-      map.setView(routePoints[0], 10);
-    }
-  }, [map, pointKey]);
-
-  return null;
 }
 
 export default function RoutePreviewMap({ legs, stops }: RoutePreviewMapProps) {
@@ -274,7 +259,7 @@ export default function RoutePreviewMap({ legs, stops }: RoutePreviewMapProps) {
               </Popup>
             </Marker>
           ))}
-          <FitMapToRoute points={mapPoints} />
+          <FitMapToRoute points={mapPoints} padding={[24, 24]} maxZoom={11} />
         </MapContainer>
       </div>
       <p className="route-map-status" role="status" aria-live="polite">

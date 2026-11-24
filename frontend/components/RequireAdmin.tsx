@@ -1,21 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { loginAdmin, logout, useSession } from "@/lib/auth";
+import { loginAdmin, useSession } from "@/lib/auth";
 
 export default function RequireAdmin({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const session = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
-  function signOut() {
-    logout();
-    router.push("/");
-  }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,11 +56,6 @@ export default function RequireAdmin({ children }: { children: ReactNode }) {
 
   return (
     <div className="admin-shell">
-      <nav className="admin-nav" aria-label="Administration navigation">
-        <button type="button" className="text-action admin-signout" onClick={signOut}>
-          Log out ({session.email})
-        </button>
-      </nav>
       {children}
     </div>
   );

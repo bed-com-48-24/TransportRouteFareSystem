@@ -17,10 +17,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           <SiteHeader />
         </Suspense>
         <div id="main-content">{children}</div>
-        <footer className="site-footer">
-          <span>SBUS · Transport information made easier</span>
-          <span>Route and fare information is estimated for this demonstration.</span>
-        </footer>
       </body>
     </html>
   );

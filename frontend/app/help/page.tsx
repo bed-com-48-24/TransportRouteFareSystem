@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import PassengerReportForm from "@/components/PassengerReportForm";
 
 const bookingSteps = [
@@ -30,20 +29,10 @@ export default function HelpPage() {
   return (
     <main className="module-shell transport-page-shell">
       <div className="transport-background" aria-hidden="true" />
-      <header className="module-intro">
-        <p className="module-eyebrow">PASSENGER HELP</p>
-        <h1>How to book a trip</h1>
-        <p>Follow these steps to choose a departure and receive your booking reference.</p>
-        <div className="module-shortcuts">
-          <Link className="primary-button" href="/transport-booking">Browse trips <span aria-hidden="true">→</span></Link>
-        </div>
-      </header>
-
       <div className="help-layout">
         <section className="module-section help-steps" aria-labelledby="booking-help-heading">
           <div className="module-section-heading">
             <div>
-              <p className="module-eyebrow">FOUR STEPS</p>
               <h2 id="booking-help-heading">From departure to ticket</h2>
             </div>
           </div>
@@ -60,7 +49,6 @@ export default function HelpPage() {
         <section className="module-section help-report" aria-labelledby="report-heading">
           <div className="module-section-heading">
             <div>
-              <p className="module-eyebrow">SEND FEEDBACK</p>
               <h2 id="report-heading">Report an issue</h2>
             </div>
           </div>
